@@ -735,6 +735,13 @@ def render(report, rating: dict, meta: dict) -> str:
             f"因此所有结论都是条件结论：<b>在 {pool_date} 最活跃的 {report.n_symbols} 只股票中，"
             "再按活跃度排序</b>，不能外推为全市场流动性溢价。下方用不同基准日重取样池做稳健性检验。"
         )
+    elif kind == "universe":
+        pool_narrative = (
+            f"<b>选样方式：</b>样本池为 <b>{selection}</b>（{pool.get('rule', '')}），"
+            f"共 {report.n_symbols:,} 只、{report.n_dates} 个交易日；"
+            "按区间内可交易标的计算，不使用固定基准日选池，因此不存在「用因子分子选池」的内生性。"
+            "<b>残余偏差：</b>库内无历史行情的退市股仍会缺失，结论需按此折价。"
+        )
     else:
         pool_narrative = (
             f"<b>选样方式：</b>样本池按 {pool_date} 成交额取前 {pool_size} 只，属于流动性/规模倾斜的股票池；"
