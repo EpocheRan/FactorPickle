@@ -848,6 +848,7 @@ def render(report, rating: dict, meta: dict) -> str:
         ["成本假设", "单边 10bp / 往返 20bp（每条腿）；多空合计 40bp，按换手率扣除"],
         ["PIT / 财务口径", d.get("pit") or "行情类因子：无财务披露时点问题"],
         ["评分卡版本", str(rating.get("scorecard_version", "—"))],
+        ["本次口径变更", "；".join(rating.get("scorecard_changelog") or []) or "—"],
         ["生成时间", meta.get("generated_at", "")],
         ["数据截止 / 口径", fresh_note],
         ["run_id", meta.get("run_id", "")],

@@ -19,7 +19,13 @@ import numpy as np
 from . import diagnostics as diag
 
 GRADE_LINES = (("A", 85.0), ("B", 70.0), ("C", 55.0))
-SCORECARD_VERSION = "v2.1-2026-10"
+SCORECARD_VERSION = "v2.2-2026-11"
+
+#: 口径变更记录（写入报告，便于跨版本比较时判断差异来源）
+SCORECARD_CHANGELOG = [
+    "v2.2：恢复市场状态划分（创业板指 200 日均线 ±3%），时间分含牛/震荡/熊稳定性",
+    "v2.2：多空净值个股收益缩尾 ±30%，修复单期异常价差导致的净值跳崖",
+]
 
 
 def _band(value: float, bands: list[tuple[float, float]], default: float) -> float:
@@ -276,6 +282,7 @@ def rate(report) -> dict:
         "usage": quadrant[1],
         "attribution": attribution,
         "scorecard_version": SCORECARD_VERSION,
+        "scorecard_changelog": list(SCORECARD_CHANGELOG),
         "detail": {
             "icir": icir,
             "nw_t": nw_t,
