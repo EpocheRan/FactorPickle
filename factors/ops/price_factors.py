@@ -58,10 +58,8 @@ def _benchmark(frame: pd.DataFrame) -> pd.Series:
             series = pd.to_numeric(frame[name], errors="coerce")
             if series.notna().any():
                 return series
-    raise ValueError(
-        "该因子需要基准指数序列：请在因子帧中提供 benchmark_close 列"
-        "（build_panel 前合并指数收盘价即可）"
-    )
+    # 没有任何基准数据：返回全 NaN，让该标的因子值为空，而不是让整列计算失败
+    return pd.Series(np.nan, index=frame.index)
 
 def _benchmark_volume(frame: pd.DataFrame) -> pd.Series:
     for name in ("benchmark_volume", "bm_volume"):

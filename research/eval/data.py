@@ -232,9 +232,10 @@ def _attach_extras(frame: pd.DataFrame, codes: list[str], start: str, end: str,
 def _attach_benchmark(frame, start: str, end: str):
     """把基准指数收盘价并进帧，供 beta/alpha 族因子使用（失败则放行）。"""
     try:
+        _lo = str(pd.to_datetime(frame["date"]).min().date())
         rows = _query(
             "select ts, close from ohlcv_1d "
-            f"where type='idx' and code='000300' and ts between '{start}' and '{end}'"
+            f"where type='idx' and code='000300' and ts between '{_lo}' and '{end}'"
         )
         if rows is None or rows.empty:
             return frame
