@@ -837,13 +837,11 @@ def render(report, rating: dict, meta: dict) -> str:
         )
     fresh_note += "。"
 
+    # 因子 ID / 样本池 / 样本区间 / 评估方向 已在页首 EVALUATION PROFILE 与上方
+    # 「因子定义与样本」中出现，此处不再重复，只保留运行元数据。
     meta_rows = [
-        ["因子 ID", report.factor_id],
         ["类别 / 家族", f"{report.category} / {diag.family_of(report.factor_id)}（{diag.family_label(diag.family_of(report.factor_id))}）"],
-        ["评估方向", f"{d.get('direction_text', '—')}；信号 = 原值 × {report.direction:+d}"],
         ["方向来源", str(report.direction_source)],
-        ["样本池", report.universe],
-        ["样本区间", f"{report.start.date()} ~ {report.end.date()}"],
         ["标的数 / 交易日", f"{report.n_symbols} / {report.n_dates}"],
         ["覆盖率", f"{report.coverage:.1%}"],
         ["成交口径", "T 日收盘出信号，T+1 开盘买入，T+h 收盘卖出"],
@@ -854,7 +852,7 @@ def render(report, rating: dict, meta: dict) -> str:
         ["数据截止 / 口径", fresh_note],
         ["run_id", meta.get("run_id", "")],
     ]
-    meta_table = _table(["项目", "取值"], meta_rows)
+    meta_table = _table(["运行信息", "取值"], meta_rows)
 
     warn_html = ""
     if report.warnings:
