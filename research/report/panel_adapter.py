@@ -30,6 +30,35 @@ def _pivot(frame: pd.DataFrame, column: str) -> pd.DataFrame:
         return frame.pivot_table(index="date", columns="symbol", values=column, aggfunc="last")
 
 
+def _regime_for(dates: pd.DatetimeIndex):
+    """市场状态：以创业板指(399006) 200 日均线 ±3% 划分牛/震荡/熊。
+
+    口径写死在代码里并在报告「数据口径」中标明；取数失败时返回 None（相关小节留空）。
+    """
+    try:
+        from research.eval.data import _query
+
+        rows = _query(
+            "select ts, close from ohlcv_1d "
+            "where type='idx' and code='399006' order by ts"
+        )
+        if rows is None or rows.empty:
+            return None
+        index = pd.to_datetime(rows["ts"], utc=True).dt.tz_convert(None).dt.normalize()
+        series = pd.Series(
+            pd.to_numeric(rows["close"], errors="coerce").to_numpy(), index=index
+        )
+        series = series[~series.index.duplicated()].sort_index()
+        ma = series.rolling(200, min_periods=120).mean()
+        regime = pd.Series("neutral", index=series.index, dtype=object)
+        regime[series > ma * 1.03] = "bull"
+        regime[series < ma * 0.97] = "bear"
+        regime[ma.isna()] = "neutral"
+        return regime.reindex(dates).ffill()
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def load_panel(
     pool_date: str | None = None,
     pool_size: int | None = None,
@@ -110,7 +139,7 @@ def load_panel(
         open=open_,
         market_cap=market_cap,
         industry=None,
-        regime=None,
+        regime=_regime_for(close.index),
         symbols=list(columns),
         high=high,
         low=low,

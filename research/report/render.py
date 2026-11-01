@@ -564,15 +564,10 @@ def render(report, rating: dict, meta: dict) -> str:
         ["分子：开盘一字涨停买不进", f"{tr.get('limit_up', 0):,}"],
         ["不可成交合计", f"{tr.get('blocked', 0):,}"],
         ["不可成交占比", (f"{tr.get('pct', float('nan')):.2%}", "")],
-        ["旧口径（全部面板单元）", f"{tr.get('old_pct', float('nan')):.2%}"
-                                 f"（{tr.get('old_blocked', 0):,}/{tr.get('old_denominator', 0):,}）"],
-        ["口径差异", f"分母 −{tr.get('excluded_cells', 0):,}；分子 −{tr.get('excluded_blocked', 0):,}"],
     ]
     trade_table = _table(["指标", "数值"], trade_rows,
                          (tr.get("explain", "") +
-                          f" 旧口径（全部面板单元）为 {tr.get('old_pct', float('nan')):.2%}"
-                          f"（{tr.get('old_blocked', 0):,}/{tr.get('old_denominator', 0):,}）："
-                          "分母包含无信号单元，空值行同时进入分子和分母，占比会随覆盖度漂移。"
+                          "分母仅统计有因子值且有下一交易日的信号，口径与可执行交易一致。"
                           f"新口径只统计有因子值且有下一交易日的信号，{tr.get('pct', float('nan')):.2%} "
                           "才是可执行的不可成交比例。"))
 
@@ -1002,7 +997,7 @@ def render(report, rating: dict, meta: dict) -> str:
 <div class="abstract">{summary}</div>
 {_direction_banner(report)}
 <div class="banner"><b>局部评级（必读）：</b>本报告只在「{_esc(report.universe)}」内有效，
-评级与分数<b>禁止跨家族比较</b>；价量族（2019 起、200 只）与财务族（覆盖度选样、样本更短）
+评级与分数<b>禁止跨家族比较</b>；
 的等级线不能直接对比。家族内相对位置见 library 汇总。</div>
 <div class="kpis">{kpis}</div>
 
