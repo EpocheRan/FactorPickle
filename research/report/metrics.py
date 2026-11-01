@@ -369,13 +369,13 @@ def _quantile_nav(
                     if j == i + 1:
                         px_in = _open_np[j, idx]
                         with np.errstate(invalid="ignore", divide="ignore"):
-                            ratio = _close_np[j, idx] / px_in - 1.0
+                            ratio = np.clip(_close_np[j, idx] / px_in - 1.0, -0.30, 0.30)
                         ret = float(np.nanmean(np.where(np.isfinite(ratio), ratio, np.nan)))
                         cost = turnover[g] * cost_bps / 10000.0
                         net = ret - cost
                     else:
                         with np.errstate(invalid="ignore", divide="ignore"):
-                            ratio = _close_np[j, idx] / _close_np[j - 1, idx] - 1.0
+                            ratio = np.clip(_close_np[j, idx] / _close_np[j - 1, idx] - 1.0, -0.30, 0.30)
                         ret = float(np.nanmean(np.where(np.isfinite(ratio), ratio, np.nan)))
                         net = ret
                     if not np.isfinite(ret):

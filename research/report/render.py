@@ -87,6 +87,33 @@ tbody tr:last-child td{border-bottom:1.5px solid var(--ink);}
 """
 
 
+def _formula_text(d: dict) -> str:
+    """把 registry 元数据转成可读公式；已知因子给中文表达式。"""
+    import re as _re
+
+    fid = str(d.get("id") or d.get("factor_id") or d.get("name") or "")
+    raw = str(d.get("formula") or "")
+    m = _re.search(r"turnover_std_bias_(\d+)_(\d+)", fid)
+    if m:
+        short, long_ = m.group(1), m.group(2)
+        return f"换手率波动偏离 = MA{short}(换手率) / MA{long_}(换手率)（短窗 {short} 日 / 长窗 {long_} 日）"
+    mapped = {
+        "momentum.rsrs": "RSRS 阻力支撑相对强度：对过去 N 日 high~low 做 OLS 回归得斜率 β，再按斜率与波动标准化",
+        "risk.vol_21d": "21 日收益率标准差（年化前）",
+        "risk.beta_250d_csi300": "250 日滚动 beta = cov(个股日收益, 沪深300 日收益) / var(沪深300 日收益)",
+        "size.market_cap": "对数流通市值 = ln(流通市值)",
+    }
+    if fid in mapped:
+        return mapped[fid]
+    if raw and not raw.startswith("见 registry"):
+        return raw
+    op = d.get("op") or fid
+    on = d.get("on") or "—"
+    win = d.get("window")
+    tail = f"；窗口 {win} 日" if win else ""
+    return f"按 {on} 计算算子 {op}{tail}（详情见 factors 注册表）"
+
+
 def _esc(value) -> str:
     return html.escape(str(value))
 
@@ -670,7 +697,7 @@ def render(report, rating: dict, meta: dict) -> str:
 
     # ---------------- 因子定义与样本表
     def_rows = [
-        ["公式", d.get("formula", "—")],
+        ["公式", _formula_text(d)],
         ["数据源 / 字段", d.get("source", "—")],
         ["单位", unit or "—"],
         ["变换", d.get("transform", "—")],
