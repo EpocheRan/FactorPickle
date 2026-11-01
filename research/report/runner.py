@@ -204,8 +204,20 @@ def generate(
     robustness: bool = True,
     run_id: str | None = None,
     verify_repro: bool = True,
+    panel: Panel | None = None,
 ) -> dict:
-    panel, factor = _resolve_panel(factor_id, pool_date, pool_size, start, end)
+    # 批量场景由调用方预加载面板，避免每个因子重复取数
+    if panel is None:
+        panel, factor = _resolve_panel(factor_id, pool_date, pool_size, start, end)
+    else:
+        category = factor_id.split(".", 1)[0]
+        factor = (
+            financial_factor_panel(factor_id, panel.close,
+                                   str(panel.close.index.min().date()),
+                                   str(panel.data_cutoff.date()))
+            if category in ("quality", "value")
+            else price_factor_panel(factor_id, panel)
+        )
     definition = definitions.describe(factor_id)
     if direction is None:
         direction = definition.direction

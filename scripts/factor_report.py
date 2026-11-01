@@ -14,6 +14,7 @@ import argparse
 import logging
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -112,6 +113,15 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     factors = [f.strip() for f in (args.batch or args.factor).split(",") if f.strip()]
 
+    shared_panel = None
+    if len(factors) > 1:
+        from research.report.panel_adapter import load_panel as _load_panel
+
+        _t0 = time.time()
+        shared_panel = _load_panel(args.pool_date, args.pool, args.start, args.end)
+        print(f"共享面板就绪：{len(shared_panel.symbols)} 只 / {len(shared_panel.close)} 天"
+              f"（{time.time() - _t0:.1f}s），{len(factors)} 个因子复用")
+
     for factor in factors:
         result = generate(
             factor,
@@ -123,6 +133,7 @@ def main() -> int:
             category=args.category,
             direction=args.direction,
             out_dir=args.out,
+            panel=shared_panel,
         )
         rating = result["rating"]
         print(f"[{factor}] 评级 {rating['grade']} / {rating['score']} 分 "
