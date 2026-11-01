@@ -1065,8 +1065,14 @@ def build_report(
         tradeable=mask if exclude_limit_up else None,
     )
     try:
-        _ret5 = close.pct_change(5, fill_method=None)
-        report.cross_section_std = float(np.nanstd(_ret5.to_numpy(), axis=1).mean())
+        import warnings as _w
+
+        with _w.catch_warnings():
+            _w.simplefilter("ignore", RuntimeWarning)
+            _ret5 = close.pct_change(5, fill_method=None)
+            _stds = np.nanstd(_ret5.to_numpy(dtype="float64"), axis=1)
+        _stds = _stds[np.isfinite(_stds) & (_stds > 0)]
+        report.cross_section_std = float(_stds.mean()) if _stds.size else float("nan")
     except Exception:  # noqa: BLE001
         report.cross_section_std = float("nan")
     # 复现自检：用完全相同的因子对象与参数再跑一次，比较结果是否逐点一致。
