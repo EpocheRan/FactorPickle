@@ -286,7 +286,8 @@ def assertions(ctx: EvalContext, params: dict) -> ItemResult:
         problems.append("IC 不可用")
     else:
         value = float(ic_result.values.get("ic", 0.0))
-        if ctx.direction and value * ctx.direction < 0:
+        # ic 已经是 signal（原始值 × direction），再乘 direction 会二次翻转
+        if value < 0:
             problems.append("IC 符号与族先验方向相反")
     if coverage is not None and coverage.values.get("n_days", 0) < int(params["min_days"]):
         problems.append(f"有效天数 {coverage.values.get('n_days')} < {params['min_days']}")

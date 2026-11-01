@@ -229,6 +229,29 @@ def _attach_extras(frame: pd.DataFrame, codes: list[str], start: str, end: str,
     return frame
 
 
+def _attach_benchmark(frame, start: str, end: str):
+    """把基准指数收盘价并进帧，供 beta/alpha 族因子使用（失败则放行）。"""
+    try:
+        rows = _query(
+            "select ts, close from ohlcv_1d "
+            f"where type='idx' and code='000300' and ts between '{start}' and '{end}'"
+        )
+        if rows is None or rows.empty:
+            return frame
+        # QuestDB 既可能返回 tz-aware 也可能返回 naive，统一到 naive UTC
+        rows["ts"] = (
+            pd.to_datetime(rows["ts"], utc=True).dt.tz_convert(None).dt.normalize()
+        )
+        bench = pd.Series(
+            pd.to_numeric(rows["close"], errors="coerce").to_numpy(),
+            index=rows["ts"],
+        ).sort_index()
+        frame["benchmark_close"] = pd.to_datetime(frame["date"]).map(bench)
+        return frame
+    except Exception:  # noqa: BLE001
+        return frame
+
+
 def load_panel(spec: EvalSpec) -> PanelData:
     """按统一口径取一次数，供所有因子共用（保证同池、同期、同列）。"""
     end = spec.end or _today()
@@ -246,6 +269,7 @@ def load_panel(spec: EvalSpec) -> PanelData:
     frame["hfq_close"] = frame["hfq_close"].fillna(frame["close"] * adjust)
 
     frame = _apply_listing_filter(frame)
+    frame = _attach_benchmark(frame, spec.start, end)
     dates = pd.DatetimeIndex(sorted(frame["date"].unique()))
     dates = dates[dates >= _stamp(spec.start)]
     return PanelData(
