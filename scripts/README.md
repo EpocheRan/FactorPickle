@@ -16,6 +16,10 @@
 
 ## 数据构建（按需执行，非日常）
 
+> **历史回补已迁移**：`backfill_history.py` 现为 shim，实际实现位于
+> `acquisition/backfill/`，统一入口 `python -m acquisition backfill --phase <name>`。
+> 可用阶段：daily / delisted / index_weight / structure / periodic / financial / valuation。
+
 `init_database.py`、`backfill_*.py`、`repair_index_data.py`、`calibrate_directions.py`、
 `migrate_database.py`、`migrate_factors.py`。
 

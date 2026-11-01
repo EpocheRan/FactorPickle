@@ -128,3 +128,35 @@ python -m acquisition backfill --phase p1-index --start 2017-01-01 --end 2026-10
 - 分钟线回补（源有问题）；
 - 概念成分历史（源无数据）；
 - 把增量 syncer 也改成可回补（后续可加 `mode="backfill"`，本期不做）。
+
+## 11. 实现状态（2026-11-01）
+
+已落地 `acquisition/backfill/`（提交 `3a54858`）：
+
+| 组件 | 状态 |
+|---|---|
+| `write()` 500 行切批 / NaN→None / 单批失败隔离 | ✅ |
+| `max_ts()` 续跑（不看行数） | ✅ |
+| `gap_report()` + `--dry-run` | ✅ |
+| `fetch_range()` 命中上限自动按月分片 | ✅ |
+| `Scope` / `@phase` 注册 / `Api` 限流 | ✅ |
+
+七个阶段全部迁移，`python -m acquisition backfill --list` 可查：
+
+```
+daily · delisted · index_weight · structure · periodic · financial · valuation
+```
+
+与设计的差异：
+
+1. **不保留 alias**（用户要求），旧编号名 `p0-daily` / `p1-index` 等直接报错；
+2. `structure` 只保留按日三表，`share_float` / `repurchase` 移交 `periodic`（避免长区间被单次上限截断）；
+3. `financial` 阶段只做**覆盖率判定 + 跳过**，不做逐代码回补（数据已完整；缺失时明确报错而非静默空转）；
+4. `p0-codefix` 不迁移——它是一次性的"同码不同股"修复，实测 `code='000001'` 的 stock/idx 已互不覆盖。
+
+`scripts/backfill_history.py` 已转为 shim（import + deprecation 提示）。
+
+## 12. 待补
+
+- 三个单测：`write` 切批/NaN、`max_ts` 续跑、`fetch_range` 触顶退化；
+- 主 CLI 的 `--list` 已在 `python -m acquisition backfill` 下可用，`acquisition.cli` 未改动（用 `__main__.py` 分流）。

@@ -82,6 +82,7 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 | [design/architecture_v2.md](design/architecture_v2.md) | 模块边界、DB 所有权、存储分层与里程碑 |
 | [design/factor_library_v1.md](design/factor_library_v1.md) | 因子分类、命名、版本与增量方式 |
 | [design/factor_materialization_v1.md](design/factor_materialization_v1.md) | 因子物化：registry/长表/latest/缓存 |
+| [design/acquisition_backfill_v1.md](design/acquisition_backfill_v1.md) | 历史回补：阶段化、切批、覆盖率判定、自适应分片 |
 | [design/factor_report_v2.md](design/factor_report_v2.md) | 因子报告 v2：方向、价差、成本、断言、归因 |
 | [design/backtest_architecture.md](design/backtest_architecture.md) | 回测引擎详细架构（PyBroker + 自建账本） |
 | [design/data_pipeline_v1.md](design/data_pipeline_v1.md) | 分时/板块映射/披露三条 P0–P2 数据链路 |
@@ -105,6 +106,7 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 | [notes/20261031_first_strategy_turnover_regime.md](notes/20261031_first_strategy_turnover_regime.md) | 第一条策略基线（年化 8.2%/Sharpe 0.54）与三个回测层缺口 |
 | [notes/20261031_three_walls_fixed.md](notes/20261031_three_walls_fixed.md) | 三堵墙的修复：PIT 成分池、turnover 取数、两融/资金流进面板 |
 | [notes/20261031_one_path.md](notes/20261031_one_path.md) | 一条可执行路径：固定战场/骨架/裁判 + 每周一次循环 |
+| [notes/20261101_backfill_results.md](notes/20261101_backfill_results.md) | 补数结果与问题复盘：六域覆盖、11 个坑 |
 | [notes/20261031_eval_architecture_v3.md](notes/20261031_eval_architecture_v3.md) | 评估体系 v3：全市场默认、评估项化、报告层零 SQL、170s |
 | [notes/20261031_eval_items_p1_p4.md](notes/20261031_eval_items_p1_p4.md) | 评估项化改造 P1–P4：item 目录、profile 存库、报告只增不减 |
 | [notes/20261030_drop_retired_tables.sql](notes/20261030_drop_retired_tables.sql) | 已删除的 5 张退役表回滚 SQL |
