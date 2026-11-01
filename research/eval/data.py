@@ -169,6 +169,35 @@ def _load_ohlcv(codes: list[str], start: str, end: str, warmup_days: int) -> pd.
     return data.sort_values(["symbol", "date"]).reset_index(drop=True)
 
 
+def _apply_listing_filter(frame):
+    """按 list_date / delist_date 过滤，防止退市后代码复用把两段行情连成一条序列。
+
+    查询失败时直接放行（fail open），不影响主链路。
+    """
+    try:
+        info = _query(
+            "select code, last(list_date) as list_date, last(delist_date) as delist_date "
+            "from stock_basic_info group by code"
+        )
+        if info is None or info.empty:
+            return frame
+        info = info.set_index("code")
+        listed = pd.to_datetime(info["list_date"], errors="coerce")
+        delisted = pd.to_datetime(info["delist_date"], errors="coerce")
+        keep = []
+        for symbol, date in zip(frame["symbol"].astype(str), frame["date"]):
+            lo, hi = listed.get(symbol), delisted.get(symbol)
+            if pd.notna(lo) and date < lo:
+                keep.append(False)
+            elif pd.notna(hi) and date > hi:
+                keep.append(False)
+            else:
+                keep.append(True)
+        return frame[pd.Series(keep, index=frame.index)]
+    except Exception:  # noqa: BLE001
+        return frame
+
+
 def _attach_extras(frame: pd.DataFrame, codes: list[str], start: str, end: str,
                    extras: tuple[str, ...]) -> pd.DataFrame:
     start_ts = (_stamp(start) - pd.Timedelta(days=800)).date().isoformat()
@@ -216,6 +245,7 @@ def load_panel(spec: EvalSpec) -> PanelData:
         frame[f"hfq_{column}"] = frame[column] * adjust
     frame["hfq_close"] = frame["hfq_close"].fillna(frame["close"] * adjust)
 
+    frame = _apply_listing_filter(frame)
     dates = pd.DatetimeIndex(sorted(frame["date"].unique()))
     dates = dates[dates >= _stamp(spec.start)]
     return PanelData(
