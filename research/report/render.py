@@ -262,6 +262,8 @@ def render(report, rating: dict, meta: dict) -> str:
         f"Q5−Q1 毛价差 {_pct(gross.get('mean', float('nan')), 2)}/期、"
         f"净价差 {_pct(net.get('mean', float('nan')), 2)}/期"
         f"（单期成本 {_pct(report.cost_mean, 2)}，净价差 t={_num(net.get('t', float('nan')), 1)}）；"
+        "净价差 = 毛价差 − 多空两条腿成本；各分组净收益是「多头口径」（每组自扣自身成本），"
+        "两组相减不等于多空净价差；"
         f"多空组合几何年化 {_pct(ls.get('ann', float('nan')), 1)}、夏普 {_num(ls.get('sharpe', float('nan')), 2)}、"
         f"最大回撤 {_pct(ls.get('mdd', float('nan')), 1)}。"
         f"时间维度 {rating['time_score']:.0f}/100、空间维度 {rating['space_score']:.0f}/100，"
