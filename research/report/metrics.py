@@ -1064,6 +1064,14 @@ def build_report(
         analysis_factor, close, open_, groups=groups, horizon=primary_horizon, cost_bps=cost_bps,
         tradeable=mask if exclude_limit_up else None,
     )
+    report.quantile_factor = analysis_factor
+    # 复现自检必须复用同一组参数，否则比较的是两次不同设定，永远"不一致"
+    report.quantile_args = {
+        "groups": groups,
+        "horizon": primary_horizon,
+        "cost_bps": cost_bps,
+        "tradeable": mask if exclude_limit_up else None,
+    }
     report.nav = nav
     report.daily_returns = daily
     report.period_returns = period_returns

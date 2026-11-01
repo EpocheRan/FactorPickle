@@ -252,10 +252,16 @@ def generate(
         )
     if verify_repro:
         # 同输入再跑一次分层：只比较每期均值/IC/ρ，验证没有隐藏随机源
-        sig = factor * int(direction)
+        sig = getattr(report, "quantile_factor", None)
+        if sig is None:
+            sig = factor * int(direction)
+        _qargs = getattr(report, "quantile_args", {}) or {}
         _, _, pr2, pg2, _, _, _ = metrics._quantile_nav(
-            sig, panel.close, panel.open, groups=5, horizon=5, cost_bps=20.0,
-            tradeable=None,
+            sig, panel.close, panel.open,
+            groups=_qargs.get("groups", 5),
+            horizon=_qargs.get("horizon", 5),
+            cost_bps=_qargs.get("cost_bps", 20.0),
+            tradeable=_qargs.get("tradeable"),
         )
         left = {
             "ic": float(report.ic[5].mean()) if 5 in report.ic else float("nan"),
