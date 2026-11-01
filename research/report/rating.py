@@ -179,6 +179,17 @@ def rate(report) -> dict:
         np.isfinite(ic_mean) and ic_mean < -0.010
         and ((not np.isfinite(t_dir)) or t_dir < -2)
     )
+    # IC 隐含价差：等权五分组的两端密度约 2.5σ，σ 取 5 日截面收益标准差
+    _sigma = float(getattr(report, "cross_section_std", float("nan")))
+    _gross = float((report.spread_gross or {}).get("mean", float("nan")))
+    _expected = abs(ic_mean) * 2.5 * _sigma if np.isfinite(_sigma) else float("nan")
+    _ratio = _gross / _expected if np.isfinite(_expected) and _expected > 1e-12 else float("nan")
+    ic_spread_ratio = float(_ratio)
+    ic_spread_triggered = bool(np.isfinite(_ratio) and not (0.5 <= _ratio <= 1.5))
+    ic_spread_actual = (
+        f"实测 {_gross * 100:+.2f}% / 隐含 {_expected * 100:+.2f}%（比值 {_ratio:.2f}）"
+        if np.isfinite(_ratio) else "—"
+    )
     veto_rules = [
         {
             "rule": "证据不足",
@@ -189,7 +200,7 @@ def rate(report) -> dict:
         },
         {
             "rule": "方向与先验相反",
-            "threshold": "IC<−0.010 且独立 t<−2（不自动翻转）",
+            "threshold": "signal = 原值 × direction；IC(信号)<−0.010 且独立 t<−2 才判反向（不自动翻转）",
             "actual": f"IC {ic_mean:+.3f}，独立 t {t_dir:+.1f}",
             "triggered": direction_bad,
             "status": "触发" if direction_bad else "通过",
@@ -214,6 +225,13 @@ def rate(report) -> dict:
             "actual": trade_check.actual,
             "triggered": trade_check.status == "fail",
             "status": trade_status,
+        },
+        {
+            "rule": "IC 与价差背离",
+            "threshold": "实测毛价差 / IC 隐含价差 ∈ [0.5, 1.5]",
+            "actual": ic_spread_actual,
+            "triggered": bool(ic_spread_triggered),
+            "status": "触发" if ic_spread_triggered else "通过",
         },
         {
             "rule": "换手过高（每期）",
@@ -274,6 +292,7 @@ def rate(report) -> dict:
         "capped": capped,
         "items": items,
         "vetoes": vetoes,
+        "ic_spread_ratio": ic_spread_ratio,
         "veto_table": veto_rules,
         "grade_lines": GRADE_LINES,
         "time_score": round(time_score, 1),

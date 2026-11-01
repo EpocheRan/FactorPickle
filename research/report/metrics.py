@@ -1064,6 +1064,11 @@ def build_report(
         analysis_factor, close, open_, groups=groups, horizon=primary_horizon, cost_bps=cost_bps,
         tradeable=mask if exclude_limit_up else None,
     )
+    try:
+        _ret5 = close.pct_change(5, fill_method=None)
+        report.cross_section_std = float(np.nanstd(_ret5.to_numpy(), axis=1).mean())
+    except Exception:  # noqa: BLE001
+        report.cross_section_std = float("nan")
     report.quantile_factor = analysis_factor
     # 复现自检必须复用同一组参数，否则比较的是两次不同设定，永远"不一致"
     report.quantile_args = {
