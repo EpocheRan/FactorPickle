@@ -694,7 +694,8 @@ def render(report, rating: dict, meta: dict) -> str:
 
     pool = report.pool or {}
     pool_rows = [
-        ["入池基准日", pool.get("date", "—")],
+        ["入池基准日",
+         "不适用（全市场口径）" if pool.get("kind") == "universe" else pool.get("date", "—")],
         ["构造规则", pool.get("rule", "—")],
         ["板块范围", pool.get("boards", "—")],
         ["基准日候选 / 最终入池", f"{pool.get('candidates', 0):,} / {pool.get('selected', 0):,}"],
@@ -775,7 +776,7 @@ def render(report, rating: dict, meta: dict) -> str:
         robust_table = _table(
             ["池基准日", "起点", "股票数", "IC(h=5)", "独立 t", "Q5−Q1/期", "ρ"],
             rob_rows,
-            "注：换基准日重建样本池后重跑同一因子。若 IC/价差符号或量级不一致，说明结论是"
+            "注：首行为当前样本池（全市场）基准；其余行为换基准日重建的点位池对照。若 IC/价差符号或量级不一致，说明结论是"
             "「特定池子」的条件结论，评级本身不稳。",
         )
         robust_block = f"<h3>样本池稳健性：换基准日是否还是同一个答案</h3>{robust_table}"
