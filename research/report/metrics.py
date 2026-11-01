@@ -1069,6 +1069,29 @@ def build_report(
         report.cross_section_std = float(np.nanstd(_ret5.to_numpy(), axis=1).mean())
     except Exception:  # noqa: BLE001
         report.cross_section_std = float("nan")
+    # 复现自检：用完全相同的因子对象与参数再跑一次，比较结果是否逐点一致。
+    # 必须在内部完成——外部重新推导输入会因中性化/裁剪等变换而失真。
+    try:
+        _again = _quantile_nav(
+            analysis_factor, close, open_, groups=groups, horizon=primary_horizon,
+            cost_bps=cost_bps, tradeable=mask if exclude_limit_up else None,
+        )
+        _pr2, _pg2 = _again[2], _again[3]
+        _left = {
+            "q5_net": float(period_returns["Q5"].mean()),
+            "q1_net": float(period_returns["Q1"].mean()),
+            "mono": diag.group_monotonicity(period_gross.mean())[0],
+        }
+        _right = {
+            "q5_net": float(_pr2["Q5"].mean()),
+            "q1_net": float(_pr2["Q1"].mean()),
+            "mono": diag.group_monotonicity(_pg2.mean())[0],
+        }
+        _check = diag.reproduction_check(_left, _right, list(_left))
+        report.reproduction = _check.as_dict()
+        report._repro_check = _check
+    except Exception as exc:  # noqa: BLE001
+        report.reproduction = {"status": "unavailable", "detail": str(exc)[:120]}
     report.quantile_factor = analysis_factor
     # 复现自检必须复用同一组参数，否则比较的是两次不同设定，永远"不一致"
     report.quantile_args = {
@@ -1235,7 +1258,8 @@ def build_report(
         diag.tradeability_interval(gross, report.cost_mean),
         diag.direction_prior(ic5, t5, report.direction),
     ]
-    report.diagnostics = checks
+    _repro = getattr(report, "_repro_check", None)
+    report.diagnostics = list(checks) + ([_repro] if _repro is not None else [])
     report.attribution = diag.attribute_failure(report)
     for check in checks:
         if check.status == "fail":

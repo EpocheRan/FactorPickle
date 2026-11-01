@@ -251,33 +251,7 @@ def generate(
             superset=panel,
         )
     if verify_repro:
-        # 同输入再跑一次分层：只比较每期均值/IC/ρ，验证没有隐藏随机源
-        sig = getattr(report, "quantile_factor", None)
-        if sig is None:
-            sig = factor * int(direction)
-        _qargs = getattr(report, "quantile_args", {}) or {}
-        _, _, pr2, pg2, _, _, _ = metrics._quantile_nav(
-            sig, panel.close, panel.open,
-            groups=_qargs.get("groups", 5),
-            horizon=_qargs.get("horizon", 5),
-            cost_bps=_qargs.get("cost_bps", 20.0),
-            tradeable=_qargs.get("tradeable"),
-        )
-        left = {
-            "ic": float(report.ic[5].mean()) if 5 in report.ic else float("nan"),
-            "mono": report.monotonicity,
-            "q5_net": float(report.quantile_returns.get("Q5", float("nan"))),
-            "q1_net": float(report.quantile_returns.get("Q1", float("nan"))),
-        }
-        right = {
-            "ic": float(report.ic[5].mean()) if 5 in report.ic else float("nan"),
-            "mono": diag.group_monotonicity(pg2.mean())[0],
-            "q5_net": float(pr2["Q5"].mean()) if "Q5" in pr2 else float("nan"),
-            "q1_net": float(pr2["Q1"].mean()) if "Q1" in pr2 else float("nan"),
-        }
-        check = diag.reproduction_check(left, right, list(left))
-        report.diagnostics = list(report.diagnostics or []) + [check]
-        report.reproduction = check.as_dict()
+        # 复现检查已在 metrics.build_report 内部用同一因子对象与参数完成
         report.attribution = diag.attribute_failure(report)
     score = rating_mod.rate(report)
 
