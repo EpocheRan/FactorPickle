@@ -29,7 +29,7 @@ from .ops import flow as flow_ops
 from .ops.price_factors import ALL_NAMES as ALL_PRICE_FACTORS
 from .ops.price_factors import register_price_ops
 from .taxonomy import Category, SUBCATEGORIES, normalize_category, normalize_subcategory
-from .technical import ATR, atr, atr_wilder, true_range
+from .technical import ATR, SqueezeMomentum, atr, atr_wilder, linreg, squeeze_momentum, true_range
 
 register_price_ops()
 
@@ -41,6 +41,9 @@ __all__ = [
     "ALL_FLOW_FACTORS",
     "ALL_PRICE_FACTORS",
     "ATR",
+    "SqueezeMomentum",
+    "squeeze_momentum",
+    "linreg",
     "CUSTOM_FACTORS",
     "Category",
     "Dependency",

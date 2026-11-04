@@ -33,7 +33,7 @@ _RULES: tuple[tuple[str, int], ...] = (
     ("momentum.", +1),
     ("size.", +1),
     ("sentiment.margin", -1),
-    ("sentiment.flow_large", +1),
+    ("sentiment.flow_large", -1),
     ("sentiment.flow_retail", -1),
 )
 

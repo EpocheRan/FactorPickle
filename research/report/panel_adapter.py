@@ -30,6 +30,23 @@ def _pivot(frame: pd.DataFrame, column: str) -> pd.DataFrame:
         return frame.pivot_table(index="date", columns="symbol", values=column, aggfunc="last")
 
 
+def _extras_wide(panel_data) -> dict:
+    """把长表中的两融/资金流列透视成 {列名: 宽表}，供情绪因子使用。"""
+    frame = getattr(panel_data, "frame", None)
+    if frame is None or frame.empty:
+        return {}
+    date_col = "date" if "date" in frame.columns else "ts"
+    sym_col = "symbol" if "symbol" in frame.columns else "code"
+    out = {}
+    for col in [c for c in frame.columns if c.startswith(("margin_", "mf_"))]:
+        try:
+            out[col] = frame.pivot_table(index=date_col, columns=sym_col,
+                                         values=col, aggfunc="last")
+        except Exception:  # noqa: BLE001
+            continue
+    return out
+
+
 def _regime_for(dates: pd.DatetimeIndex):
     """市场状态：以创业板指(399006) 200 日均线 ±3% 划分牛/震荡/熊。
 
@@ -69,6 +86,7 @@ def load_panel(
     max_amount: float | None = None,
     warmup_days: int = 800,
     universe: str | None = None,
+    extras: tuple[str, ...] = (),
 ) -> Panel:
     """唯一取数入口（经 B 模块）；``pool_date/pool_size`` 仅为兼容旧签名。"""
     target = universe or DEFAULT_UNIVERSE
@@ -80,6 +98,7 @@ def load_panel(
         end=end,
         warmup_days=warmup_days,
         min_names=30,
+        extras=extras,
     )
     data = _load_panel_data(spec)
     frame = data.frame
@@ -139,6 +158,7 @@ def load_panel(
         open=open_,
         market_cap=market_cap,
         industry=None,
+        extras=_extras_wide(data),
         regime=_regime_for(close.index),
         symbols=list(columns),
         high=high,

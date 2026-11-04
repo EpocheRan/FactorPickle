@@ -31,6 +31,36 @@ def financial_factor_panel(*args, **kwargs):
     return stored_factor_panel(*args, **kwargs)
 
 
+def flow_factor_panel(factor_id: str, panel: "Panel") -> pd.DataFrame:
+    """情绪/资金类因子：在 extras（两融、资金流）上按标的分组计算。"""
+    from factors.ops.flow import FLOW_FACTORS
+
+    if not panel.extras:
+        raise KeyError(f"{factor_id} 需要资金/两融数据，但面板未加载 extras")
+    try:
+        fn, _window, _unit, _direction, _dataset = FLOW_FACTORS[factor_id]
+    except KeyError as exc:
+        raise KeyError(factor_id) from exc
+
+    base = {"amount": panel.amount, "high": panel.high, "low": panel.low,
+            "close": panel.close}
+    frames = {**{k: v for k, v in panel.extras.items()}, **{k: v for k, v in base.items() if v is not None}}
+    out: dict[str, pd.Series] = {}
+    index = panel.close.index
+    for symbol in panel.symbols:
+        cols = {k: v[symbol] for k, v in frames.items() if symbol in v.columns}
+        if not cols:
+            continue
+        data = pd.DataFrame(cols).sort_index()
+        try:
+            out[symbol] = fn(data)
+        except Exception:  # noqa: BLE001
+            continue
+    if not out:
+        raise KeyError(factor_id)
+    return pd.DataFrame(out).reindex(index=index).reindex(columns=list(panel.symbols))
+
+
 def _pivot(frame: pd.DataFrame, column: str) -> pd.DataFrame:
     if frame.empty:
         return pd.DataFrame()
@@ -52,6 +82,7 @@ class Panel:
     amount: pd.DataFrame | None = None
     turnover: pd.DataFrame | None = None
     close_raw: pd.DataFrame | None = None
+    extras: dict | None = None
     open_raw: pd.DataFrame | None = None
     benchmark: pd.Series | None = None
     stock_info: pd.DataFrame | None = None
@@ -124,6 +155,7 @@ def load_panel(
     max_amount: float | None = None,
     warmup_days: int = 800,
     universe: str | None = None,
+    **kwargs,
 ):
     """取数委托给唯一的 B 模块（``research.eval.data``）。
 
@@ -141,6 +173,7 @@ def load_panel(
         max_amount=max_amount,
         warmup_days=warmup_days,
         universe=universe,
+        **kwargs,
     )
 
 

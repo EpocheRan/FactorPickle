@@ -41,7 +41,8 @@ def _amount(frame: pd.DataFrame) -> pd.Series:
 )
 def margin_balance_chg_20d(frame: pd.DataFrame) -> pd.Series:
     """融资余额 20 日变化率：杠杆盘加仓速度（拥挤度代理，方向 -1）。"""
-    rzye = _col(frame, "margin_rzye")
+    # 两融数据 T 日盘后披露，评估时只能用 T-1 日及以前的数据
+    rzye = _col(frame, "margin_rzye").shift(1)
     return rzye / rzye.shift(20).replace(0, np.nan) - 1
 
 
@@ -53,7 +54,9 @@ def margin_balance_chg_20d(frame: pd.DataFrame) -> pd.Series:
 )
 def margin_short_ratio(frame: pd.DataFrame) -> pd.Series:
     """融券余额 / 融资余额：看空力量占杠杆盘比重（方向 -1）。"""
-    return _col(frame, "margin_rqye") / _col(frame, "margin_rzye").replace(0, np.nan)
+    rqye = _col(frame, "margin_rqye").shift(1)
+    rzye = _col(frame, "margin_rzye").shift(1)
+    return rqye / rzye.replace(0, np.nan)
 
 
 @factor(
@@ -64,7 +67,8 @@ def margin_short_ratio(frame: pd.DataFrame) -> pd.Series:
 )
 def margin_buy_ratio_20d(frame: pd.DataFrame) -> pd.Series:
     """MA20(融资买入额 / 成交额)：杠杆参与度（方向 -1）。"""
-    ratio = _col(frame, "margin_rzmre") / _amount(frame)
+    # 同上：融资买入额滞后一日，避免用当日盘后数据
+    ratio = _col(frame, "margin_rzmre").shift(1) / _amount(frame)
     return ratio.rolling(20, min_periods=10).mean()
 
 

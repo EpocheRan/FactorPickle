@@ -23,7 +23,7 @@ from data_interface.common.timeutil import now_cn
 
 from . import definitions, diagnostics as diag, metrics, rating as rating_mod, render
 from .db import query as _query  # noqa: F401 - 兼容旧调用点
-from .panel import Panel, financial_factor_panel, load_panel, peer_panels, price_factor_panel
+from .panel import flow_factor_panel, Panel, financial_factor_panel, load_panel, peer_panels, price_factor_panel
 
 logger = logging.getLogger("Research.Report")
 
@@ -65,14 +65,17 @@ def _universe_label(panel: Panel, pool_size: int, pool_date: str) -> str:
     return f"{selection or '样本池'}（{n:,} 只）"
 
 
-def _resolve_panel(factor_id: str, pool_date: str, pool_size: int, start: str, end: str | None) -> tuple[Panel, pd.DataFrame]:
-    panel = load_panel(pool_date, pool_size, start, end)
+def _resolve_panel(factor_id: str, pool_date: str, pool_size: int, start: str,
+                   end: str | None, extras: tuple[str, ...] = ()) -> tuple[Panel, pd.DataFrame]:
+    panel = load_panel(pool_date, pool_size, start, end, extras=extras)
     category = factor_id.split(".", 1)[0]
     if category in ("quality", "value"):
         frame = financial_factor_panel(factor_id, panel.close, str(panel.close.index.min().date()), str(panel.data_cutoff.date()))
         if frame.empty:
             raise RuntimeError(f"{factor_id} 无物化数据（先跑 backfill_factors.py）")
         return panel, frame
+    if category == "sentiment":
+        return panel, flow_factor_panel(factor_id, panel)
     return panel, price_factor_panel(factor_id, panel)
 
 
@@ -208,7 +211,9 @@ def generate(
 ) -> dict:
     # 批量场景由调用方预加载面板，避免每个因子重复取数
     if panel is None:
-        panel, factor = _resolve_panel(factor_id, pool_date, pool_size, start, end)
+        _extras = ("margin_detail", "moneyflow_daily") if factor_id.startswith("sentiment.") else ()
+        panel, factor = _resolve_panel(factor_id, pool_date, pool_size, start, end,
+                                       extras=_extras)
     else:
         category = factor_id.split(".", 1)[0]
         factor = (
@@ -216,7 +221,11 @@ def generate(
                                    str(panel.close.index.min().date()),
                                    str(panel.data_cutoff.date()))
             if category in ("quality", "value")
-            else price_factor_panel(factor_id, panel)
+            else (
+                flow_factor_panel(factor_id, panel)
+                if category == "sentiment"
+                else price_factor_panel(factor_id, panel)
+            )
         )
     definition = definitions.describe(factor_id)
     if direction is None:
