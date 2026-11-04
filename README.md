@@ -46,7 +46,7 @@ MCPserver ── 统一工具出口（http / sse / stdio）
 | `data_interface/` | 行情 / 财务 / 资金 / 情绪 / 板块读写与复权 | `data_interface.api.*` |
 | `factors/` | 因子定义、时序与横截面算子 | `from factors import F` |
 | `factor_engine/` | 因子物化、宽表、审计与对账 | `python -m factor_engine` |
-| `research/` | 统一评估：评估项目录（G）+ profile（F）+ 报告（E）；默认全市场 | `python scripts/factor_report.py` / `scripts/factor_eval.py` / `scripts/profile.py` |
+| `research/` | 统一评估：评估项目录（G）+ profile（F）+ 报告（E）；默认全市场 | `python scripts/cli/factor_report.py` / `scripts/cli/factor_eval.py` / `scripts/cli/profile.py` |
 | `screener/` | 因子筛股、基线、停牌与覆盖检查 | `python -m screener` |
 | `backtest/` | 单股 / 横截面回测、执行规则、账本 | `python -m backtest` |
 | `strategies/` | 策略基类、universe、weighting、模型 | `python -m backtest list` |

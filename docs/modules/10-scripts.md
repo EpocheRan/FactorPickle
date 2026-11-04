@@ -43,7 +43,6 @@
 | `backfill_factors.py` | **财务因子物化**（STORED） | `--codes 120 --start 2024-01-01 --chunk 4` |
 | `backfill_history.py` | **历史数据补齐（分阶段）** | 见下表 |
 | `factor_report.py` | 单因子 HTML 报告 | `--factor momentum.return_21d --pool 200` |
-| `factor_scorecard.py` | **全量评级 + 评分卡入库** | `--source price --pool 200 --render` |
 | `calibrate_directions.py` | 用实测 IC 校准方向 | `--min-abs-ic 0.02 --apply` |
 | `research_reversal_density.py` | 反转信号密度阈值研究 | `--codes 500` |
 | `research_reversal_regimes.py` | 分市场状态的最优阈值 | `--codes 500` |
@@ -145,7 +144,7 @@ python scripts/factor_scorecard.py --source financial --pool 200 --start 2024-01
 python scripts/calibrate_directions.py --min-abs-ic 0.02
 
 # 5) 单因子报告
-python scripts/factor_report.py --factor liquidity.amount_ma_20d --pool 200 --start 2019-01-01
+python scripts/cli/factor_report.py --factor liquidity.amount_ma_20d --pool 200 --start 2019-01-01
 ```
 
 ### 2.2 注意事项（坑）
