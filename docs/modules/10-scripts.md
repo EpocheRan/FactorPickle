@@ -37,7 +37,6 @@
 | `backfill_intraday.py` | 补分时（新浪源） | `--codes 000949 --freq 5 --start 2026-10-01` |
 | `backfill_boards.py` / `backfill_concept.py` | 板块目录/成分/日线 | `python scripts/backfill_boards.py` |
 | `backfill_disclosure.py` | 披露日历与公告 | `python scripts/backfill_disclosure.py` |
-| `backfill_factors.py` | **财务因子物化**（STORED） | `--codes 120 --start 2024-01-01 --chunk 4` |
 | `backfill_history.py` | **历史数据补齐（分阶段）** | 见下表 |
 | `factor_report.py` | 单因子 HTML 报告 | `--factor momentum.return_21d --pool 200` |
 | `calibrate_directions.py` | 用实测 IC 校准方向 | `--min-abs-ic 0.02 --apply` |
@@ -129,7 +128,6 @@ python scripts/backfill_history.py --phase p3-financial --start-year 2010
 
 ```bash
 # 1) 财务因子物化（STORED，必须先跑才能给财务因子评级）
-python scripts/backfill_factors.py --codes 120 --start 2024-01-01 --chunk 4
 
 # 2) 全量评级（价量 85 个）
 python scripts/factor_scorecard.py --source price --pool 200 --start 2019-01-01 --render
