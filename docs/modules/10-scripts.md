@@ -34,8 +34,6 @@
 | `migrate_factors.py` | 因子注册表迁移 | `python scripts/migrate_factors.py` |
 | `repair_index_data.py` | 修复指数日线（缺失/错标） | `python scripts/repair_index_data.py` |
 | `verify_p0_p2.py` | 校验分时/板块/披露三条链路 | `python scripts/verify_p0_p2.py` |
-| `backfill_intraday.py` | 补分时（新浪源） | `--codes 000949 --freq 5 --start 2026-10-01` |
-| `backfill_boards.py` / `backfill_concept.py` | 板块目录/成分/日线 | `python scripts/backfill_boards.py` |
 | `backfill_disclosure.py` | 披露日历与公告 | `python scripts/backfill_disclosure.py` |
 | `backfill_history.py` | **历史数据补齐（分阶段）** | 见下表 |
 | `factor_report.py` | 单因子 HTML 报告 | `--factor momentum.return_21d --pool 200` |

@@ -17,6 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end", default=None)
     parser.add_argument("--chunk", type=int, default=500, help="每批写入行数")
     parser.add_argument("--dry-run", action="store_true", help="只出缺口报告，不写库")
+    parser.add_argument("--codes", default="", help="逗号分隔代码（部分阶段使用）")
     parser.add_argument("--min-codes", type=int, default=2500, help="每日已有行数达标阈值")
     args = parser.parse_args(argv)
 
@@ -37,7 +38,8 @@ def main(argv: list[str] | None = None) -> int:
 
     end = args.end or str(__import__("pandas").Timestamp.today().date())
     scope = Scope(start=args.start, end=end, dry_run=args.dry_run, chunk=args.chunk,
-                  min_codes=args.min_codes)
+                  min_codes=args.min_codes,
+                  codes=tuple(c.strip() for c in (args.codes or "").split(",") if c.strip()))
     result = run_phase(args.phase, scope)
 
     if args.dry_run:

@@ -500,3 +500,35 @@ def disclosure(api, scope: Scope) -> PhaseResult:
     for item in (result.get("details") or [])[:5]:
         logger.info("  %s", item)
     return PhaseResult(phase="disclosure", rows=rows)
+
+
+@phase("boards", tables=("map_stock_board", "dim_board", "concept_board_daily"))
+def boards(api, scope: Scope) -> PhaseResult:
+    """个股↔板块映射回补（东财 slist）+ 可选自算板块日线。
+
+    代码来源：``--codes`` 显式指定；不传则取库内全部 A 股。
+    """
+    codes = list(scope.codes)
+    if not codes:
+        rows = sql("select distinct code from ohlcv_1d where type='stock' order by code")
+        codes = [str(r[0]) for r in rows if str(r[0])[:2] in ("60", "00", "30", "68")]
+    if not codes:
+        logger.warning("boards: 没有可处理的代码")
+        return PhaseResult(phase="boards", rows=0)
+
+    if scope.dry_run:
+        return PhaseResult(phase="boards", rows=0,
+                           gaps=[gap_report("map_stock_board", scope.start, scope.end)])
+
+    from data_interface.common.config import load_config
+    from data_interface.concept.service import ConceptService
+
+    service = ConceptService(config=load_config())
+    logger.info("boards: 待处理 %s 只，快照日 %s", len(codes), scope.end)
+    result = service.sync_stock_boards(codes, as_of=scope.end)
+    total = int(result["map_rows"]) + int(result["dim_rows"])
+    logger.info("映射写入：%s 只 → map %s 行，dim %s 行，失败 %s 只",
+                result["codes"], result["map_rows"], result["dim_rows"], len(result["errors"]))
+    if result["errors"]:
+        logger.warning("失败样例: %s", result["errors"][:5])
+    return PhaseResult(phase="boards", rows=total)

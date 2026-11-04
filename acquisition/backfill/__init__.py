@@ -191,6 +191,7 @@ class Scope:
     dry_run: bool = False
     chunk: int = 500
     min_codes: int = 2500
+    codes: tuple[str, ...] = ()
 
 
 @dataclass
