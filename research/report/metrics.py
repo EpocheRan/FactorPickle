@@ -580,6 +580,7 @@ class FactorReport:
     turnover_by_group: pd.Series | None = None
 
     filter_test: dict = field(default_factory=dict)
+    strat_ic: object | None = None
     annual_ic_return: pd.DataFrame | None = None
 
     ic_neutral: pd.DataFrame | None = None
@@ -894,6 +895,39 @@ def neutralize_factor(factor: pd.DataFrame, market_cap: pd.DataFrame | None) -> 
     return out
 
 
+def _as_industry_frame(industry, like: pd.DataFrame):
+    """统一 industry 入参类型：Series(代码→行业) 广播成与因子同形状的宽表。"""
+    if industry is None or not isinstance(industry, pd.Series):
+        return industry
+    cols = like.columns
+    mapping = industry.reindex(cols).to_numpy()
+    return pd.DataFrame(np.tile(mapping, (len(like), 1)), index=like.index, columns=cols)
+
+
+def _stratified_ic(factor: pd.DataFrame, fwd: pd.DataFrame,
+                   strata: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """按分层掩码计算 IC 均值 / 独立 t / 样本日数。
+
+    复用 _rank_ic_frame：掩码外的值置 NaN，秩相关只在层内计算，
+    不重新取数、不重建面板——直接在已加载的宽表上切片。
+    """
+    rows = []
+    for name, mask in strata.items():
+        series = _rank_ic_frame(factor.where(mask), fwd)
+        series = series.replace([np.inf, -np.inf], np.nan).dropna()
+        if len(series) < 20:
+            rows.append({"stratum": name, "ic": np.nan, "t": np.nan, "n_days": len(series)})
+            continue
+        se = series.std(ddof=1) / np.sqrt(len(series))
+        rows.append({
+            "stratum": name,
+            "ic": float(series.mean()),
+            "t": float(series.mean() / se) if se > 0 else np.nan,
+            "n_days": int(len(series)),
+        })
+    return pd.DataFrame(rows)
+
+
 def build_report(
     factor: pd.DataFrame,
     close: pd.DataFrame,
@@ -966,6 +1000,7 @@ def build_report(
     # 系统性抬成正数（旧版 4/4 强因子 IC>0、ρ 与价差打架，根因就在这里）。
     if direction not in (-1, 1):
         raise ValueError(f"direction 必须是 +1/-1，收到 {direction!r}")
+    industry = _as_industry_frame(industry, factor)
     analysis_factor = factor * int(direction)
     if neutralize:
         analysis_factor = neutralize_factor(analysis_factor, market_cap)
@@ -1124,6 +1159,38 @@ def build_report(
         report._repro_check = _check
     except Exception as exc:  # noqa: BLE001
         report.reproduction = {"status": "unavailable", "detail": str(exc)[:120]}
+    # 分层 IC：流动性 / 市值 / 行业，全部在已加载宽表上切片
+    try:
+        _strata: dict[str, pd.DataFrame] = {}
+        if amount is not None:
+            _ar = amount.reindex(index=analysis_factor.index, columns=analysis_factor.columns).rank(
+                axis=1, pct=True)
+            _strata["流动性 L1 后40%"] = _ar <= 0.4
+            _strata["流动性 L2 中20%"] = (_ar > 0.4) & (_ar <= 0.6)
+            _strata["流动性 L3 前40%"] = _ar > 0.6
+        if market_cap is not None:
+            _mr = market_cap.reindex(index=analysis_factor.index, columns=analysis_factor.columns).rank(
+                axis=1, pct=True)
+            for i, label in enumerate(("市值 S1 最小", "市值 S2", "市值 S3", "市值 S4", "市值 S5 最大")):
+                lo, hi = i / 5, (i + 1) / 5
+                _strata[label] = (_mr > lo) & (_mr <= hi) if i else (_mr <= hi)
+        if industry is not None:
+            _map = industry
+            if isinstance(industry, pd.DataFrame) and "symbol" in industry.columns:
+                _map = industry.set_index("symbol")["industry"]
+            elif isinstance(industry, pd.DataFrame):
+                _map = industry.iloc[-1]
+            if isinstance(_map, pd.Series):
+                for name in _map.dropna().unique()[:12]:
+                    cols = [c for c in analysis_factor.columns if _map.get(c) == name]
+                    if len(cols) >= 30:
+                        _strata[f"行业 {name}"] = pd.DataFrame(
+                            False, index=analysis_factor.index, columns=analysis_factor.columns)
+                        _strata[f"行业 {name}"][cols] = True
+        if _strata:
+            report.strat_ic = _stratified_ic(analysis_factor, fwd[primary_horizon], _strata)
+    except Exception:  # noqa: BLE001
+        report.strat_ic = None
     report.quantile_factor = analysis_factor
     # 复现自检必须复用同一组参数，否则比较的是两次不同设定，永远"不一致"
     report.quantile_args = {

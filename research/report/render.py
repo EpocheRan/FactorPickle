@@ -259,7 +259,7 @@ def render(report, rating: dict, meta: dict) -> str:
         f"（95% CI {_ci(ic_lo, ic_hi)}，ICIR <b>{_num(ic_ir, 2)}</b>，"
         f"NW t = {_num(ic_t, 1)}，独立样本 t = {_num(t_indep, 1)}）；"
         f"分层单调性 {_num(report.monotonicity, 2)}，"
-        f"Q5−Q1 毛价差 {_pct(gross.get('mean', float('nan')), 2)}/期、"
+        f"G5−G1 毛价差 {_pct(gross.get('mean', float('nan')), 2)}/期、"
         f"净价差 {_pct(net.get('mean', float('nan')), 2)}/期"
         f"（单期成本 {_pct(report.cost_mean, 2)}，净价差 t={_num(net.get('t', float('nan')), 1)}）；"
         "净价差 = 毛价差 − 多空两条腿成本；各分组净收益是「多头口径」（每组自扣自身成本），"
@@ -395,7 +395,7 @@ def render(report, rating: dict, meta: dict) -> str:
             (f"{value * 100:+.2f}%", _cls(value)),
         ])
     qrows.append([
-        "Q5−Q1（期均值）",
+        "G5−G1（期均值）",
         (f"{(report.spread_gross or {}).get('mean', float('nan')) * 100:+.2f}%",
          _cls((report.spread_gross or {}).get("mean", np.nan))),
         (f"{(report.spread_net or {}).get('mean', float('nan')) * 100:+.2f}%",
@@ -413,7 +413,7 @@ def render(report, rating: dict, meta: dict) -> str:
     perf_fig = ""
     if report.ls_nav is not None and len(report.ls_nav) > 20:
         ls_nav = _downsample(report.ls_nav)
-        lines = [("多空 Q5−Q1", ls_nav.to_numpy(), charts.BURGUNDY)]
+        lines = [("多空 G5−G1", ls_nav.to_numpy(), charts.BURGUNDY)]
         dd = _downsample(report.drawdown).to_numpy() if report.drawdown is not None else []
         svg = charts.nav_chart(lines, dd, _xlabels(ls_nav.index), width=980, height=420)
         perf_fig = _figure(
@@ -431,9 +431,9 @@ def render(report, rating: dict, meta: dict) -> str:
         ["Calmar", f"{report.perf.get('calmar', float('nan')):.2f}"],
         ["期胜率", f"{report.perf.get('win', float('nan')):.0%}"],
         ["样本期数（5 日）", f"{report.perf.get('n_days', 0)}"],
-        ["Q5−Q1 毛价差/期", _pct((report.spread_gross or {}).get("mean", np.nan))],
+        ["G5−G1 毛价差/期", _pct((report.spread_gross or {}).get("mean", np.nan))],
         ["单期成本", _pct(report.cost_mean)],
-        ["Q5−Q1 净价差/期", _pct((report.spread_net or {}).get("mean", np.nan))],
+        ["G5−G1 净价差/期", _pct((report.spread_net or {}).get("mean", np.nan))],
         ["净价差 t 值", f"{(report.spread_net or {}).get('t', float('nan')):.1f}"],
     ]
     spread_per = float(report.long_short.get(
@@ -444,8 +444,8 @@ def render(report, rating: dict, meta: dict) -> str:
     vol_ = report.perf.get("vol", float("nan"))
     drag = 0.5 * vol_ ** 2 if np.isfinite(vol_) else float("nan")
     table_spread = float((report.spread_net or {}).get("mean", float("nan")))
-    perf_table = _table(["多空组合（Q5−Q1，5 日非重叠）", "数值"], perf_rows,
-                        f"注：表内 Q5−Q1 净价差 {table_spread*100:.2f}%/期；多空两条腿各付一次往返 20bp。"
+    perf_table = _table(["多空组合（G5−G1，5 日非重叠）", "数值"], perf_rows,
+                        f"注：表内 G5−G1 净价差 {table_spread*100:.2f}%/期；多空两条腿各付一次往返 20bp。"
                         f"算术年化 ≈ {arith_ann*100:.1f}%（{spread_per*100:.2f}%/期 × 242/5），"
                         f"扣波动拖累 {drag*100:.1f}pp 后为 {arith_ann*100-drag*100:.1f}%，"
                         f"几何复利 {report.perf.get('ann', float('nan'))*100:.1f}%；"
@@ -607,8 +607,8 @@ def render(report, rating: dict, meta: dict) -> str:
         ["T+h 收盘跌停/停牌（无法按计划卖出）", f"{ss.get('blocked_at_target', 0):,}（{ss.get('pct_blocked', float('nan')):.2%}）"],
         ["顺延卖出笔数", f"{ss.get('delayed', 0):,}（{ss.get('pct_delayed', float('nan')):.2%}）"],
         ["平均 / 最大顺延（交易日）", f"{ss.get('avg_delay', 0):.2f} / {ss.get('max_delay', 0):.0f}"],
-        ["Q5−Q1 每期收益：计划卖出", _pct(ss.get("spread_planned", np.nan), 2)],
-        ["Q5−Q1 每期收益：顺延卖出", _pct(ss.get("spread_delayed", np.nan), 2)],
+        ["G5−G1 每期收益：计划卖出", _pct(ss.get("spread_planned", np.nan), 2)],
+        ["G5−G1 每期收益：顺延卖出", _pct(ss.get("spread_delayed", np.nan), 2)],
         ["影响", (_pct(ss.get("spread_delta", np.nan), 2), _cls(ss.get("spread_delta", np.nan)))],
     ]
     sell_table = _table(["卖出端可执行性", "数值"], sell_rows,
@@ -672,7 +672,7 @@ def render(report, rating: dict, meta: dict) -> str:
         ["断言", "结果", "本因子实际值", "通过条件", "说明"],
         diag_rows or [["—", "—", "—", "—", "—"]],
         "注：断言只用于定位「算错 / 方向错 / 传导断裂」，不替代评级。"
-        "ρ 与 Q5−Q1 的硬边界只在 |ρ|≥0.8 时成立；中间区间只报警，因为非单调排列可以出现 ρ>0 但 Q5<Q1。",
+        "ρ 与 G5−G1 的硬边界只在 |ρ|≥0.8 时成立；中间区间只报警，因为非单调排列可以出现 ρ>0 但 Q5<Q1。",
     )
 
     # ---------------- 附录：持有期明细
@@ -715,6 +715,13 @@ def render(report, rating: dict, meta: dict) -> str:
         )],
     ]
     def_table = _table(["项目", "说明"], def_rows)
+    def_table += (
+        '<p class="small"><b>分组口径：</b>G1–G5 = 按评估信号等分的五组'
+        '（G1 信号最弱、G5 最强，多空 = G5 减 G1）；'
+        'S1–S5 = 按当日流通市值五等分（S1 最小、S5 最大）；'
+        'L1–L3 = 按当日成交额分层（L1 后 40%、L2 中 20%、L3 前 40%）。'
+        "三类编号互不相同，避免把「信号分位」与「市值分位」混淆。</p>"
+    )
 
     pool = report.pool or {}
     pool_rows = [
@@ -798,7 +805,7 @@ def render(report, rating: dict, meta: dict) -> str:
                 f"{rec['mono']:.2f}",
             ])
         robust_table = _table(
-            ["池基准日", "起点", "股票数", "IC(h=5)", "独立 t", "Q5−Q1/期", "ρ"],
+            ["池基准日", "起点", "股票数", "IC(h=5)", "独立 t", "G5−G1/期", "ρ"],
             rob_rows,
             "注：首行为当前样本池（全市场）基准；其余行为换基准日重建的点位池对照。若 IC/价差符号或量级不一致，说明结论是"
             "「特定池子」的条件结论，评级本身不稳。",
@@ -899,6 +906,21 @@ def render(report, rating: dict, meta: dict) -> str:
         )
         regime_alt_block = f"<h3>regime 代理敏感性</h3>{alt_table}"
 
+
+    strat_block = ""
+    _strat = getattr(report, "strat_ic", None)
+    if _strat is not None and len(_strat):
+        _rows = [
+            [str(rec["stratum"]), f"{rec['ic']:+.3f}" if np.isfinite(rec["ic"]) else "—",
+             f"{rec['t']:.1f}" if np.isfinite(rec["t"]) else "—", f"{int(rec['n_days'])}"]
+            for _, rec in _strat.iterrows()
+        ]
+        strat_block = (
+            "<h3>分层 IC：流动性 / 市值 / 行业</h3>"
+            + _table(["分层", "IC 均值", "独立 t", "样本日"], _rows,
+                     "注：在各层内部单独计算秩相关，掩码外置空；用于判断因子是否只在特定规模或流动性区间有效。")
+        )
+
     neutral_block = ""
     if report.ic_neutral is not None and not report.ic_neutral.empty:
         neutral_block = f"<h3>市值 / 行业中性化后的 IC</h3>{neutral_table}"
@@ -983,7 +1005,7 @@ def render(report, rating: dict, meta: dict) -> str:
     if report.peers is not None and len(report.peers):
         peer_name = str(report.peers.abs().idxmax())
     lead_03 = (
-        f"<b>本节结论：</b>Q5−Q1 毛价差 {float((report.spread_gross or {}).get('mean', np.nan))*100:+.2f}%/期、"
+        f"<b>本节结论：</b>G5−G1 毛价差 {float((report.spread_gross or {}).get('mean', np.nan))*100:+.2f}%/期、"
         f"净价差 {float((report.spread_net or {}).get('mean', np.nan))*100:+.2f}%/期"
         f"（成本 {report.cost_mean*100:.2f}%，净价差 t={float((report.spread_net or {}).get('t', np.nan)):.1f}）；"
         f"最大回撤 {report.perf.get('mdd', float('nan'))*100:.1f}%；"
@@ -1089,7 +1111,7 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 <h3>多空净值、回撤与分年收益</h3>
 {perf_fig}
 <div class="grid2">{perf_table}{annual_table}</div>
-{neutral_block}
+{strat_block}{neutral_block}
 {size_block}
 {inc_block}
 {trade_block}
@@ -1128,11 +1150,11 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 
 <h3>重估条件（什么情况下应推翻本结论）</h3>
 <ul class="small">
-  <li><b>样本池：</b>改用 point-in-time 全 A 池（含退市股）重跑后，IC 与 Q5−Q1 仍同号且量级不减半；
+  <li><b>样本池：</b>改用 point-in-time 全 A 池（含退市股）重跑后，IC 与 G5−G1 仍同号且量级不减半；
       否则本结论只适用于「{_esc(report.universe)}」。</li>
   <li><b>中性化：</b>市值+行业双中性后 IC 仍 ≥ 0.015、独立 t ≥ 2，且残差 IC 保留 ≥ 30%；
       否则本因子主要是风格暴露。</li>
-  <li><b>价差：</b>Q5−Q1 毛价差的独立 t（非重叠期）≥ 2 且净价差 ≥ 单期成本；
+  <li><b>价差：</b>G5−G1 毛价差的独立 t（非重叠期）≥ 2 且净价差 ≥ 单期成本；
       否则即使 IC 显著，也不足以覆盖交易成本。</li>
 </ul>
 

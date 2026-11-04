@@ -65,6 +65,16 @@ def _universe_label(panel: Panel, pool_size: int, pool_date: str) -> str:
     return f"{selection or '样本池'}（{n:,} 只）"
 
 
+def _industry_frame(industry, close):
+    """把「代码→行业」映射广播成与面板同形状的 DataFrame（供中性化与分层使用）。"""
+    if industry is None or not isinstance(industry, pd.Series):
+        return industry
+    cols = close.columns
+    mapping = industry.reindex(cols).to_numpy()
+    data = np.tile(mapping, (len(close), 1))
+    return pd.DataFrame(data, index=close.index, columns=cols)
+
+
 def _resolve_panel(factor_id: str, pool_date: str, pool_size: int, start: str,
                    end: str | None, extras: tuple[str, ...] = ()) -> tuple[Panel, pd.DataFrame]:
     panel = load_panel(pool_date, pool_size, start, end, extras=extras)
@@ -172,7 +182,7 @@ def _pool_robustness(
                 factor, panel.close, panel.open,
                 factor_id=factor_id, category=factor_id.split(".", 1)[0],
                 direction=direction, regime=panel.regime,
-                market_cap=panel.market_cap, industry=panel.industry,
+                market_cap=panel.market_cap, industry=_industry_frame(panel.industry, panel.close),
                 full=False,
             )
             rows.append(

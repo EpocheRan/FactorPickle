@@ -60,6 +60,22 @@ def _market_cap_from_extras(extras: dict, index, columns):
     return mc * 10000.0 if med < 1e6 else mc
 
 
+def _industry_map():
+    """东财行业映射（主归属），代码 → 行业名；取数失败返回 None。"""
+    try:
+        from research.eval.data import _query
+
+        rows = _query(
+            "select code, last(board_name) as name from map_stock_board "
+            "where is_primary = true group by code"
+        )
+        if rows is None or rows.empty:
+            return None
+        return pd.Series(rows["name"].to_numpy(), index=rows["code"].astype(str)).dropna()
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _regime_for(dates: pd.DatetimeIndex):
     """市场状态：以创业板指(399006) 200 日均线 ±3% 划分牛/震荡/熊。
 
@@ -170,7 +186,7 @@ def load_panel(
     return Panel(
         close=close,
         open=open_,
-        industry=None,
+        industry=_industry_map(),
         market_cap=_market_cap_from_extras(_extras_map, close.index, columns),
         regime=_regime_for(close.index),
         symbols=list(columns),
