@@ -34,12 +34,9 @@
 | `migrate_factors.py` | 因子注册表迁移 | `python scripts/migrate_factors.py` |
 | `repair_index_data.py` | 修复指数日线（缺失/错标） | `python scripts/repair_index_data.py` |
 | `verify_p0_p2.py` | 校验分时/板块/披露三条链路 | `python scripts/verify_p0_p2.py` |
-| `backfill_daily_by_code.py` | 按代码补日线（含历史） | `--codes 600519 --start 2017-01-01` |
-| `backfill_daily_pre2022.py` | 按日期补 2022 前全市场日线 | `--start 2017-11-01 --end 2022-10-01` |
 | `backfill_intraday.py` | 补分时（新浪源） | `--codes 000949 --freq 5 --start 2026-10-01` |
 | `backfill_boards.py` / `backfill_concept.py` | 板块目录/成分/日线 | `python scripts/backfill_boards.py` |
 | `backfill_disclosure.py` | 披露日历与公告 | `python scripts/backfill_disclosure.py` |
-| `backfill_moneyflow.py` | 资金流 | `python scripts/backfill_moneyflow.py` |
 | `backfill_factors.py` | **财务因子物化**（STORED） | `--codes 120 --start 2024-01-01 --chunk 4` |
 | `backfill_history.py` | **历史数据补齐（分阶段）** | 见下表 |
 | `factor_report.py` | 单因子 HTML 报告 | `--factor momentum.return_21d --pool 200` |

@@ -14,6 +14,7 @@ COMMANDS = {
     "factor-eval": ("scripts.cli.factor_eval", "批量因子评估（IC/价差/换手）"),
     "profile": ("scripts.cli.profile", "评估 profile 管理"),
     "export-pool": ("scripts.cli.export_pool", "导出股票池"),
+    "verify-equivalence": ("scripts.cli.verify_equivalence", "新旧评估口径等价性回放"),
 }
 
 
