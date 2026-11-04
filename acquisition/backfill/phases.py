@@ -397,3 +397,37 @@ def _month_chunks(start: str, end: str) -> list[tuple[str, str]]:
             chunks.append((str(lo.date()), str(hi.date())))
         cursor = nxt
     return chunks
+
+
+@phase("moneyflow", tables=("moneyflow_daily",))
+def moneyflow(api, scope: Scope) -> PhaseResult:
+    """按交易日回补 moneyflow（复用 data_interface 的 MoneyflowService）。"""
+    if scope.dry_run:
+        return PhaseResult(phase="moneyflow", rows=0,
+                           gaps=[gap_report("moneyflow_daily", scope.start, scope.end)])
+    from data_interface.moneyflow.service import MoneyflowService
+
+    days = trading_days(scope.start, scope.end)
+    existing = {
+        str(r[0])[:10]
+        for r in sql(
+            "select ts from moneyflow_daily "
+            f"where ts between '{scope.start}' and '{scope.end}' group by ts"
+        )
+    }
+    todo = [d for d in days if d not in existing]
+    logger.info("moneyflow 目标 %s 天，已有 %s 天，待补 %s 天",
+                len(days), len(existing), len(todo))
+    service = MoneyflowService()
+    total, failed = 0, 0
+    for index, day in enumerate(todo, 1):
+        try:
+            result = service.sync(day, day, max_trade_days=1)
+            total += int(result.get("rows_written") or 0)
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            logger.warning("%s 回补失败: %s", day, str(exc)[:100])
+        if index % 20 == 0 or index == len(todo):
+            logger.info("  [%s/%s] %s 累计 %s 行，失败 %s 天",
+                        index, len(todo), day, f"{total:,}", failed)
+    return PhaseResult(phase="moneyflow", rows=total)
