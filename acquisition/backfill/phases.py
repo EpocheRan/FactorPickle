@@ -431,3 +431,72 @@ def moneyflow(api, scope: Scope) -> PhaseResult:
             logger.info("  [%s/%s] %s 累计 %s 行，失败 %s 天",
                         index, len(todo), day, f"{total:,}", failed)
     return PhaseResult(phase="moneyflow", rows=total)
+
+
+@phase("concept", tables=("concept_board_dim", "concept_board_daily"))
+def concept(api, scope: Scope) -> PhaseResult:
+    """概念板块：维度快照写入 + 逐板块日线回补（复用 ConceptService）。"""
+    if scope.dry_run:
+        return PhaseResult(
+            phase="concept", rows=0,
+            gaps=[gap_report("concept_board_dim", scope.start, scope.end),
+                  gap_report("concept_board_daily", scope.start, scope.end)],
+        )
+    from data_interface.concept.models import BOARD_TYPE_CONCEPT
+    from data_interface.concept.service import ConceptService
+    from data_interface.common.timeutil import now_cn
+
+    RECONSTRUCTED = "akshare.ths_index.reconstructed"
+    service = ConceptService()
+    boards = service.boards()
+    if not boards:
+        logger.warning("concept: 库内无板块元数据，先跑 concept_meta")
+        return PhaseResult(phase="concept", rows=0)
+
+    now = now_cn()
+    frames = []
+    for snapshot in (scope.start, scope.end):
+        frames.append(pd.DataFrame([
+            {
+                "ts": pd.Timestamp(snapshot),
+                "board_code": b.board_code,
+                "name": b.name,
+                "board_type": b.board_type or BOARD_TYPE_CONCEPT,
+                "source": RECONSTRUCTED,
+                "source_code": b.source_code or b.board_code,
+                "status": "active",
+                "updated_at": now,
+            }
+            for b in boards
+        ]))
+    written = int(service.repository.upsert_boards(pd.concat(frames, ignore_index=True)))
+    logger.info("concept-dim: boards=%s rows=%s", len(boards), f"{written:,}")
+
+    total, failed = written, 0
+    for index, board in enumerate(boards, 1):
+        try:
+            total += int(service.sync_one_board_daily(board, scope.start, scope.end) or 0)
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            logger.warning("%s 日线失败: %s", board.board_code, str(exc)[:80])
+        if index % 50 == 0 or index == len(boards):
+            logger.info("  [%s/%s] 累计 %s 行，失败 %s", index, len(boards), f"{total:,}", failed)
+    return PhaseResult(phase="concept", rows=total)
+
+
+@phase("disclosure", tables=("fin_disclosure_calendar", "announcement"))
+def disclosure(api, scope: Scope) -> PhaseResult:
+    """预约披露日历回补（公告按代码补需传 codes，此处只同步日历）。"""
+    if scope.dry_run:
+        return PhaseResult(phase="disclosure", rows=0,
+                           gaps=[gap_report("fin_disclosure_calendar", scope.start, scope.end)])
+    from data_interface.common.config import load_config
+    from data_interface.disclosure.service import DisclosureService
+
+    service = DisclosureService(config=load_config())
+    result = service.sync_calendar(None, as_of=None)
+    rows = int(result.get("rows_written") or 0)
+    logger.info("disclosure 日历写入 %s 行", f"{rows:,}")
+    for item in (result.get("details") or [])[:5]:
+        logger.info("  %s", item)
+    return PhaseResult(phase="disclosure", rows=rows)
