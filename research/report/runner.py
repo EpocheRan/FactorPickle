@@ -106,6 +106,8 @@ def _slice_panel(panel: Panel, symbols: Sequence[str], start: str) -> Panel:
     def cut(frame: pd.DataFrame | None) -> pd.DataFrame | None:
         if frame is None:
             return None
+        if not isinstance(frame, pd.DataFrame):
+            return frame  # industry 等 Series 字段不参与切片
         sliced = frame.reindex(columns=keep).loc[lambda item: item.index >= start_ts]
         return sliced
 

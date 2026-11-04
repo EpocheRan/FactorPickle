@@ -215,7 +215,11 @@ def neutralize_panel(
 
     codes = np.full(n_cols, -1, dtype="int64")
     if industry is not None and mode in ("industry", "both"):
-        last = industry.reindex(columns=factor.columns).ffill().iloc[-1]
+        if isinstance(industry, pd.Series):
+            # Series(代码→行业)：直接按因子列对齐，无需 ffill
+            last = industry.reindex(factor.columns)
+        else:
+            last = industry.reindex(columns=factor.columns).ffill().iloc[-1]
         mapping = {name: i for i, name in enumerate(pd.unique(last.dropna()))}
         codes = np.array([mapping.get(v, -1) if pd.notna(v) else -1 for v in last.to_numpy()], dtype="int64")
 
