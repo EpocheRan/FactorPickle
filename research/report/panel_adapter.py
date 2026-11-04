@@ -38,13 +38,26 @@ def _extras_wide(panel_data) -> dict:
     date_col = "date" if "date" in frame.columns else "ts"
     sym_col = "symbol" if "symbol" in frame.columns else "code"
     out = {}
-    for col in [c for c in frame.columns if c.startswith(("margin_", "mf_"))]:
+    wanted = ("margin_", "mf_", "float_mv", "total_mv")
+    for col in [c for c in frame.columns if c.startswith(wanted)]:
         try:
             out[col] = frame.pivot_table(index=date_col, columns=sym_col,
                                          values=col, aggfunc="last")
         except Exception:  # noqa: BLE001
             continue
     return out
+
+
+def _market_cap_from_extras(extras: dict, index, columns):
+    """从 extras 里的 float_mv 构造市值宽表（单位：元）。"""
+    mc = extras.get("float_mv")
+    if mc is None:
+        return None
+    mc = mc.reindex(index=index).reindex(columns=columns)
+    if not mc.notna().to_numpy().any():
+        return mc
+    med = float(mc.stack().median())
+    return mc * 10000.0 if med < 1e6 else mc
 
 
 def _regime_for(dates: pd.DatetimeIndex):
@@ -102,6 +115,7 @@ def load_panel(
     )
     data = _load_panel_data(spec)
     frame = data.frame
+    _extras_map = _extras_wide(data)
 
     close = _pivot(frame, "hfq_close").sort_index()
     close = close.reindex(index=data.dates)
@@ -156,9 +170,8 @@ def load_panel(
     return Panel(
         close=close,
         open=open_,
-        market_cap=market_cap,
         industry=None,
-        extras=_extras_wide(data),
+        market_cap=_market_cap_from_extras(_extras_map, close.index, columns),
         regime=_regime_for(close.index),
         symbols=list(columns),
         high=high,

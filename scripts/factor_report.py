@@ -101,6 +101,7 @@ def main() -> int:
     parser.add_argument("--pool-date", default="2017-11-01")
     parser.add_argument("--start", default="2019-01-01")
     parser.add_argument("--end", default=None)
+    parser.add_argument("--neutralize", action="store_true", help="横截面市值中性化后再评估")
     parser.add_argument("--out", default="output/factor_reports")
     parser.add_argument("--category", default=None)
     parser.add_argument("--direction", type=int, default=None)
@@ -133,6 +134,7 @@ def main() -> int:
             category=args.category,
             direction=args.direction,
             out_dir=args.out,
+            neutralize=getattr(args, "neutralize", False),
             panel=shared_panel,
         )
         rating = result["rating"]

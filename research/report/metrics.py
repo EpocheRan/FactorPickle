@@ -872,6 +872,28 @@ def _incremental(
     }, corr_series
 
 
+def neutralize_factor(factor: pd.DataFrame, market_cap: pd.DataFrame | None) -> pd.DataFrame:
+    """逐日对 log 市值做横截面回归取残差（市值中性化），返回同形状因子。"""
+    if market_cap is None:
+        return factor
+    mc = market_cap.reindex(index=factor.index, columns=factor.columns)
+    logmc = np.log(np.where(mc > 0, mc, np.nan))
+    out = pd.DataFrame(index=factor.index, columns=factor.columns, dtype="float64")
+    for dt in factor.index:
+        y = factor.loc[dt].to_numpy(dtype="float64")
+        x = logmc[factor.index.get_loc(dt)] if isinstance(logmc, np.ndarray) else logmc.loc[dt].to_numpy(dtype="float64")
+        mask = np.isfinite(y) & np.isfinite(x)
+        if mask.sum() < 30:
+            continue
+        xx = x[mask]
+        yy = y[mask]
+        xx = xx - xx.mean()
+        beta = float((xx * (yy - yy.mean())).sum() / max((xx * xx).sum(), 1e-12))
+        resid = yy - yy.mean() - beta * xx
+        out.loc[dt, np.array(factor.columns)[mask]] = resid
+    return out
+
+
 def build_report(
     factor: pd.DataFrame,
     close: pd.DataFrame,
@@ -894,6 +916,7 @@ def build_report(
     peers: dict[str, pd.DataFrame] | None = None,
     definition: dict | None = None,
     pool: dict | None = None,
+    neutralize: bool = False,
     freshness: dict | None = None,
     is_st: dict[str, bool] | None = None,
     exclude_limit_up: bool = False,
@@ -944,6 +967,9 @@ def build_report(
     if direction not in (-1, 1):
         raise ValueError(f"direction 必须是 +1/-1，收到 {direction!r}")
     analysis_factor = factor * int(direction)
+    if neutralize:
+        analysis_factor = neutralize_factor(analysis_factor, market_cap)
+        report.neutralized = True
     report.direction = int(direction)
     report.raw_direction = int(direction)
     report.direction_source = direction_source

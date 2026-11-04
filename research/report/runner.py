@@ -208,10 +208,11 @@ def generate(
     run_id: str | None = None,
     verify_repro: bool = True,
     panel: Panel | None = None,
+    neutralize: bool = False,
 ) -> dict:
     # 批量场景由调用方预加载面板，避免每个因子重复取数
     if panel is None:
-        _extras = ("margin_detail", "moneyflow_daily") if factor_id.startswith("sentiment.") else ()
+        _extras = (("margin_detail", "moneyflow_daily") if factor_id.startswith("sentiment.") else ()) + ("fin_valuation_daily",)
         panel, factor = _resolve_panel(factor_id, pool_date, pool_size, start, end,
                                        extras=_extras)
     else:
@@ -243,6 +244,7 @@ def generate(
         amount=panel.amount, benchmark=panel.benchmark, peers=peers,
         definition=definition.as_dict(), pool=panel.pool, freshness=panel.freshness,
         is_st=panel.is_st,
+        neutralize=neutralize,
     )
     if robustness:
         report.pool_robustness = _pool_robustness(
