@@ -21,8 +21,6 @@ from dataclasses import dataclass, field
 import numpy as np
 
 
-class _FastSkip(Exception):
-    """fast 模式内部用于跳过重计算。"""
 
 import pandas as pd
 
@@ -978,7 +976,6 @@ def build_report(
     definition: dict | None = None,
     pool: dict | None = None,
     neutralize: bool = False,
-    fast: bool = False,
     freshness: dict | None = None,
     is_st: dict[str, bool] | None = None,
     exclude_limit_up: bool = False,
@@ -1167,8 +1164,6 @@ def build_report(
     # 复现自检：用完全相同的因子对象与参数再跑一次，比较结果是否逐点一致。
     # 必须在内部完成——外部重新推导输入会因中性化/裁剪等变换而失真。
     try:
-        if fast:
-            raise _FastSkip
         _again = _quantile_nav(
             analysis_factor, close, open_, groups=groups, horizon=primary_horizon,
             cost_bps=cost_bps, tradeable=mask if exclude_limit_up else None,
@@ -1191,8 +1186,6 @@ def build_report(
         report.reproduction = {"status": "unavailable", "detail": str(exc)[:120]}
     # 分层 IC：流动性 / 市值 / 行业，全部在已加载宽表上切片
     try:
-        if fast:
-            raise _FastSkip
         _strata: dict[str, pd.DataFrame] = {}
         if amount is not None:
             _ar = amount.reindex(index=analysis_factor.index, columns=analysis_factor.columns).rank(

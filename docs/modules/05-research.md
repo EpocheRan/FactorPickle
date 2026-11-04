@@ -5,7 +5,7 @@
 ### 1.1 职责边界
 
 `research` 回答一个问题：**这个因子值不值得用**。它把因子面板 + 行情，变成一份可评审的
-报告（HTML）+ 一条可追踪的评分记录（`factor_scorecard`）。
+报告（HTML）+ 可复核的五维评分卡（评分逻辑与报告同源）。
 
 两节核心内容对应两个维度：
 
@@ -21,7 +21,7 @@
 | 上游 | `factors` | `F.ts(...)` 取价量因子 |
 | 上游 | `data_interface` | 只读 `common.config` / `timeutil` 建连接 |
 | 上游 | `factor_value_daily` | 财务因子从物化表读 |
-| 下游 | QuestDB `factor_scorecard` | 评级入库 |
+| 下游 | HTML 报告 + JSON | 报告与评分同源落盘 |
 | 下游 | `output/factor_reports/` | HTML 报告 + 汇总 CSV |
 
 ### 1.3 关键文件
@@ -37,7 +37,7 @@
 | `report/render.py` | `render(report, score, meta)`：教科书式 HTML（内联 SVG） |
 | `report/charts.py` | SVG 图表原语：折线/柱状（带误差棒）/净值+回撤/评分条/象限 |
 | `report/runner.py` | `generate`（单因子端到端） |
-| `report/scorecard.py` | `factor_scorecard` 建表与写入 |
+| `report/rating.py` | 五维评分与否决判定 |
 
 ### 1.4 数据流
 
@@ -50,7 +50,7 @@ build_report(factor, close, open, ...)          # 4 个持有期 IC + 分层 + �
       │
 rate(report)                                    # 评分 + 否决 + 象限
       ├─ render → output/factor_reports/<id>.html
-      └─ scorecard.save → factor_scorecard
+      └─ rating.rate → 五维评分（写入报告）
 ```
 
 ## 2. 核心类与方法

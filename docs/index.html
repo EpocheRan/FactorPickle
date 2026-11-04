@@ -848,7 +848,7 @@
             <div class="why-card-body">
               <div class="why-card-meta">03 / RESEARCH</div>
               <h3>报告经得起复核</h3>
-              <p>IC / NW-t、分层、衰减、成本、断言与失效归因；HTML 报告与评分卡同源。</p>
+              <p>评估项 + profile、分层 IC（流动性/市值/行业）、五维评分（时间 30 / 空间 20 / 兑现 20 / 增量 15 / 可交易 15）、样本池稳健性与失效归因；HTML 报告与评分逻辑同源。</p>
             </div>
           </article>
           <article class="why-card">
@@ -1137,7 +1137,7 @@ fields:[F('updated_at|TIMESTAMP|更新时间|pk'), F('name|SYMBOL|profile 名|pk
    fields:[F('job_id|SYMBOL|作业 ID|pk'), F('dataset|SYMBOL|数据集'), F('cursor|TIMESTAMP|游标'), F('status|SYMBOL|状态'), F('attempts|INT|重试次数'), F('rows_written|LONG|写入行数')]},
 
   {id:'factor_scorecard', cn:'因子评分卡', domain:'factor', core:true, writer:'research', readers:['scripts','research'],
-   desc:'因子评级结果：IC / ICIR / NW-t / 单调性 / 换手 / 覆盖率与四象限；按 run 去重保留历史。',
+   desc:'（已下线）历史评级表。评级已改为报告内五维评分，不再落库；本表仅保留历史快照',
    fields:[F('run_id|SYMBOL|评级批次|pk'), F('factor_id|SYMBOL|因子 ID|fk'), F('grade|SYMBOL|评级 A~D'), F('score|DOUBLE|总分'), F('ic_mean|DOUBLE|IC 均值'), F('turnover|DOUBLE|每期换手'), F('quadrant|SYMBOL|时间×空间象限')]},
 
   {id:'factor_alias', cn:'因子别名', domain:'factor', core:false, writer:'factor_engine', readers:['screener','backtest'],
@@ -1262,7 +1262,7 @@ const MODULES = [
    note:'create_profolio / list__profolio 是历史拼写，不要改名。交易记录才是台账真相来源。'},
 
   {id:'scripts', name:'scripts', cn:'运维脚本', layer:'运维层', color:'#94a3b8',
-   role:'一次性迁移、回填、体检、评分卡与方向校准；只做运维动作，不承载业务逻辑。',
+   role:'一次性迁移、回填、体检与方向校准；只做运维动作，不承载业务逻辑。',
    funcs:['init_database.py / migrate_database.py','migrate_market_type.py / migrate_market_to_exchange.py','factor_scorecard.py / factor_audit.py / factor_corr.py','backfill_history.py / backfill_factors.py','calibrate_directions.py / verify_p0_p2.py'],
    deps:['全模块'], tables:['factor_registry','factor_scorecard'],
    note:'迁移窗口只写新表、旧表冻结；完成后直接 DROP，不归档观察。'},
