@@ -78,7 +78,7 @@ docker logs mcp-app --tail 100
 uv sync
 cp config.example.json config.json
 
-python scripts/init_database.py     # 只需执行一次
+python scripts/maintenance/init_database.py     # 只需执行一次
 python MCPserver.py
 ```
 

@@ -37,7 +37,7 @@ services:
     restart: "no"
     command: >
       sh -c "pip install --no-cache-dir psycopg2-binary==2.9.11 &&
-             python scripts/init_database.py"
+             python scripts/maintenance/init_database.py"
 
   mcp-server:
     image: python:3.12-slim

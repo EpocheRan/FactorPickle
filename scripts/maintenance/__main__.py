@@ -1,7 +1,4 @@
-﻿"""数据运维入口：python -m data_interface.maintenance <cmd> --help
-
-各子命令保持原有脚本参数，只做转发，不含业务逻辑。
-"""
+"""数据运维入口：python -m scripts.maintenance <cmd> --help"""
 
 from __future__ import annotations
 
@@ -10,17 +7,17 @@ import importlib
 import sys
 
 COMMANDS = {
-    "init-db": "data_interface.maintenance.init_database",
-    "migrate-db": "data_interface.maintenance.migrate_database",
-    "migrate-factors": "data_interface.maintenance.migrate_factors",
-    "repair-index": "data_interface.maintenance.repair_index_data",
-    "fix-index-series": "data_interface.maintenance.fix_index_series",
-    "verify-backfill": "data_interface.maintenance.verify_p0_p2",
+    "init-db": "scripts.maintenance.init_database",
+    "migrate-db": "scripts.maintenance.migrate_database",
+    "migrate-factors": "scripts.maintenance.migrate_factors",
+    "repair-index": "scripts.maintenance.repair_index_data",
+    "fix-index-series": "scripts.maintenance.fix_index_series",
+    "verify-backfill": "scripts.maintenance.verify_p0_p2",
 }
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m data_interface.maintenance")
+    parser = argparse.ArgumentParser(prog="python -m scripts.maintenance")
     parser.add_argument("command", nargs="?", choices=sorted(COMMANDS), help="子命令")
     parser.add_argument("args", nargs=argparse.REMAINDER, help="透传给子命令")
     ns = parser.parse_args(argv)
