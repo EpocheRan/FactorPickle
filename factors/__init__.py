@@ -25,6 +25,7 @@ from .spec import (
     close_enough,
 )
 from .stored import SCREENER_DAILY_COLUMNS, StoredColumn
+from .ops import delta_volume as delta_ops
 from .ops import flow as flow_ops
 from .ops.price_factors import ALL_NAMES as ALL_PRICE_FACTORS
 from .ops.price_factors import register_price_ops

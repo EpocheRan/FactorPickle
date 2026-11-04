@@ -136,3 +136,66 @@ __all__ = [
     "margin_buy_ratio_20d",
     "margin_short_ratio",
 ]
+
+# ---------------------------------------------------------------- 主力/散户净买入
+@factor(
+    "sentiment.main_net_buy_20d",
+    unit="ratio",
+    window=20,
+    inputs=("mf_buy_lg", "mf_buy_elg", "mf_sell_lg", "mf_sell_elg", "amount"),
+)
+def main_net_buy_20d(frame: pd.DataFrame) -> pd.Series:
+    """主力净买入强度：MA20((大单+超大单净额)/成交额)，方向 +1。"""
+    buy = _col(frame, "mf_buy_lg") + _col(frame, "mf_buy_elg")
+    sell = _col(frame, "mf_sell_lg") + _col(frame, "mf_sell_elg")
+    ratio = (buy - sell) * 10000.0 / _amount(frame)   # 万元 → 元
+    return ratio.rolling(20, min_periods=10).mean()
+
+
+@factor(
+    "sentiment.retail_net_sell_20d",
+    unit="ratio",
+    window=20,
+    inputs=("mf_buy_sm", "mf_sell_sm", "amount"),
+)
+def retail_net_sell_20d(frame: pd.DataFrame) -> pd.Series:
+    """散户净买入强度：MA20((小单买入-卖出)/成交额)，方向 -1（反向指标）。"""
+    ratio = (_col(frame, "mf_buy_sm") - _col(frame, "mf_sell_sm")) * 10000.0 / _amount(frame)
+    return ratio.rolling(20, min_periods=10).mean()
+
+
+@factor(
+    "sentiment.main_retail_divergence_20d",
+    unit="ratio",
+    window=20,
+    inputs=("mf_buy_lg", "mf_buy_elg", "mf_sell_lg", "mf_sell_elg",
+            "mf_buy_sm", "mf_sell_sm", "amount"),
+)
+def main_retail_divergence_20d(frame: pd.DataFrame) -> pd.Series:
+    """主力散户背离 = 主力净买入 − 散户净买入，方向 +1。"""
+    main = (_col(frame, "mf_buy_lg") + _col(frame, "mf_buy_elg")
+            - _col(frame, "mf_sell_lg") - _col(frame, "mf_sell_elg"))
+    retail = _col(frame, "mf_buy_sm") - _col(frame, "mf_sell_sm")
+    ratio = (main - retail) * 10000.0 / _amount(frame)
+    return ratio.rolling(20, min_periods=10).mean()
+
+
+@factor(
+    "sentiment.main_net_persistence_20d",
+    unit="ratio",
+    window=20,
+    inputs=("mf_buy_lg", "mf_buy_elg", "mf_sell_lg", "mf_sell_elg"),
+)
+def main_net_persistence_20d(frame: pd.DataFrame) -> pd.Series:
+    """主力净买入持续性：过去 20 日净买入天数占比，方向 +1。"""
+    net = (_col(frame, "mf_buy_lg") + _col(frame, "mf_buy_elg")
+           - _col(frame, "mf_sell_lg") - _col(frame, "mf_sell_elg"))
+    return (net > 0).astype(float).rolling(20, min_periods=10).mean()
+
+# 新因子在文件末尾定义，注册需放在定义之后
+FLOW_FACTORS.update({
+    "sentiment.main_net_buy_20d": (main_net_buy_20d, 20, "ratio", +1, "moneyflow_daily"),
+    "sentiment.retail_net_sell_20d": (retail_net_sell_20d, 20, "ratio", -1, "moneyflow_daily"),
+    "sentiment.main_retail_divergence_20d": (main_retail_divergence_20d, 20, "ratio", +1, "moneyflow_daily"),
+    "sentiment.main_net_persistence_20d": (main_net_persistence_20d, 20, "ratio", +1, "moneyflow_daily"),
+})
