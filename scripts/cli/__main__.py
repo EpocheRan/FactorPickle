@@ -12,6 +12,7 @@ import sys
 COMMANDS = {
     "factor-report": ("scripts.cli.factor_report", "单因子报告 / 批量报告"),
     "factor-eval": ("scripts.cli.factor_eval", "批量因子评估（IC/价差/换手）"),
+    "factor-score": ("scripts.cli.factor_score", "快速评分（不生成 HTML）"),
     "profile": ("scripts.cli.profile", "评估 profile 管理"),
     "export-pool": ("scripts.cli.export_pool", "导出股票池"),
     "verify-equivalence": ("scripts.cli.verify_equivalence", "新旧评估口径等价性回放"),

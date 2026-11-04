@@ -644,12 +644,11 @@ def render(report, rating: dict, meta: dict) -> str:
 
     # ---------------- 评级规则
     rules_rows = [
-        ["预测力与稳定性", "45", "预测力 30 = 30×(0.6×min(1,IC/0.05)+0.4×min(1,ICIR/0.5))，IC/ICIR 为负记 0；"
-                                "稳定性 25 = 分年 CI 显著率×40% + 分状态显著率×30% + 滚动 12m IC 同号率×30%；"
-                                "两项合计后 ×45/55 合为一维"],
-        ["空间单调性", "15", "毛收益 ρ≥0.80→15，≥0.60→10，≥0.40→6，≥0→3，<0→0；IC<0 记 0"],
-        ["可交易性", "20", "覆盖率 6 + 换手 6 + 净价差 t 值 8（t≥2→8，≥1→5，≥0→3）"],
-        ["增量性", "20", "残差 IC 保留比例 ×10/15 + 相关性分散度 ×5/15，再按 20/15 折算；残差为负或相关≥0.95 记 0"],
+        ["时间维度", "30", "分年 CI 显著率 40% + 分状态显著率 30% + 滚动 12m 同号率 30%"],
+        ["空间维度", "20", "毛收益单调性 ρ 与 IC 正向强度合成；ρ<0 记 0"],
+        ["兑现维度", "20", "实测净价差 / (IC×2.5σ)，比值 0.8 以上记满分（折价系数）"],
+        ["增量维度", "15", "与同类因子的残差 IC 保留率；越独立分越高"],
+        ["可交易维度", "15", "覆盖率 40% + 换手便利 30% + 净价差 t 30%"],
     ]
     rules_table = _table(["分项", "满分", "评分规则"], rules_rows,
                          "等级线：A ≥ 85，B ≥ 70，C ≥ 55，D < 55。一票否决只把 A/B 封顶到 C，不改变原始分。"
@@ -864,6 +863,48 @@ def render(report, rating: dict, meta: dict) -> str:
     ]
     meta_table = _table(["运行信息", "取值"], meta_rows)
 
+
+    _real = rating.get("realization_score", float("nan"))
+    _advice = []
+    if rating["grade"] in ("A", "B"):
+        _advice.append(f"可进多因子合成，建议权重 {10 if rating['grade'] == 'B' else 15}%~"
+                       f"{15 if rating['grade'] == 'B' else 25}%。")
+    elif rating["grade"] == "C":
+        _advice.append("仅作为组合的辅助成分或过滤条件，不建议单独承担仓位。")
+    else:
+        _advice.append("归档，不建议使用；如要复用需重新设计信号或换样本。")
+    if np.isfinite(_real):
+        if _real >= 80:
+            _advice.append(f"兑现率 {_real:.0f}/100：IC 能基本兑现为分组收益。")
+        elif _real >= 40:
+            _advice.append(f"兑现率 {_real:.0f}/100：约 {_real:.0f}% 的 IC 兑现为价差，"
+                           "其余被成本与尾部稀释。")
+        else:
+            _advice.append(f"兑现率 {_real:.0f}/100：大部分 IC 未兑现，实际收益远低于统计显著性暗示的水平。")
+    if np.isfinite(report.turnover):
+        _advice.append(f"每期换手 {report.turnover:.0%}，"
+                       + ("适合 5–10 日调仓。" if report.turnover <= 0.5 else
+                          "建议 20 日以上调仓以摊薄成本。"))
+    _dims = [
+        ("时间", rating.get("time_score", 0.0), 30.0),
+        ("空间", rating.get("space_score", 0.0), 20.0),
+        ("兑现", rating.get("realization_score", 0.0), 20.0),
+        ("增量", rating.get("incremental_score", 0.0), 15.0),
+        ("可交易", rating.get("tradability_score", 0.0), 15.0),
+    ]
+    _vals_w = [float(v or 0.0) / 100.0 * w for _, v, w in _dims]
+    _labels_w = [f"{name} {val:.0f}/{w:.0f}" for (name, _, w), val in zip(_dims, _vals_w)]
+    _radar = charts.radar_chart(
+        _labels_w, _vals_w, maxes=[w for _, _, w in _dims], show_value=False,
+        caption=f"五维评分（加权分，合计 {sum(_vals_w):.1f}/100；评级 {rating['grade']}）",
+    )
+    radar_block = _radar
+    advice_block = (
+        "<h3>使用建议</h3><div class=\"block\"><ul>"
+        + "".join(f"<li>{_esc(item)}</li>" for item in _advice)
+        + "</ul></div>"
+    )
+
     warn_html = ""
     if report.warnings:
         warn_html = '<div class="warn"><b>诊断提示</b><br>' + "<br>".join(
@@ -915,10 +956,35 @@ def render(report, rating: dict, meta: dict) -> str:
              f"{rec['t']:.1f}" if np.isfinite(rec["t"]) else "—", f"{int(rec['n_days'])}"]
             for _, rec in _strat.iterrows()
         ]
+        _labels = [str(rec["stratum"]) for _, rec in _strat.iterrows()]
+        _vals = [float(rec["ic"]) for _, rec in _strat.iterrows()]
         strat_block = (
             "<h3>分层 IC：流动性 / 市值 / 行业</h3>"
-            + _table(["分层", "IC 均值", "独立 t", "样本日"], _rows,
-                     "注：在各层内部单独计算秩相关，掩码外置空；用于判断因子是否只在特定规模或流动性区间有效。")
+            + charts.bar_chart(_labels, _vals, height=250,
+                               formatter=lambda v: f"{v:+.3f}",
+                               caption="各层内部单独计算秩相关；L=流动性分层，S=市值五等分，行业为东财一级。")
+        )
+
+
+    _hs = getattr(report, "horizon_spreads", None)
+    horizon_block = ""
+    if _hs is not None and len(_hs):
+        _rows = [
+            [f"{int(rec['horizon'])} 日", str(rec["variant"]),
+             (f"{rec['gross']*100:+.2f}%", _cls(rec["gross"])),
+             (f"{rec['net']*100:+.2f}%", _cls(rec["net"])),
+             f"{rec['turnover']:.0%}" if np.isfinite(rec["turnover"]) else "—"]
+            for _, rec in _hs.iterrows()
+        ]
+        _labels = [f"{int(rec['horizon'])}日{'' if rec['variant'] == '原始' else '·中性'}"
+                   for _, rec in _hs.iterrows()]
+        _vals = [float(rec["gross"]) * 100 for _, rec in _hs.iterrows()]
+        horizon_block = (
+            "<h3>多持有期对比：5 / 10 / 20 日的 G5−G1</h3>"
+            + charts.bar_chart(_labels, _vals, height=220,
+                               formatter=lambda v: f"{v:+.2f}%",
+                               caption="毛价差/期（未扣多空两条腿成本）；「·中性」为 10 日持有期做市值中性化后的对照，"
+                                       "两者差即「押注市值」的贡献。")
         )
 
     neutral_block = ""
@@ -1111,7 +1177,7 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 <h3>多空净值、回撤与分年收益</h3>
 {perf_fig}
 <div class="grid2">{perf_table}{annual_table}</div>
-{strat_block}{neutral_block}
+{horizon_block}{strat_block}{neutral_block}
 {size_block}
 {inc_block}
 {trade_block}
@@ -1119,11 +1185,7 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 {cost_block}
 
 <h2><span class="no">04</span>评级与定位</h2>
-<div class="grid3">
-  <div>{quad_svg}<p class="small">时间维度 = 100×(0.4×年份 CI 显著率 + 0.3×状态 CI 显著率 + 0.3×滚动 12m IC 同号率)；
-  空间维度 = 100×clip(0.7×max(ρ,0) + 0.3×min(1,IC/0.06), 0, 1)。图：x=空间、y=时间，中线=60；
-  右上核心、右下择时、左上过滤、左下淘汰。</p></div>
-  <div class="verdict">
+<div class="verdict">
     <h3>结论：{_esc(rating['grade'])} 级 · {_esc(rating['quadrant'])}</h3>
     <p>{_esc(rating['usage'])}</p>
     <p class="small">评级看综合分与否决，象限看时间×空间；两者不一致时以评级为准，
@@ -1135,18 +1197,26 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
     <ul>{verdict_items}</ul>
     <p><b>关键判断：</b></p>
     <ul>{''.join(f'<li>{_esc(n)}</li>' for n in rating['notes'])}</ul>
+</div>
+<div class="grid2">
+  <div>{radar_block}</div>
+  <div>
+    {quad_svg}
+    <p class="small">时间维度 = 100×(0.4×年份 CI 显著率 + 0.3×状态 CI 显著率 + 0.3×滚动 12m IC 同号率)；
+    空间维度 = 100×clip(0.7×max(ρ,0) + 0.3×min(1,IC/0.06), 0, 1)。x=空间、y=时间，中线=60；
+    右上核心、右下择时、左上过滤、左下淘汰。</p>
+    <div class="cap" style="font-size:12px;color:var(--muted);margin-top:6px;">
+      <b>图 4-1</b>空间区分度 vs 时间稳定性。
+    </div>
   </div>
 </div>
+{advice_block}
 <h3>评级规则（可复核）</h3>
 {rules_table}
 {veto_table}
 <h3>结构化自检（断言）</h3>
 {diag_table}
 {warn_html}
-{score_svg}
-<div class="cap" style="font-size:12px;color:var(--muted);margin-top:6px;">
-  <b>图 4-1</b>评分卡（满分 100）：预测力与稳定性 45 + 空间单调性 15 + 可交易性 20 + 增量性 20。
-</div>
 
 <h3>重估条件（什么情况下应推翻本结论）</h3>
 <ul class="small">

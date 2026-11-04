@@ -19,10 +19,12 @@ import numpy as np
 from . import diagnostics as diag
 
 GRADE_LINES = (("A", 85.0), ("B", 70.0), ("C", 55.0))
-SCORECARD_VERSION = "v2.2-2026-11"
+SCORECARD_VERSION = "v2.3-2026-11"
 
 #: 口径变更记录（写入报告，便于跨版本比较时判断差异来源）
 SCORECARD_CHANGELOG = [
+    "v2.3：IC 与价差背离由一票否决改为折价系数，纳入三维综合分（时间40%/空间35%/兑现25%）",
+    "v2.3：修复暖机数据被提前裁掉，长窗因子样本从 2020-09 提前到 2020-01",
     "v2.2：恢复市场状态划分（创业板指 200 日均线 ±3%），时间分含牛/震荡/熊稳定性",
     "v2.2：多空净值个股收益缩尾 ±30%，修复单期异常价差导致的净值跳崖",
 ]
@@ -227,13 +229,6 @@ def rate(report) -> dict:
             "status": trade_status,
         },
         {
-            "rule": "IC 与价差背离",
-            "threshold": "实测毛价差 / IC 隐含价差 ∈ [0.5, 1.5]",
-            "actual": ic_spread_actual,
-            "triggered": bool(ic_spread_triggered),
-            "status": "触发" if ic_spread_triggered else "通过",
-        },
-        {
             "rule": "换手过高（每期）",
             "threshold": "> 80%",
             "actual": f"{report.turnover:.0%}" if np.isfinite(report.turnover) else "—",
@@ -252,12 +247,47 @@ def rate(report) -> dict:
     # ---- 二维定位
     time_score = 100.0 * (0.4 * year_base + 0.3 * regime_base + 0.3 * rolling_base)
     space_score = 100.0 * _clip01(0.7 * max(mono, 0.0) + 0.3 * min(1.0, ic_pos / 0.06))
+
+    # ---- 第三维：兑现率（IC 隐含价差 vs 实测净价差）
+    # 不再一票否决，改为折价系数：ratio≥0.8 记满分，线性折算，最低 0。
+    _ratio = float(ic_spread_ratio) if np.isfinite(ic_spread_ratio) else float("nan")
+    realization = 100.0 * _clip01(_ratio / 0.8) if np.isfinite(_ratio) else 50.0
+    transmission_note = (
+        f"实测净价差 / IC 隐含价差 = {_ratio:.2f}（≥0.8 视为完全兑现）"
+        if np.isfinite(_ratio) else "传导比不可计算（IC 或截面波动缺失）"
+    )
+
+    # 综合分：时间 40% + 空间 35% + 兑现 25%
+    # 第四维：增量性（与同类因子的区分度），原 0-20 分制归一到 0-100
+    incremental_score = 100.0 * min(1.0, max(0.0, incremental) / 20.0)
+
+    # 第五维：可交易性 = 覆盖率 40% + 换手便利 30% + 净价差 t 30%
+    _cov = float(getattr(report, "coverage", 0.0) or 0.0)
+    _to = float(report.turnover) if np.isfinite(report.turnover) else 1.0
+    _net_t = float((report.spread_net or {}).get("t", 0.0) or 0.0)
+    tradability_score = 100.0 * _clip01(
+        0.4 * min(1.0, _cov / 0.90)
+        + 0.3 * max(0.0, 1.0 - _to / 0.80)
+        + 0.3 * min(1.0, max(0.0, _net_t) / 2.0)
+    )
+
+    # 权威口径：时间 30 + 空间 20 + 兑现 20 + 增量 15 + 可交易 15
+    total = (0.30 * time_score + 0.20 * space_score + 0.20 * realization
+             + 0.15 * incremental_score + 0.15 * tradability_score)
+    raw_grade = "A" if total >= 85 else "B" if total >= 72 else "C" if total >= 55 else "D"
+    # 综合分重算后重新定级，其余否决项仍然封顶
+    grade = raw_grade
+    capped = False
+    if vetoes and grade in ("A", "B"):
+        grade = "C"
+        capped = True
+    _weight = {"A": "15%~25%", "B": "10%~15%", "C": "5%~8%"}.get(grade, "0（归档）")
     if time_score >= 60 and space_score >= 60:
-        quadrant = ("核心因子", "可直接进多因子合成，权重 15%~25%")
+        quadrant = ("核心因子", f"可直接进多因子合成，建议权重 {_weight}")
     elif time_score < 60 and space_score >= 60:
-        quadrant = ("择时因子", "空间区分度强但状态依赖，只在特定 regime 启用")
+        quadrant = ("择时因子", f"空间区分度强但状态依赖，只在特定 regime 启用（权重 {_weight}）")
     elif time_score >= 60 and space_score < 60:
-        quadrant = ("过滤因子", "适合做负面剔除/风控条件，不做打分")
+        quadrant = ("过滤因子", f"适合做负面剔除/风控条件，不做打分（权重 {_weight}）")
     else:
         quadrant = ("淘汰", "时间与空间均不达标，归档并记录失效原因")
 
@@ -297,6 +327,10 @@ def rate(report) -> dict:
         "grade_lines": GRADE_LINES,
         "time_score": round(time_score, 1),
         "space_score": round(space_score, 1),
+        "realization_score": round(realization, 1),
+        "incremental_score": round(incremental_score, 1),
+        "tradability_score": round(tradability_score, 1),
+        "transmission_note": transmission_note,
         "quadrant": quadrant[0],
         "usage": quadrant[1],
         "attribution": attribution,

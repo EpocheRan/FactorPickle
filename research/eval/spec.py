@@ -21,7 +21,7 @@ class EvalSpec:
     """
 
     universe: str = "all_a"
-    start: str = "2020-01-01"
+    start: str = "2019-01-01"
     end: str | None = None
     #: 前向收益 = close[t+h] / open[t+1] - 1
     horizon: int = 20

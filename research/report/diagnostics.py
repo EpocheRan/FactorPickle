@@ -153,7 +153,10 @@ def ic_spread_transmission(
     """IC 能否按理论系数传导成 Q5−Q1（毛价差，期均值）。
 
     期望价差 = IC × 横截面收益标准差 × 2.80（五分位正态近似）。
-    实测/期望 <0 或 >2 时报警：前者是符号/对齐错误，后者说明价差被少数极值主导。
+
+    与评级共用同一阈值 [0.5, 1.5]：低于 0.5 记为「折价」（传导不足），
+    高于 1.5 说明价差被少数极值放大。两者都只告警，不再一票否决，
+    折价程度以 realization_score 计入综合分。
     """
     if not np.isfinite(ic) or not np.isfinite(sigma) or sigma <= 0 or not np.isfinite(spread_gross):
         return Check("ic_transmission", "IC→Q5−Q1 传导", "skip", "—", "—", "数据不足")
@@ -166,13 +169,14 @@ def ic_spread_transmission(
         f"实测 {spread_gross * 100:+.2f}%/期 vs 期望 {expected * 100:+.2f}%/期"
         f"（IC {ic:+.3f}×σ {sigma:.1%}×{multiplier:.2f}），比值 {ratio:+.2f}"
     )
-    if ratio < 0 or ratio > 2:
-        return Check(
-            "ic_transmission", "IC→Q5−Q1 传导", "warn", actual, "0 < 实测/期望 < 2",
-            "符号相反说明 IC 与分组收益不是同一口径（重叠期/极值/复利）；"
-            "比值 >2 说明价差被少数极端收益放大。此时不能只用 IC 判断因子好坏。",
-        )
-    return Check("ic_transmission", "IC→Q5−Q1 传导", "pass", actual, "0 < 实测/期望 < 2", "")
+    if 0.5 <= ratio <= 1.5:
+        return Check("ic_transmission", "IC→Q5−Q1 传导", "pass", actual, "0.5 ≤ 实测/期望 ≤ 1.5", "")
+    if ratio < 0:
+        return Check("ic_transmission", "IC→Q5−Q1 传导", "warn", actual, "0.5 ≤ 实测/期望 ≤ 1.5",
+                     "符号相反说明 IC 与分组收益不是同一口径（重叠期/极值/复利）。")
+    return Check("ic_transmission", "IC→Q5−Q1 传导", "warn", actual, "0.5 ≤ 实测/期望 ≤ 1.5",
+                 f"传导比 {ratio:.2f}：IC 只兑现了 {ratio:.0%}，其余被成本与尾部稀释；"
+                 "已按折价系数计入综合分，不触发否决。")
 
 
 def tradeability_interval(spread_gross: dict, cost: float) -> Check:

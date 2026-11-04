@@ -75,6 +75,21 @@ def _industry_frame(industry, close):
     return pd.DataFrame(data, index=close.index, columns=cols)
 
 
+def _slice_to_eval(panel, factor, start: str):
+    """因子算完后裁到评估区间：面板与因子同时从 start 开始。"""
+    start_ts = pd.Timestamp(start).normalize()
+    idx = panel.close.index[panel.close.index >= start_ts]
+    if len(idx) == 0:
+        return panel, factor
+    sliced = {}
+    for name, value in vars(panel).items():
+        if isinstance(value, pd.DataFrame):
+            sliced[name] = value.reindex(index=idx)
+        else:
+            sliced[name] = value
+    return Panel(**sliced), factor.reindex(index=idx)
+
+
 def _resolve_panel(factor_id: str, pool_date: str, pool_size: int, start: str,
                    end: str | None, extras: tuple[str, ...] = ()) -> tuple[Panel, pd.DataFrame]:
     panel = load_panel(pool_date, pool_size, start, end, extras=extras)
@@ -83,10 +98,10 @@ def _resolve_panel(factor_id: str, pool_date: str, pool_size: int, start: str,
         frame = financial_factor_panel(factor_id, panel.close, str(panel.close.index.min().date()), str(panel.data_cutoff.date()))
         if frame.empty:
             raise RuntimeError(f"{factor_id} 无物化数据（先跑 backfill_factors.py）")
-        return panel, frame
+        return _slice_to_eval(panel, frame, start)
     if category == "sentiment":
-        return panel, flow_factor_panel(factor_id, panel)
-    return panel, price_factor_panel(factor_id, panel)
+        return _slice_to_eval(panel, flow_factor_panel(factor_id, panel), start)
+    return _slice_to_eval(panel, price_factor_panel(factor_id, panel), start)
 
 
 def _pool_symbols(panel: Panel, pool_date: str, pool_size: int) -> tuple[str, ...]:
@@ -221,6 +236,9 @@ def generate(
     verify_repro: bool = True,
     panel: Panel | None = None,
     neutralize: bool = False,
+    horizon: int = 5,
+    groups: int = 5,
+    eval_horizon: int | None = None,
 ) -> dict:
     # 批量场景由调用方预加载面板，避免每个因子重复取数
     if panel is None:
@@ -257,6 +275,8 @@ def generate(
         definition=definition.as_dict(), pool=panel.pool, freshness=panel.freshness,
         is_st=panel.is_st,
         neutralize=neutralize,
+        primary_horizon=horizon,
+        groups=groups,
     )
     if robustness:
         report.pool_robustness = _pool_robustness(

@@ -547,3 +547,60 @@ def histogram(
                      f'{_esc(caption)}</text>')
     parts.append("</svg>")
     return "".join(parts)
+
+
+def radar_chart(
+    axes: Sequence[str],
+    values: Sequence[float],
+    *,
+    size: float = 420,
+    full: float = 100.0,
+    maxes: Sequence[float] | None = None,
+    show_value: bool = True,
+    color: str = BURGUNDY,
+    caption: str | None = None,
+) -> str:
+    """三维雷达图：axes 为维度名，values 为 0~full 的分数。"""
+    import math
+
+    cx = cy = size / 2
+    radius = size * 0.32
+    n = len(axes)
+    angles = [-math.pi / 2 + 2 * math.pi * i / n for i in range(n)]
+
+    def pt(i: int, r: float) -> tuple[float, float]:
+        return cx + r * math.cos(angles[i]), cy + r * math.sin(angles[i])
+
+    pad = 72  # 左右留白，避免轴标签被 viewBox 裁掉
+    parts = [f'<svg viewBox="{-pad} 0 {size + 2 * pad} {size}" width="100%" '
+             f'style="width:100%;height:auto;overflow:visible" role="img">']
+    for ring in (0.25, 0.5, 0.75, 1.0):
+        pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, radius * ring) for i in range(n)))
+        parts.append(f'<polygon points="{pts}" fill="none" stroke="#e3e6ea" stroke-width="1"/>')
+    for i in range(n):
+        x, y = pt(i, radius)
+        parts.append(f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{x:.1f}" y2="{y:.1f}" stroke="#e3e6ea" stroke-width="1"/>')
+    poly = []
+    for i, v in enumerate(values):
+        _cap = float(maxes[i]) if maxes else full
+        ratio = max(0.0, min(1.0, (v if v == v else 0.0) / max(_cap, 1e-9)))
+        poly.append(pt(i, radius * ratio))
+    parts.append('<polygon points="' + " ".join(f"{x:.1f},{y:.1f}" for x, y in poly)
+                 + f'" fill="{color}" fill-opacity="0.16" stroke="{color}" stroke-width="2"/>')
+    for i, v in enumerate(values):
+        x, y = poly[i]
+        parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.2" fill="{color}"/>')
+    for i, name in enumerate(axes):
+        lx, ly = pt(i, radius * 1.14)
+        anchor = "middle"
+        if math.cos(angles[i]) > 0.3:
+            anchor = "start"
+        elif math.cos(angles[i]) < -0.3:
+            anchor = "end"
+        _txt = f"{_esc(name)} {values[i]:.0f}" if show_value else _esc(name)
+        parts.append(f'<text x="{lx:.1f}" y="{ly:.1f}" font-size="11" fill="#5b6470" text-anchor="{anchor}">{_txt}</text>')
+    parts.append("</svg>")
+    svg = "".join(parts)
+    if caption:
+        return f'<figure class="chart">{svg}<figcaption>{_esc(caption)}</figcaption></figure>'
+    return f'<figure class="chart">{svg}</figure>'

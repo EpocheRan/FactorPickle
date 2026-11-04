@@ -108,7 +108,7 @@ def _regime_for(dates: pd.DatetimeIndex):
 def load_panel(
     pool_date: str | None = None,
     pool_size: int | None = None,
-    start: str = "2020-01-01",
+    start: str = "2019-01-01",
     end: str | None = None,
     *,
     min_amount: float | None = None,
@@ -134,7 +134,9 @@ def load_panel(
     _extras_map = _extras_wide(data)
 
     close = _pivot(frame, "hfq_close").sort_index()
-    close = close.reindex(index=data.dates)
+    # 保留 warmup 行：长窗因子（如 504 日）必须用预热数据，否则有效样本会晚半年以上。
+    # 评估区间裁剪交给 runner（因子算完之后再切）。
+    close = close.sort_index()
     columns = close.columns
     open_ = _pivot(frame, "hfq_open").reindex(index=close.index, columns=columns)
     high = _pivot(frame, "hfq_high").reindex(index=close.index, columns=columns) if "hfq_high" in frame else close

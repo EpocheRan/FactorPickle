@@ -19,6 +19,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
+
+
+class _FastSkip(Exception):
+    """fast 模式内部用于跳过重计算。"""
+
 import pandas as pd
 
 from . import diagnostics as diag
@@ -582,6 +587,7 @@ class FactorReport:
 
     filter_test: dict = field(default_factory=dict)
     strat_ic: object | None = None
+    horizon_spreads: object | None = None
     annual_ic_return: pd.DataFrame | None = None
 
     ic_neutral: pd.DataFrame | None = None
@@ -972,6 +978,7 @@ def build_report(
     definition: dict | None = None,
     pool: dict | None = None,
     neutralize: bool = False,
+    fast: bool = False,
     freshness: dict | None = None,
     is_st: dict[str, bool] | None = None,
     exclude_limit_up: bool = False,
@@ -1160,6 +1167,8 @@ def build_report(
     # 复现自检：用完全相同的因子对象与参数再跑一次，比较结果是否逐点一致。
     # 必须在内部完成——外部重新推导输入会因中性化/裁剪等变换而失真。
     try:
+        if fast:
+            raise _FastSkip
         _again = _quantile_nav(
             analysis_factor, close, open_, groups=groups, horizon=primary_horizon,
             cost_bps=cost_bps, tradeable=mask if exclude_limit_up else None,
@@ -1182,6 +1191,8 @@ def build_report(
         report.reproduction = {"status": "unavailable", "detail": str(exc)[:120]}
     # 分层 IC：流动性 / 市值 / 行业，全部在已加载宽表上切片
     try:
+        if fast:
+            raise _FastSkip
         _strata: dict[str, pd.DataFrame] = {}
         if amount is not None:
             _ar = amount.reindex(index=analysis_factor.index, columns=analysis_factor.columns).rank(
@@ -1255,6 +1266,52 @@ def build_report(
         report.spread_gross = diag.spread_stats(gross_spread)
         report.spread_net = diag.spread_stats(net_spread)
         report.cost_mean = float(cost_series.mean()) if len(cost_series) else float("nan")
+
+        # 多持有期对比（5/10/20 日）＋ 10 日市值中性化版本
+        _hs_rows = []
+        _results = {}
+        for _h in (5, 10, 20):
+            try:
+                if _h == primary_horizon:
+                    _g, _n = period_gross, period_returns
+                    _to = float(turnover_df.mean().mean()) if len(turnover_df) else float("nan")
+                else:
+                    _nav_h, _to_h, _pr_h, _pg_h, _daily_h, _lsc_h, _tmean = _quantile_nav(
+                        analysis_factor, close, open_, groups=groups, horizon=_h,
+                        cost_bps=cost_bps,
+                        tradeable=mask if exclude_limit_up else None,
+                    )
+                    _g, _n = _pg_h, _pr_h
+                    _to = float(_to_h.mean().mean()) if len(_to_h) else float("nan")
+                _hi, _lo = f"Q{groups}", "Q1"
+                _gs = float((_g[_hi] - _g[_lo]).mean())
+                _ns = float((_n[_hi] - _n[_lo]).mean())
+                _hs_rows.append({
+                    "horizon": _h, "variant": "原始",
+                    "gross": _gs, "net": _ns, "turnover": _to,
+                })
+                _results[_h] = (_gs, _ns)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("持有期 %s 计算失败: %s", _h, exc)
+
+        # 10 日 + 市值中性化
+        try:
+            _neu = neutralize_factor(analysis_factor, market_cap)
+            _nav_n, _to_n, _pr_n, _pg_n, _d_n, _l_n, _tm_n = _quantile_nav(
+                _neu, close, open_, groups=groups, horizon=10, cost_bps=cost_bps,
+                tradeable=mask if exclude_limit_up else None,
+            )
+            _hi, _lo = f"Q{groups}", "Q1"
+            _hs_rows.append({
+                "horizon": 10, "variant": "市值中性",
+                "gross": float((_pg_n[_hi] - _pg_n[_lo]).mean()),
+                "net": float((_pr_n[_hi] - _pr_n[_lo]).mean()),
+                "turnover": float(_to_n.mean().mean()) if len(_to_n) else float("nan"),
+            })
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("10 日中性化对比失败: %s", exc)
+
+        report.horizon_spreads = pd.DataFrame(_hs_rows)
         report.filter_test = _filter_test(period_returns, primary_horizon)
         if len(net_spread) > 10:
             ls_nav = (1 + net_spread).cumprod()

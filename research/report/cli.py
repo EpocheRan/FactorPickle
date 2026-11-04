@@ -101,6 +101,8 @@ def main() -> int:
     parser.add_argument("--pool-date", default="2017-11-01")
     parser.add_argument("--start", default="2019-01-01")
     parser.add_argument("--end", default=None)
+    parser.add_argument("--horizon", type=int, default=5, help="主持有期（交易日）")
+    parser.add_argument("--groups", type=int, default=5, help="分组数")
     parser.add_argument("--neutralize", action="store_true", help="横截面市值中性化后再评估")
     parser.add_argument("--out", default="output/factor_reports")
     parser.add_argument("--category", default=None)
@@ -135,6 +137,8 @@ def main() -> int:
             direction=args.direction,
             out_dir=args.out,
             neutralize=getattr(args, "neutralize", False),
+            horizon=int(getattr(args, "horizon", 5)),
+            groups=int(getattr(args, "groups", 5)),
             panel=shared_panel,
         )
         rating = result["rating"]
@@ -150,6 +154,7 @@ def main() -> int:
                 _, meta = _run_pipeline(
                     [factor],
                     profile=args.profile,
+                    horizon=int(getattr(args, "horizon", 5)),
                     universe=f"pool:{args.pool_date}:{args.pool}",
                     start=args.start,
                     end=args.end,
