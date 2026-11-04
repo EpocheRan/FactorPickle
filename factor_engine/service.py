@@ -109,8 +109,27 @@ class FactorEngineService:
         codes: Sequence[str] | None = None,
         *,
         write_latest: bool = True,
+        resume: bool = False,
+        skip_existing: bool = False,
     ) -> dict[str, Any]:
         ids = [str(item) for item in (factor_ids or self.all_ids)]
+        # B) 跳过已跑到结束日的因子；A) 从各自最新日期之后续算
+        _end_ts = pd.Timestamp(end_date).normalize()
+        _resume_from: dict[str, pd.Timestamp] = {}
+        if skip_existing or resume:
+            kept = []
+            for fid in ids:
+                latest = self.store.latest_ts(fid)
+                if skip_existing and latest is not None and latest >= _end_ts:
+                    logger.info("%s 已覆盖到 %s，跳过", fid, latest.date())
+                    continue
+                if resume and latest is not None and latest > pd.Timestamp(start_date).normalize():
+                    _resume_from[fid] = latest + pd.Timedelta(days=1)
+                kept.append(fid)
+            ids = kept
+            if not ids:
+                return {"job_id": None, "rows_written": 0, "factor_ids": [],
+                        "reason": "all factors already up to date"}
         specs = [get_spec(item) for item in ids]
         spec_by_id = {spec.factor_id: spec for spec in specs}
         legacy_specs = [
@@ -282,6 +301,14 @@ class FactorEngineService:
                             "computed_at": computed_at,
                         }
                     )
+
+        if _resume_from:
+            before = len(records)
+            records = [
+                r for r in records
+                if r["ts"] >= _resume_from.get(str(r["factor_id"]), pd.Timestamp.min)
+            ]
+            logger.info("resume 过滤：%s -> %s 行", before, len(records))
 
         if not records:
             return {

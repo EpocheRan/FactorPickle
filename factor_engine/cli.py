@@ -46,6 +46,10 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--end", required=True)
     build.add_argument("--factor", default=None, help="逗号分隔 factor_id，默认全部内置")
     build.add_argument("--codes", default=None, help="逗号分隔代码，默认全市场")
+    build.add_argument("--resume", action="store_true",
+                       help="从各因子最新日期之后续算")
+    build.add_argument("--skip-existing", action="store_true",
+                       help="跳过已跑到结束日的因子")
     build.add_argument("--top-amount", type=int, default=0,
                        help="按参考日成交额取前 N 只（覆盖 --codes）")
 
@@ -73,6 +77,8 @@ def main(argv: list[str] | None = None) -> int:
             args.start,
             args.end,
             codes,
+            resume=args.resume,
+            skip_existing=args.skip_existing,
         )
         print(json.dumps(result, ensure_ascii=False, default=str))
         return 0
