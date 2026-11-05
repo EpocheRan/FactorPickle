@@ -225,12 +225,45 @@ function lineChart(svg,tip,labels,series,opt={}){
   });
   g+=`<rect x="${pl}" y="${pt}" width="${W-pl-pr}" height="${H-pt-pb}" fill="transparent"/>`;
   svg.innerHTML=g;
+  const NS='http://www.w3.org/2000/svg';
+  const layer=document.createElementNS(NS,'g');
+  layer.setAttribute('pointer-events','none');
+  const vline=document.createElementNS(NS,'line');
+  vline.setAttribute('stroke','#8b949e');
+  vline.setAttribute('stroke-dasharray','3 3');
+  vline.setAttribute('stroke-width','1');
+  vline.style.display='none';
+  layer.appendChild(vline);
+  const dots=series.map(s=>{
+    const dot=document.createElementNS(NS,'circle');
+    dot.setAttribute('r','4.2');
+    dot.setAttribute('fill',s.color);
+    dot.setAttribute('stroke','#0d1117');
+    dot.setAttribute('stroke-width','1.5');
+    dot.style.display='none';
+    layer.appendChild(dot);
+    return dot;
+  });
+  svg.appendChild(layer);
   const wrap=svg.parentElement;
   const rect=()=>svg.getBoundingClientRect();
   svg.onmousemove=e=>{
     const r=rect(), mx=e.clientX-r.left;
-    if(mx<pl||mx>W-pr){tip.style.display='none';return;}
+    if(mx<pl||mx>W-pr){tip.style.display='none';vline.style.display='none';dots.forEach(d=>d.style.display='none');return;}
     const i=Math.max(0,Math.min(n-1,Math.round((mx-pl)/((W-pl-pr)/Math.max(1,n-1)))));
+    vline.setAttribute('x1',x(i));vline.setAttribute('x2',x(i));
+    vline.setAttribute('y1',pt);vline.setAttribute('y2',H-pb);
+    vline.style.display='';
+    series.forEach((s,j)=>{
+      const v=s.values[i];
+      if(Number.isFinite(v)){
+        dots[j].setAttribute('cx',x(i));
+        dots[j].setAttribute('cy',y(v));
+        dots[j].style.display='';
+      }else{
+        dots[j].style.display='none';
+      }
+    });
     let html=`<b>${labels[i]}</b>`;
     series.forEach(s=>{if(Number.isFinite(s.values[i]))html+=`<div style="color:${s.color}">${s.name}: ${opt.tipFmt?opt.tipFmt(s.values[i]):fmtNum(s.values[i])}</div>`;});
     tip.innerHTML=html;tip.style.display='block';
@@ -238,7 +271,7 @@ function lineChart(svg,tip,labels,series,opt={}){
     tip.style.left=Math.min(r.width-170,Math.max(0,left+10))+'px';
     tip.style.top=(e.clientY-r.top+10)+'px';
   };
-  svg.onmouseleave=()=>{tip.style.display='none';};
+  svg.onmouseleave=()=>{tip.style.display='none';vline.style.display='none';dots.forEach(d=>d.style.display='none');};
 }
 
 function drawEquity(){
@@ -300,7 +333,7 @@ function drawRolling(){
 }
 
 function drawScatter(){
-  const svg=$('scatterChart');const W=520,H=260,pl=46,pr=14,pt=14,pb=30;
+  const svg=$('scatterChart');const W=560,H=320,pl=58,pr=16,pt=16,pb=56;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
   if(!D.benchmark||!D.benchmark.series||!D.benchmark.series.length){
     svg.innerHTML='<text x="20" y="30" fill="#8b949e">未配置基准</text>';return;
@@ -318,9 +351,21 @@ function drawScatter(){
   const pad=1;x0-=pad;x1+=pad;y0-=pad;y1+=pad;
   const X=v=>pl+(W-pl-pr)*(v-x0)/(x1-x0), Y=v=>pt+(H-pt-pb)*(1-(v-y0)/(y1-y0));
   let g='';
-  for(let k=0;k<=4;k++){const yy=pt+(H-pt-pb)*k/4;g+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" stroke="#222b36"/>`;}
-  g+=`<line x1="${pl}" y1="${H-pb}" x2="${W-pr}" y2="${H-pb}" stroke="#444"/>`;
-  g+=`<line x1="${pl}" y1="${pt}" x2="${pl}" y2="${H-pb}" stroke="#444"/>`;
+  for(let k=0;k<=4;k++){
+    const yy=pt+(H-pt-pb)*k/4;
+    g+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" stroke="#222b36"/>`;
+    const xv=x0+(x1-x0)*k/4, xx=X(xv);
+    g+=`<line x1="${xx}" y1="${pt}" x2="${xx}" y2="${H-pb}" stroke="#1b232d"/>`;
+    g+=`<text x="${xx}" y="${H-pb+16}" text-anchor="middle" fill="#8b949e" font-size="10">${fmtNum(xv,1)}%</text>`;
+    const yv=y1-(y1-y0)*k/4;
+    g+=`<text x="${pl-7}" y="${Y(yv)+4}" text-anchor="end" fill="#8b949e" font-size="10">${fmtNum(yv,1)}%</text>`;
+  }
+  g+=`<line x1="${pl}" y1="${H-pb}" x2="${W-pr}" y2="${H-pb}" stroke="#555"/>`;
+  g+=`<line x1="${pl}" y1="${pt}" x2="${pl}" y2="${H-pb}" stroke="#555"/>`;
+  if(x0<0&&x1>0)g+=`<line x1="${X(0)}" y1="${pt}" x2="${X(0)}" y2="${H-pb}" stroke="#3a4654"/>`;
+  if(y0<0&&y1>0)g+=`<line x1="${pl}" y1="${Y(0)}" x2="${W-pr}" y2="${Y(0)}" stroke="#3a4654"/>`;
+  g+=`<text x="${(pl+W-pr)/2}" y="${H-6}" text-anchor="middle" fill="#8b949e" font-size="10.5">基准日收益 %</text>`;
+  g+=`<text transform="translate(13 ${(pt+H-pb)/2}) rotate(-90)" text-anchor="middle" fill="#8b949e" font-size="10.5">策略日收益 %</text>`;
   pts.forEach(p=>{g+=`<circle cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="1.7" fill="#58a6ff" opacity=".55"/>`;});
   const n=pts.length,sx=xs.reduce((a,b)=>a+b,0),sy=ys.reduce((a,b)=>a+b,0);
   const sxx=xs.reduce((a,b)=>a+b*b,0),sxy=pts.reduce((a,p)=>a+p[0]*p[1],0);
