@@ -1,8 +1,5 @@
 # 07 · backtest（回测引擎）
 
-> 详细设计见 [../design/backtest_architecture.md](../design/backtest_architecture.md)，用法见
-> [../guides/backtest.md](../guides/backtest.md)。本篇只给架构定位与核心 API 速查。
-
 ## 1. 架构与依赖
 
 ### 1.1 职责边界
@@ -10,16 +7,19 @@
 `backtest` 是**唯一的撮合与资金曲线实现**：给定策略 + 行情 + 因子，产出订单、成交、持仓、
 净值与绩效指标。它保证 A 股规则：T+1、整手、涨跌停不可成交、停牌、印花税/佣金/过户费。
 
-`PyBroker` 是 **optional extra**（`uv sync --extra backtest`），MCP 运行时不加载。
+- **执行引擎**：RQAlpha 6.5.x（optional extra `backtest`，MCP 运行时不加载）。
+- **数据**：`data_interface` 已载入的 `DataBundle`；引擎不直接访问 QuestDB。
+- **规则**：自建 `a_share.py`（涨跌停价、整手、费用、T+1 台账）。
+- **净值**：`equity/metrics` 以 RQAlpha 组合为准；自建 `PortfolioLedger` 保留为对账 oracle。
 
 ### 1.2 上下游
 
 | 方向 | 模块 | 关系 |
 |---|---|---|
-| 上游 | `strategies` | 策略定义（`BaseStrategy` 子类 / `STRATEGY` 模块变量） |
+| 上游 | `strategies` | 策略类 / `STRATEGY` 模块变量 |
 | 上游 | `factors` | 因子面板（`build_panel`） |
 | 上游 | `factor_engine` | 读 STORED 因子 |
-| 上游 | `data_interface` | 行情、交易日历 |
+| 上游 | `data_interface` | 行情、交易日历、证券状态 |
 | 下游 | `output/backtest/<run_id>/` | orders/trades/equity/metrics |
 
 ### 1.3 关键文件
@@ -27,36 +27,47 @@
 | 文件 | 作用 |
 |---|---|
 | `application/runner.py` | `BacktestRunner`：`run` / `optimize` / `walkforward` |
-| `application/loader.py` | 加载策略模块的 `STRATEGY` |
-| `application/cross_section.py` | 横截面混合架构（向量化选股 + PyBroker 执行候选集） |
-| `config.py` | `BacktestSettings.from_dict` |
-| `domain/models.py` | `RunSpec` / `ExecutionRules` / `DataBundle` / `FillMode` |
-| `infrastructure/engine/pybroker_engine.py` | PyBroker 封装 |
-| `infrastructure/data/questdb.py` | 只读行情源 |
-| `execution/ledger.py` | 自建账本 `PortfolioLedger` |
-| `research/service.py` | 因子研究（IC/分层/换手/衰减） |
+| `application/cross_section.py` | 向量化选股 → 调仓日 targets + 每日 ranks |
+| `application/rebalance.py` | 调仓日期门控 |
+| `application/registry.py` | 数据源 / 输出 / 引擎注册（当前只有 `rqalpha`） |
+| `infrastructure/engine/rqalpha/engine.py` | `RQAlphaEngine`：`EngineRequest → BacktestResult` |
+| `infrastructure/engine/rqalpha/source.py` | `DataBundle` → RQAlpha 日线数据源 |
+| `infrastructure/engine/rqalpha/adapter.py` | 策略回调：T 日排队、T+1 开盘提交、止损 |
+| `infrastructure/engine/rqalpha/cost.py` | `FeeModel` → RQAlpha 费用接口 |
+| `infrastructure/engine/rqalpha/mod.py` | 把数据源 / 费用注入 RQAlpha |
+| `infrastructure/execution/a_share.py` | 涨跌停价、整手、T+1、费用 |
+| `infrastructure/execution/ledger.py` | `PortfolioLedger`、`reconcile`、指标 |
+| `domain/models.py` | `RunSpec` / `ExecutionRules` / `BacktestResult` |
 
 ### 1.4 数据流
 
 ```
 BacktestRunner.run(strategy_path)
-   ├─ loader 加载 STRATEGY → BaseStrategy 实例
+   ├─ loader 加载 STRATEGY → BaseStrategy
    ├─ _resolve_universe（explicit / all_a / index）
    ├─ 取行情 + 因子（stored 优先，AUTO 回退 compute）
-   ├─ 引擎执行（单股 or 横截面）
-   └─ 账本 → metrics → output/backtest/<run_id>/
+   ├─ 横截面：CrossSectionPlan（targets / ranks / candidates）
+   ├─ RQAlphaEngine.run(EngineRequest)
+   │    ├─ build_instruments / RQAlphaDataSource
+   │    ├─ run_func(init / open_auction / handle_bar)
+   │    └─ trades → orders → PortfolioLedger → metrics
+   └─ 输出 console / csv
 ```
 
 ## 2. 核心类与方法
 
 ### 2.1 类表
 
-| 类 | 关键方法/字段 | 说明 |
+| 类 | 关键成员 | 说明 |
 |---|---|---|
 | `BacktestRunner` | `run(path)` / `optimize(path)` / `walkforward(path)` | 单次 / 网格 / 滚动 |
-| `BacktestSettings` | `from_dict(payload)` | 全部配置项 + 校验 |
+| `BacktestSettings` | `from_dict(payload)`；`engine` 默认 `rqalpha` | 配置与校验 |
 | `RunSpec` | dataclass | 一次运行的完整规格 |
 | `ExecutionRules` | `lot_size/t_plus_1/limit_up_down/suspension/commission_rate/stamp_tax_schedule` | 撮合规则 |
+| `RQAlphaEngine` | `run(request) -> BacktestResult` | `EnginePort` 实现 |
+| `RQAlphaDataSource` | `get_bar/history_bars/is_suspended/...` | DataBundle → RQAlpha |
+| `StrategyAdapter` | `init/open_auction/handle_bar/after_trading` | 策略回调与订单排队 |
+| `FinBridgeCostDecider` | `calc(args) -> TransactionCost` | 佣金/印花税/过户费 |
 | `PortfolioLedger` | 持仓、现金、成交 | 多标的账本 |
 
 关键默认值：`fill="next_open"`、`rebalance="weekly"`、`warmup_min_bars=260`、
@@ -66,32 +77,56 @@ BacktestRunner.run(strategy_path)
 
 ```bash
 python -m backtest list
-python -m backtest validate strategies/models/atr_trend.py
 python -m backtest run strategies/models/atr_trend.py \
-    --start 2024-01-01 --end 2026-10-28 --universe explicit --codes 600519
+    --start 2024-03-01 --end 2024-06-28 --out console
+python -m backtest run strategies/models/turnover_regime.py \
+    --start 2024-01-01 --end 2024-03-29 --out console
 ```
 
 ```python
 from backtest import BacktestRunner, BacktestSettings
 
 settings = BacktestSettings.from_dict({
-    "start": "2024-01-01", "end": "2026-10-28",
-    "fill": "next_open", "rebalance": "weekly",
+    "start": "2024-01-01", "end": "2024-03-29",
+    "fill": "next_open", "engine": "rqalpha",
 })
 runner = BacktestRunner(settings)
-result = runner.run("strategies/models/atr_trend.py")
+result = runner.run("strategies/models/turnover_regime.py")
 ```
 
-### 2.3 注意事项（坑）
+### 2.3 时序（重要）
+
+RQAlpha 日频的 `matching_type="current_bar"` 会用**当日收盘价**撮合。为避免前视：
+
+1. `handle_bar`（T 日收盘）：只算信号/止损，把订单放进 `runtime.pending`；
+2. `open_auction`（T+1 开盘）：提交 pending，按 T+1 开盘价成交；
+3. `handle_bar`（T+1 收盘）：再排下一批。
+
+T+1 由 RQAlpha 股票账户（`market_tplus=1` + `stock_t1=True`）强制执行；
+适配器在卖单前再按 `position.sellable` 截断一次。
+
+**分钟模式**：`RunSpec.freq="1m"` 时 `handle_bar` 每 1m 调用，订单在下一根 1m 开盘成交
+（`matching_type="next_bar"`）；止损看 `bar.low`；T+1 由适配器 `entry_dates` 执行，
+`sys_accounts.stock_t1` 关闭以规避 RQAlpha 1m 结算的 `sellable` 问题。
+
+### 2.4 注意事项（坑）
 
 | 坑 | 说明 |
 |---|---|
-| **横截面不能绑止损** | 入场在 `after_exec`，PyBroker 的 `stop_loss` 无法绑定 entry；风控退出写在 `on_bar` + `close_position()` |
-| **横截面不要在 `on_bar` 买** | `on_bar` 只对**持仓**调用；开仓统一由 `after_exec` 做 |
-| **非调仓日只做 buffer 退出** | `rank > top_n + buffer` 才卖，不重置目标权重 |
-| **调仓日先卖后买** | 卖出回款计入买入预算（已用契约实验验证） |
-| **公司行为是近似** | `corporate_actions="approx"` 由 `adj_factor` 推导，不是真实分红 |
-| **ST/新股是近似** | 只有当前 ST 状态和上市日，**历史 ST 未接** |
-| **`reference` 未打通** | `runner.py` 调 `build_panel` 时没传 `reference`，**带 `neutralize` 的 composite 因子在回测里会抛 `FactorError`**；需先补 reference 数据源 |
-| **PyBroker 版本敏感** | 契约测试锁 2.0.2；升级要先跑 `tests/test_pybroker_contract.py` |
-| **warmup 要给够** | `warmup_min_bars=260` 是下限，长窗因子（如 1320 日）需要更多前置数据，否则开头全 NaN |
+| **不要用 `handle_bar` 直接下单做次日开盘** | 日频会按当日收盘撮合，形成前视；必须走 `open_auction` |
+| **必须 `subscribe` 股票池** | 否则 `bar_dict` 为空，`handle_bar` 读不到 bar |
+| **没有原生止损单** | 止损在 `handle_bar` 里按收盘价触发、T+1 开盘卖；不是日内止损 |
+| **复权未接** | 引擎用原始价撮合/估值；分红送转暂不处理（v1 边界） |
+| **成交量上限关闭** | QuestDB 的 `volume` 单位需先校准，v1 设 `volume_limit=False` |
+| **benchmark 不在 RQAlpha 内** | 由 `equity_metrics` 用 `request.benchmark` 计算；无数据时 `benchmark_used=False` |
+| **Python 3.12** | RQAlpha 6.5.0 可装；升级前先跑 `tests/test_rqalpha_engine.py` |
+| **matplotlib 缓存警告** | 无写权限时会打印，不影响回测 |
+
+### 2.5 结果口径
+
+- `equity` / `metrics` 来自 RQAlpha 组合；`metrics_source="engine"`；
+- `orders` / `trades` 来自 RQAlpha 成交，转换为 FinBridge 列名；
+- `meta["ledger_reconciliation"]` 是诊断项：账本 vs RQAlpha 组合的相对误差；
+  2024Q1 横截面实测 `max_rel_diff ≈ 4.7e-11`；长区间因退市股约 1.9%，不影响报告口径。
+- `meta["ledger_reconciliation_common"]` 只比较两边都持有的 `(date, symbol)`，
+  用来区分“会计差异”和“数据缺口”；2024Q1 实测 `max_abs_diff ≈ 7e-12`。

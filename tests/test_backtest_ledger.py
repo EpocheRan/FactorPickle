@@ -205,13 +205,13 @@ def test_reconcile_reports_relative_tolerance():
             "equity": [100_000.0, 101_000.0],
         }
     )
-    pybroker = pd.DataFrame(
+    engine_portfolio = pd.DataFrame(
         {
             "date": pd.bdate_range("2024-01-02", periods=2),
             "equity": [100_000.0, 101_000.5],
         }
     )
-    result = reconcile(ledger, pybroker, tolerance=1e-6)
+    result = reconcile(ledger, engine_portfolio, tolerance=1e-6)
     assert result["max_abs_diff"] == pytest.approx(0.5)
     assert result["max_rel_diff"] == pytest.approx(0.5 / 101_000.5, rel=1e-9)
     assert result["exceeds_tolerance"] == 1.0

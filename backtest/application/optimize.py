@@ -1,6 +1,6 @@
 """网格优化与 walk-forward。
 
-实现选择：每个参数组合都走完整的 ``BacktestRunner.run``（PyBroker + 账本 +
+实现选择：每个参数组合都走完整的 ``BacktestRunner.run``（RQAlpha + 账本 +
 A 股规则），因此优化/滚动验证与正式回测使用同一条执行路径。代价是每个 trial
 都会重新加载数据、重建因子面板；参数网格应保持较小。
 """

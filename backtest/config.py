@@ -12,7 +12,7 @@ from .domain.models import CorporateActionMode, ExecutionRules, FillMode
 
 @dataclass(frozen=True)
 class BacktestSettings:
-    engine: str = "pybroker"
+    engine: str = "rqalpha"
     data: str = "questdb"
     factor_source: str = "auto"
     outputs: tuple[str, ...] = ("console",)

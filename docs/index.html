@@ -745,7 +745,7 @@
               <text class="atitle" x="370" y="656">backtest · 回测撮合</text>
               <text class="asub" x="370" y="674">run / optimize / walkforward</text>
               <text class="abadge" x="592" y="656" text-anchor="end">T+1 · 涨跌停</text>
-              <text class="abadge" x="370" y="692" style="fill:#5f7288">PyBroker · 自建账本</text>
+              <text class="abadge" x="370" y="692" style="fill:#5f7288">RQAlpha · 自建账本</text>
 
               <rect class="abox" x="635" y="630" width="255" height="74" rx="12"/>
               <text class="atitle" x="655" y="656">screener · 选股</text>
@@ -1243,7 +1243,7 @@ const MODULES = [
    role:'唯一的撮合与资金曲线实现：A 股 T+1、整手、涨跌停、停牌、税费，输出订单 / 成交 / 净值 / 绩效。',
    funcs:['BacktestRunner.run(path)','.optimize(path) / .walkforward(path)','BacktestSettings.from_dict(payload)','ExecutionRules / PortfolioLedger','_run_single / _run_cross'],
    deps:['strategies','factors','factor_engine','data_interface'], tables:['factor_value_daily','ohlcv_1d'],
-   note:'横截面不要在 on_bar 开仓；止损写在 on_bar + close_position。PyBroker 版本敏感。'},
+   note:'T 日 handle_bar 排队、T+1 open_auction 成交（分钟模式 next_bar）；止损按收盘触发、次日开盘卖。RQAlpha 6.5.x 版本敏感。'},
 
   {id:'strategies', name:'strategies', cn:'策略基类', layer:'应用层', color:'#2dd4bf',
    role:'定义策略怎么写：因子声明、股票池、调仓节奏、权重分配与下单意图。不含撮合逻辑。',

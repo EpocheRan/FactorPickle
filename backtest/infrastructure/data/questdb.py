@@ -406,7 +406,7 @@ class QuestDBDataSource:
             return None
         sql = (
             "SELECT ts, close FROM ohlcv_1d "
-            "WHERE market = 'IDX' AND code = %s AND ts >= %s AND ts <= %s "
+            "WHERE type = 'idx' AND code = %s AND ts >= %s AND ts <= %s "
             "ORDER BY ts"
         )
         params = [

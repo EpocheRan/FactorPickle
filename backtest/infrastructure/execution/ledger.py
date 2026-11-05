@@ -1,14 +1,14 @@
 """回测账本：多标的回放 + 公司行为钩子。
 
 - 按不复权 ``close`` 估值；停牌日沿用最近收盘。
-- 只回放**成交**（PyBroker orders），不预测订单。
+- 只回放**成交**（引擎 orders），不预测订单。
 - 公司行为：``corporate_actions`` 为 ``date/symbol/cash_div/share_ratio`` 表，
   按除权日调整现金/股数；``approx`` 模式由 ``adj_factor`` 推导，只做近似。
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 import numpy as np
@@ -20,12 +20,14 @@ class LedgerResult:
     equity: pd.DataFrame
     metrics: dict[str, float]
     reconciliation: dict[str, float]
+    positions: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 def _benchmark_metrics(
     equity_frame: pd.DataFrame,
     benchmark: pd.Series | None,
     risk_free_rate: float,
+    periods_per_year: float = 252.0,
 ) -> dict[str, float]:
     if benchmark is None or benchmark.empty or equity_frame.empty:
         return {}
@@ -52,14 +54,14 @@ def _benchmark_metrics(
     if len(aligned) < 2 or aligned["b"].var(ddof=1) <= 0:
         return {}
     beta = float(aligned["p"].cov(aligned["b"]) / aligned["b"].var(ddof=1))
-    rf_daily = float(risk_free_rate) / 252.0
+    rf_daily = float(risk_free_rate) / float(periods_per_year)
     alpha_daily = float(
         aligned["p"].mean() - rf_daily - beta * (aligned["b"].mean() - rf_daily)
     )
     active = aligned["p"] - aligned["b"]
-    tracking_error = float(active.std(ddof=1) * np.sqrt(252.0))
+    tracking_error = float(active.std(ddof=1) * np.sqrt(periods_per_year))
     information_ratio = (
-        float(active.mean() / active.std(ddof=1) * np.sqrt(252.0))
+        float(active.mean() / active.std(ddof=1) * np.sqrt(periods_per_year))
         if active.std(ddof=1) > 0
         else 0.0
     )
@@ -67,7 +69,7 @@ def _benchmark_metrics(
     port_total = float(joined["portfolio"].iloc[-1] / joined["portfolio"].iloc[0] - 1.0)
     return {
         "beta": beta,
-        "alpha_annualized_pct": alpha_daily * 252.0 * 100.0,
+        "alpha_annualized_pct": alpha_daily * float(periods_per_year) * 100.0,
         "correlation": float(aligned["p"].corr(aligned["b"])),
         "tracking_error_pct": tracking_error * 100.0,
         "information_ratio": information_ratio,
@@ -82,6 +84,7 @@ def _metrics(
     initial_cash: float,
     benchmark: pd.Series | None = None,
     risk_free_rate: float = 0.0,
+    periods_per_year: float = 252.0,
 ) -> dict[str, float]:
     equity = equity_frame["equity"].astype("float64")
     if equity.empty or equity.iloc[0] <= 0:
@@ -89,11 +92,11 @@ def _metrics(
     returns = equity.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
     total = float(equity.iloc[-1] / initial_cash - 1.0)
     periods = max(1, len(equity) - 1)
-    annualized = float((1.0 + total) ** (252.0 / periods) - 1.0) if total > -1 else -1.0
-    vol = float(returns.std(ddof=1) * np.sqrt(252.0)) if len(returns) > 1 else 0.0
-    rf_daily = float(risk_free_rate) / 252.0
+    annualized = float((1.0 + total) ** (float(periods_per_year) / periods) - 1.0) if total > -1 else -1.0
+    vol = float(returns.std(ddof=1) * np.sqrt(float(periods_per_year))) if len(returns) > 1 else 0.0
+    rf_daily = float(risk_free_rate) / float(periods_per_year)
     sharpe = (
-        float((returns.mean() - rf_daily) / returns.std(ddof=1) * np.sqrt(252.0))
+        float((returns.mean() - rf_daily) / returns.std(ddof=1) * np.sqrt(float(periods_per_year)))
         if len(returns) > 1 and returns.std(ddof=1) > 0
         else 0.0
     )
@@ -106,8 +109,75 @@ def _metrics(
         "volatility_pct": vol * 100.0,
         "sharpe": sharpe,
     }
-    result.update(_benchmark_metrics(equity_frame, benchmark, risk_free_rate))
+    result.update(
+        _benchmark_metrics(
+            equity_frame,
+            benchmark,
+            risk_free_rate,
+            periods_per_year=periods_per_year,
+        )
+    )
     return result
+
+
+def reconcile_positions(
+    ledger_positions: pd.DataFrame | None,
+    engine_positions: pd.DataFrame | None,
+) -> dict[str, float]:
+    """逐日逐仓对账，只比较两边都持有的 (date, symbol)。
+
+    退市/换股导致某一边没有的仓位会被排除，用来区分“会计差异”和“数据缺口”。
+    """
+    if (
+        ledger_positions is None
+        or ledger_positions.empty
+        or engine_positions is None
+        or engine_positions.empty
+    ):
+        return {}
+    ledger = ledger_positions.copy()
+    ledger["date"] = pd.to_datetime(ledger["date"], errors="coerce").dt.normalize()
+    ledger["symbol"] = ledger["symbol"].astype(str).str.zfill(6)
+
+    engine = engine_positions.copy()
+    if "date" not in engine.columns:
+        engine = engine.reset_index()
+        engine = engine.rename(columns={engine.columns[0]: "date"})
+    engine["date"] = pd.to_datetime(engine["date"], errors="coerce").dt.normalize()
+    engine["symbol"] = (
+        engine["order_book_id"].astype(str).str.split(".").str[0].str.zfill(6)
+    )
+    engine = engine.groupby(["date", "symbol"], as_index=False)["market_value"].sum()
+
+    merged = ledger.merge(engine, on=["date", "symbol"], suffixes=("_l", "_e"))
+    if merged.empty:
+        return {}
+    diff = (merged["market_value_l"] - merged["market_value_e"]).abs()
+    max_at = diff.idxmax()
+    return {
+        "max_abs_diff": float(diff.max()),
+        "mean_abs_diff": float(diff.mean()),
+        "points": float(len(merged)),
+        "common_pairs": float(merged[["date", "symbol"]].drop_duplicates().shape[0]),
+        "max_diff_date": str(merged.loc[max_at, "date"].date()),
+    }
+
+
+def equity_metrics(
+    equity_frame: pd.DataFrame,
+    initial_cash: float,
+    benchmark: pd.Series | None = None,
+    risk_free_rate: float = 0.0,
+    periods_per_year: float = 252.0,
+) -> dict[str, float]:
+    """公开的指标入口：账本与引擎组合共用同一套口径。"""
+    return _metrics(
+        equity_frame,
+        initial_cash,
+        benchmark=benchmark,
+        risk_free_rate=risk_free_rate,
+        periods_per_year=periods_per_year,
+    )
 
 
 class PortfolioLedger:
@@ -161,6 +231,7 @@ class PortfolioLedger:
         }
 
         rows: list[dict[str, Any]] = []
+        position_rows: list[dict[str, Any]] = []
         for raw_dt in dates:
             dt = pd.Timestamp(raw_dt).normalize()
             for _, bar in bars_by_date.get(raw_dt, pd.DataFrame()).iterrows():
@@ -192,6 +263,15 @@ class PortfolioLedger:
                 close = last_close.get(symbol, float("nan"))
                 if np.isfinite(close):
                     market_value += qty * close
+                    position_rows.append(
+                        {
+                            "date": dt,
+                            "symbol": symbol,
+                            "shares": qty,
+                            "close": close,
+                            "market_value": qty * close,
+                        }
+                    )
             rows.append(
                 {
                     "date": dt,
@@ -202,8 +282,12 @@ class PortfolioLedger:
             )
 
         frame = pd.DataFrame(rows)
+        positions = pd.DataFrame(
+            position_rows,
+            columns=["date", "symbol", "shares", "close", "market_value"],
+        )
         if frame.empty:
-            return LedgerResult(frame, {}, {})
+            return LedgerResult(frame, {}, {}, positions)
         frame["drawdown"] = frame["equity"] / frame["equity"].cummax() - 1.0
         return LedgerResult(
             frame,
@@ -214,6 +298,7 @@ class PortfolioLedger:
                 risk_free_rate=self.risk_free_rate,
             ),
             {},
+            positions,
         )
 
     # ------------------------------------------------------------------ 公司行为
@@ -281,30 +366,31 @@ class SimpleLedger:
 
 def reconcile(
     equity: pd.DataFrame,
-    pybroker_portfolio: pd.DataFrame | None,
+    engine_portfolio: pd.DataFrame | None,
     *,
     tolerance: float | None = None,
 ) -> dict[str, float]:
-    """账本 vs PyBroker portfolio 对账；``tolerance`` 为相对阈值。"""
-    if pybroker_portfolio is None or pybroker_portfolio.empty or equity.empty:
+    """账本 vs 引擎组合对账；``tolerance`` 为相对阈值。"""
+    if engine_portfolio is None or engine_portfolio.empty or equity.empty:
         return {}
     left = equity.set_index("date")["equity"].astype("float64")
-    right = pybroker_portfolio.copy()
+    right = engine_portfolio.copy()
     if "date" not in right.columns:
         right = right.reset_index()
         right = right.rename(columns={right.columns[0]: "date"})
     right["date"] = pd.to_datetime(right["date"], errors="coerce").dt.normalize()
     right = right.set_index("date")["equity"].astype("float64")
-    joined = pd.concat([left.rename("ledger"), right.rename("pybroker")], axis=1).dropna()
+    joined = pd.concat([left.rename("ledger"), right.rename("engine")], axis=1).dropna()
     if joined.empty:
         return {}
-    diff = (joined["ledger"] - joined["pybroker"]).abs()
-    scale = joined["pybroker"].abs().replace(0.0, np.nan)
+    diff = (joined["ledger"] - joined["engine"]).abs()
+    scale = joined["engine"].abs().replace(0.0, np.nan)
     relative = (diff / scale).replace([np.inf, -np.inf], np.nan)
     result = {
         "max_abs_diff": float(diff.max()),
         "mean_abs_diff": float(diff.mean()),
         "max_rel_diff": float(relative.max()) if relative.notna().any() else 0.0,
+        "max_diff_date": str(diff.idxmax().date()) if hasattr(diff.idxmax(), "date") else str(diff.idxmax()),
         "points": float(len(joined)),
     }
     if tolerance is not None:

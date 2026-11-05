@@ -21,7 +21,7 @@ dev = [
     "pytest>=8.0",
 ]
 backtest = [
-    "lib-pybroker>=2.0.2,<2.1",
+    "rqalpha>=6.5.0,<7.0",
 ]
 
 # PEP 735：uv 默认安装 dev 组，`uv run pytest` 开箱可用

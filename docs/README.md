@@ -67,7 +67,7 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 | 04 | `factor_engine` | 因子物化层：注册表、批量计算、长表落库、审计 | [04-factor-engine.md](modules/04-factor-engine.md) |
 | 05 | `research` | 因子研究报告：IC/分层/评级/可视化/评分卡入库 | [05-research.md](modules/05-research.md) |
 | 06 | `screener` | 选股：快照构建、条件筛选、覆盖率与断点 | [06-screener.md](modules/06-screener.md) |
-| 07 | `backtest` | 回测：PyBroker 引擎 + A 股规则 + 横截面执行 | [07-backtest.md](modules/07-backtest.md) |
+| 07 | `backtest` | 回测：RQAlpha 引擎 + A 股规则 + 横截面执行 | [07-backtest.md](modules/07-backtest.md) |
 | 08 | `strategies` | 策略基类：单标的/横截面、股票池、权重、上下文 | [08-strategies.md](modules/08-strategies.md) |
 | 09 | `position` | 持仓管理：组合/持仓/交易记录、成本与风控模式 | [09-position.md](modules/09-position.md) |
 | 10 | `scripts` | 运维脚本：回填、修复、报告、评分卡、方向校准 | [10-scripts.md](modules/10-scripts.md) |
@@ -84,7 +84,7 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 | [design/factor_materialization_v1.md](design/factor_materialization_v1.md) | 因子物化：registry/长表/latest/缓存 |
 | [design/acquisition_backfill_v1.md](design/acquisition_backfill_v1.md) | 历史回补：阶段化、切批、覆盖率判定、自适应分片 |
 | [design/factor_report_v2.md](design/factor_report_v2.md) | 因子报告 v2：方向、价差、成本、断言、归因 |
-| [design/backtest_architecture.md](design/backtest_architecture.md) | 回测引擎详细架构（PyBroker + 自建账本） |
+| [design/backtest_architecture.md](design/backtest_architecture.md) | 回测引擎详细架构（RQAlpha + 自建账本） |
 | [design/data_pipeline_v1.md](design/data_pipeline_v1.md) | 分时/板块映射/披露三条 P0–P2 数据链路 |
 
 ### 4.2 指南

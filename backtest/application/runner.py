@@ -36,7 +36,7 @@ _CROSS_REBALANCE = {"daily", "weekly", "monthly", "every_n_bars"}
 
 def _engine_version() -> str:
     try:
-        return version("lib-pybroker")
+        return version("rqalpha")
     except PackageNotFoundError:
         return "none"
 
@@ -232,7 +232,7 @@ class BacktestRunner:
             allow_short=self.settings.allow_short,
             risk_free_rate=self.settings.risk_free_rate,
             corporate_actions=self.settings.corporate_actions,
-            metrics_source="ledger",
+            metrics_source="engine",
             outputs=self.settings.outputs,
             data_source=self.settings.data,
             seed=self._seed(seed),
@@ -286,7 +286,7 @@ class BacktestRunner:
         initial_cash: float | None,
         seed: int | None,
     ) -> BacktestResult:
-        # 混合架构：向量化排名在本层完成，PyBroker 只执行候选集。
+        # 混合架构：向量化排名在本层完成，执行引擎只执行候选集。
         schedule = self._universe_schedule(strategy, start, end)
         codes = schedule.codes
         top_n = int(getattr(strategy, "top_n", 0) or 0)
@@ -313,7 +313,7 @@ class BacktestRunner:
             allow_short=self.settings.allow_short,
             risk_free_rate=self.settings.risk_free_rate,
             corporate_actions=self.settings.corporate_actions,
-            metrics_source="ledger",
+            metrics_source="engine",
             outputs=self.settings.outputs,
             data_source=self.settings.data,
             seed=self._seed(seed),

@@ -11,7 +11,7 @@ from typing import Any, Sequence
 import numpy as np
 import pandas as pd
 
-APP_VERSION = "0.4.0"
+APP_VERSION = "0.5.0"
 
 
 def _json_default(value: Any) -> Any:
@@ -41,7 +41,7 @@ def compute_run_id(
     snapshot,
     benchmark: pd.Series | None = None,
     security_status=None,
-    engine_name: str = "pybroker",
+    engine_name: str = "rqalpha",
     engine_version: str = "none",
     seed: int = 0,
 ) -> str:

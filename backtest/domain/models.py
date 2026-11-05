@@ -1,6 +1,6 @@
 """回测领域模型。
 
-这里只放跨层共享的数据结构，不 import pybroker / QuestDB / data_interface。
+这里只放跨层共享的数据结构，不 import 执行引擎 / QuestDB / data_interface。
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from .errors import ConfigError
 
 Mode = Literal["single", "cross"]
 FillMode = Literal["next_open", "close"]
-MetricsSource = Literal["ledger", "pybroker"]
+MetricsSource = Literal["ledger", "engine"]
 CorporateActionMode = Literal["off", "approx"]
 
 
@@ -192,7 +192,7 @@ class RunSpec:
     allow_short: bool = False
     risk_free_rate: float = 0.0
     corporate_actions: CorporateActionMode = "off"
-    metrics_source: MetricsSource = "ledger"
+    metrics_source: MetricsSource = "engine"
     outputs: tuple[str, ...] = ("console",)
     data_source: str = "questdb"
     seed: int = 0
@@ -258,7 +258,6 @@ class BacktestResult:
     run_id: str
     spec: RunSpec
     metrics: dict[str, float]
-    metrics_pybroker: dict[str, float] | None
     equity: pd.DataFrame
     orders: pd.DataFrame
     trades: pd.DataFrame

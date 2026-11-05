@@ -22,7 +22,6 @@ def _result() -> BacktestResult:
         run_id="run123",
         spec=spec,
         metrics={"total_return_pct": 1.0},
-        metrics_pybroker={"total_return_pct": 0.9},
         equity=pd.DataFrame(
             {
                 "date": [pd.Timestamp("2024-01-02")],
@@ -37,7 +36,7 @@ def _result() -> BacktestResult:
         selections=pd.DataFrame(columns=["date", "symbol"]),
         factor_meta={},
         execution_report=ExecutionReport(),
-        meta={"metrics_source": "ledger"},
+        meta={"metrics_source": "engine"},
     )
 
 

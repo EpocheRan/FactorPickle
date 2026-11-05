@@ -2,7 +2,7 @@
 
 规则（architecture_v2.md）：
 - factors 不得 import screener / backtest / data_interface /
-  factor_engine / acquisition / pybroker / psycopg2。
+  factor_engine / acquisition / rqalpha / psycopg2。
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ FORBIDDEN_ROOTS = {
     "data_interface",
     "factor_engine",
     "acquisition",
-    "pybroker",
+    "rqalpha",
     "psycopg2",
 }
 

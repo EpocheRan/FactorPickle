@@ -25,5 +25,7 @@ class ConsoleOutput:
         unfilled = result.execution_report.unfilled
         print(f"rejected: {len(rejected)}  unfilled: {len(unfilled)}")
         if result.meta.get("ledger_reconciliation"):
-            print(f"ledger reconciliation: {result.meta['ledger_reconciliation']}")
+            print(f"ledger reconciliation (diagnostic): {result.meta['ledger_reconciliation']}")
+        if result.meta.get("ledger_reconciliation_common"):
+            print(f"ledger reconciliation (common positions): {result.meta['ledger_reconciliation_common']}")
         return [OutputArtifact(kind="console", rows=len(result.equity))]

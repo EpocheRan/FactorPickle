@@ -1,0 +1,9 @@
+{
+  "orders": 69,
+  "trades": 69,
+  "metrics": {
+    "annualized_return_pct": 52.35077993872179,
+    "sharpe": 9.00645496581446,
+    "max_drawdown_pct": -2.95944394148292
+  }
+}

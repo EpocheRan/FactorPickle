@@ -41,7 +41,6 @@ class CsvOutput:
         metrics_payload = {
             "run_id": result.run_id,
             "metrics": _json_safe(result.metrics),
-            "metrics_pybroker": _json_safe(result.metrics_pybroker),
             "meta": _json_safe(result.meta),
             "factor_meta": _json_safe(result.factor_meta),
         }

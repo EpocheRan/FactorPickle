@@ -42,20 +42,20 @@ def _csv_output(settings: BacktestSettings):
     return CsvOutput(settings.output_dir)
 
 
-def _pybroker_engine():
+def _rqalpha_engine():
     try:
-        from backtest.infrastructure.engine.pybroker_engine import PyBrokerEngine
+        from backtest.infrastructure.engine.rqalpha_engine import RQAlphaEngine
     except ImportError as exc:
         raise ConfigError(
-            "PyBroker 未安装；请先执行 `uv sync --extra backtest`"
+            "RQAlpha 未安装；请先执行 `uv sync --extra backtest`"
         ) from exc
-    return PyBrokerEngine()
+    return RQAlphaEngine()
 
 
 register_data_source("questdb", _questdb_source)
 register_output("console", _console_output)
 register_output("csv", _csv_output)
-register_engine("pybroker", _pybroker_engine)
+register_engine("rqalpha", _rqalpha_engine)
 
 
 def create_data_source(name: str):
