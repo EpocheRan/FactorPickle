@@ -311,7 +311,7 @@ def rate(report) -> dict:
     filter_note = ""
     if report.filter_test and not report.filter_test.get("useful", False):
         filter_note = (
-            "过滤价值未通过：Q1 绝对收益为正且与全组接近，剔除后夏普改善不足 0.05；"
+            "过滤价值未通过：G1 绝对收益为正且与全组接近，剔除后夏普改善不足 0.05；"
             "不能把「过滤」作为使用理由。"
         )
     attribution = (

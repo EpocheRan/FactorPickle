@@ -93,15 +93,33 @@ def _slice_to_eval(panel, factor, start: str):
 def _resolve_panel(factor_id: str, pool_date: str, pool_size: int, start: str,
                    end: str | None, extras: tuple[str, ...] = ()) -> tuple[Panel, pd.DataFrame]:
     panel = load_panel(pool_date, pool_size, start, end, extras=extras)
+    # 同类因子必须在「未切片的全样本面板」上算：切片后的 Panel 只剩评估期的宽表，
+    # 长表重建后行情字段会缺失，导致对照组全空、增量性退化成只看规模。
+    _peers = None
+    try:
+        _peers = peer_panels(factor_id, panel)
+    except Exception:  # noqa: BLE001 - 对照组失败不应阻断报告
+        _peers = None
     category = factor_id.split(".", 1)[0]
     if category in ("quality", "value"):
         frame = financial_factor_panel(factor_id, panel.close, str(panel.close.index.min().date()), str(panel.data_cutoff.date()))
         if frame.empty:
             raise RuntimeError(f"{factor_id} 无物化数据（先跑 backfill_factors.py）")
-        return _slice_to_eval(panel, frame, start)
+        return _attach_peers(_slice_to_eval(panel, frame, start), _peers)
     if category == "sentiment":
-        return _slice_to_eval(panel, flow_factor_panel(factor_id, panel), start)
-    return _slice_to_eval(panel, price_factor_panel(factor_id, panel), start)
+        return _attach_peers(_slice_to_eval(panel, flow_factor_panel(factor_id, panel), start), _peers)
+    return _attach_peers(_slice_to_eval(panel, price_factor_panel(factor_id, panel), start), _peers)
+
+
+
+def _attach_peers(pair, peers):
+    """把切片前算好的同类因子挂到返回的面板上（切片会丢行情字段）。"""
+    panel, factor = pair
+    try:
+        panel._peers = peers
+    except Exception:  # noqa: BLE001
+        pass
+    return panel, factor
 
 
 def _pool_symbols(panel: Panel, pool_date: str, pool_size: int) -> tuple[str, ...]:
@@ -261,7 +279,12 @@ def generate(
     definition = definitions.describe(factor_id)
     if direction is None:
         direction = definition.direction
-    peers = peer_panels(factor_id, panel) if with_peers else None
+    peers = getattr(panel, "_peers", None) if with_peers else None
+    if peers is None and with_peers:
+        try:
+            peers = peer_panels(factor_id, panel)
+        except Exception:  # noqa: BLE001
+            peers = None
 
     report = metrics.build_report(
         factor, panel.close, panel.open,

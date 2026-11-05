@@ -168,6 +168,15 @@ def _xlabels(index, n: int = 6) -> list[str]:
     return [pd.Timestamp(index[i]).strftime("%Y-%m") for i in idx]
 
 
+
+def _size_caption(report) -> str:
+    """市值分层图注：带每档的实际流通市值区间。"""
+    ranges = getattr(report, "size_ranges", None) or {}
+    if not ranges:
+        return "S1（最小）–S5（最大）按流通市值五等分。"
+    parts = [f"{k.split(' ')[1]} {v[0]:.0f}–{v[1]:.0f} 亿" for k, v in ranges.items()]
+    return "按当日流通市值五等分（区间为该档 5%–95% 分位）：" + "；".join(parts) + "。"
+
 def _figure(no: str, title: str, svg: str, note: str = "") -> str:
     note_html = f'<div class="note">{note}</div>' if note else ""
     return (
@@ -565,13 +574,13 @@ def render(report, rating: dict, meta: dict) -> str:
                 ["相对全组回撤", _pct(ft.get("rel_mdd", np.nan), 1), "—", "—"],
                 ["尾部亏损频率（<-3%/期）", f"{ft.get('tail_q1', np.nan):.1%}", f"{ft.get('tail_rest', np.nan):.1%}", "—"],
             ],
-            f"注：{beta_note}过滤要看 Q1 相对全组的增量，而不是绝对收益。"
-            "过滤的严格定义是「剔除 Q1 后组合夏普/回撤/尾部风险改善」。",
+            f"注：{beta_note}过滤要看 G1 相对全组的增量，而不是绝对收益。"
+            "过滤的严格定义是「剔除 G1 后组合夏普/回撤/尾部风险改善」。",
         )
         filter_block = (
-            f"<h3>过滤价值检验：剔除 Q1 后组合会更好吗？</h3>{filter_table}"
+            f"<h3>过滤价值检验：剔除 G1 后组合会更好吗？</h3>{filter_table}"
             f"<p class=\"small\"><b>结论：{verdict}。</b>"
-            f"Q1 每期收益 {ft.get('q1_mean', float('nan'))*100:+.2f}%（折年 {ft.get('q1_ann', float('nan'))*100:+.1f}%），"
+            f"G1 每期收益 {ft.get('q1_mean', float('nan'))*100:+.2f}%（折年 {ft.get('q1_ann', float('nan'))*100:+.1f}%），"
             f"相对全组 {ft.get('q1_excess', float('nan'))*100:+.2f}%/期"
             f"（{ft.get('q1_excess_ann', float('nan'))*100:+.1f}%/年）；"
             f"剔除后夏普 {ft.get('all_sharpe', float('nan')):.2f}→{ft.get('rest_sharpe', float('nan')):.2f}、"
@@ -978,7 +987,7 @@ def render(report, rating: dict, meta: dict) -> str:
             + _mini(_strat["stratum"].astype(str).str.startswith("流动性"),
                     "流动性分层", "L1–L3 按日均成交额三分位；各层内部单独计算秩相关。")
             + _mini(_strat["stratum"].astype(str).str.startswith("市值"),
-                    "市值分层", "S1（最小）–S5（最大）按流通市值五等分，与上文市值三分组表二选一。")
+                    "市值分层", _size_caption(report))
         )
 
 

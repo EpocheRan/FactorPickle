@@ -585,6 +585,7 @@ class FactorReport:
 
     filter_test: dict = field(default_factory=dict)
     strat_ic: object | None = None
+    size_ranges: dict | None = None
     horizon_spreads: object | None = None
     annual_ic_return: pd.DataFrame | None = None
 
@@ -1196,9 +1197,17 @@ def build_report(
         if market_cap is not None:
             _mr = market_cap.reindex(index=analysis_factor.index, columns=analysis_factor.columns).rank(
                 axis=1, pct=True)
+            _ranges: dict[str, tuple[float, float]] = {}
+            _mc_yi = market_cap.reindex(index=analysis_factor.index,
+                                        columns=analysis_factor.columns) / 1e8
             for i, label in enumerate(("市值 S1 最小", "市值 S2", "市值 S3", "市值 S4", "市值 S5 最大")):
                 lo, hi = i / 5, (i + 1) / 5
-                _strata[label] = (_mr > lo) & (_mr <= hi) if i else (_mr <= hi)
+                _mask = (_mr > lo) & (_mr <= hi) if i else (_mr <= hi)
+                _strata[label] = _mask
+                _vals = _mc_yi.where(_mask).stack().dropna()
+                if len(_vals) > 100:
+                    _ranges[label] = (float(_vals.quantile(0.05)), float(_vals.quantile(0.95)))
+            report.size_ranges = _ranges
         if industry is not None:
             _map = industry
             if isinstance(industry, pd.DataFrame) and "symbol" in industry.columns:

@@ -2,8 +2,8 @@
 
 这一层把「报告里的结论」变成可被程序复核的**断言**：
 
-- ``rho_spread_identity``：分层单调性 ρ 与 Q5−Q1 的方向是否自洽；
-- ``ic_spread_transmission``：Rank IC 能否按横截面离散度传导成 Q5−Q1；
+- ``rho_spread_identity``：分层单调性 ρ 与 G5−G1 的方向是否自洽；
+- ``ic_spread_transmission``：Rank IC 能否按横截面离散度传导成 G5−G1；
 - ``tradeability_interval``：用价差置信区间（而不是点估计）判断能否覆盖成本；
 - ``direction_prior``：设计方向与实测 IC 是否相反（方向错，而不是「没信号」）。
 
@@ -21,7 +21,7 @@ import pandas as pd
 
 #: 正态分布下五分位 Q5 与 Q1 的均值差（以横截面收益标准差为单位）。
 #: φ(0.8)/0.2 = 1.395，两侧相减为 2.79；1.76 只是**单侧** 10% 尾部的均值，
-#: 不能直接乘在 Q5−Q1 上。这里用 2.80，并允许在报告里覆盖。
+#: 不能直接乘在 G5−G1 上。这里用 2.80，并允许在报告里覆盖。
 QUINTILE_SPREAD_MULTIPLIER = 2.80
 
 GRADE_ORDER = ("A", "B", "C", "D")
@@ -114,7 +114,7 @@ def spread_stats(series: pd.Series) -> dict:
 
 # ---------------------------------------------------------------- 断言
 def rho_spread_identity(rho: float, spread: float, groups: int = 5) -> Check:
-    """ρ 与 Q5−Q1 的方向自洽性。
+    """ρ 与 G5−G1 的方向自洽性。
 
     严格可证的边界：``ρ ≥ 0.8``（n=5）时 Σd²≤4，排列只允许一次相邻交换，
     此时 Q5 必然高于 Q1；反之 ``ρ ≤ −0.8`` 时 Q5 必然低于 Q1。
@@ -122,25 +122,25 @@ def rho_spread_identity(rho: float, spread: float, groups: int = 5) -> Check:
     因此那里只报警、不判失败——把 ``ρ>0 ⇒ Q5>Q1`` 当恒等式会误杀非单调因子。
     """
     if not np.isfinite(rho) or not np.isfinite(spread):
-        return Check("rho_spread", "ρ 与 Q5−Q1 恒等式", "skip", "—", "—", "样本不足")
-    actual = f"ρ={rho:+.2f}，Q5−Q1={spread * 100:+.2f}%/期"
+        return Check("rho_spread", "ρ 与 G5−G1 恒等式", "skip", "—", "—", "样本不足")
+    actual = f"ρ={rho:+.2f}，G5−G1={spread * 100:+.2f}%/期"
     if rho >= 0.80 and spread <= 0:
         return Check(
-            "rho_spread", "ρ 与 Q5−Q1 恒等式", "fail", actual, "ρ≥0.8 时 Q5−Q1 必须 >0",
+            "rho_spread", "ρ 与 G5−G1 恒等式", "fail", actual, "ρ≥0.8 时 G5−G1 必须 >0",
             "n=5 且 ρ≥0.8 只允许一次相邻交换，Q5 不可能低于 Q1，属计算/对齐错误。",
         )
     if rho <= -0.80 and spread >= 0:
         return Check(
-            "rho_spread", "ρ 与 Q5−Q1 恒等式", "fail", actual, "ρ≤−0.8 时 Q5−Q1 必须 <0",
+            "rho_spread", "ρ 与 G5−G1 恒等式", "fail", actual, "ρ≤−0.8 时 G5−G1 必须 <0",
             "方向定义与分组排序相反，先查 sig 是否被重复取负。",
         )
     if rho > 0 and spread <= 0:
         return Check(
-            "rho_spread", "ρ 与 Q5−Q1 恒等式", "warn", actual, "ρ>0 但 Q5≤Q1",
+            "rho_spread", "ρ 与 G5−G1 恒等式", "warn", actual, "ρ>0 但 G5≤G1",
             "中间组非单调时可出现（如 [3,1,4,5,2]），需看 Q2–Q4 是否贡献了正相关；"
             "不能直接用「ρ>0 则价差为正」做硬断言。",
         )
-    return Check("rho_spread", "ρ 与 Q5−Q1 恒等式", "pass", actual, "同号", "")
+    return Check("rho_spread", "ρ 与 G5−G1 恒等式", "pass", actual, "同号", "")
 
 
 def ic_spread_transmission(
@@ -150,7 +150,7 @@ def ic_spread_transmission(
     *,
     multiplier: float = QUINTILE_SPREAD_MULTIPLIER,
 ) -> Check:
-    """IC 能否按理论系数传导成 Q5−Q1（毛价差，期均值）。
+    """IC 能否按理论系数传导成 G5−G1（毛价差，期均值）。
 
     期望价差 = IC × 横截面收益标准差 × 2.80（五分位正态近似）。
 
@@ -159,10 +159,10 @@ def ic_spread_transmission(
     折价程度以 realization_score 计入综合分。
     """
     if not np.isfinite(ic) or not np.isfinite(sigma) or sigma <= 0 or not np.isfinite(spread_gross):
-        return Check("ic_transmission", "IC→Q5−Q1 传导", "skip", "—", "—", "数据不足")
+        return Check("ic_transmission", "IC→G5−G1 传导", "skip", "—", "—", "数据不足")
     expected = ic * sigma * multiplier
     if abs(expected) < 1e-8:
-        return Check("ic_transmission", "IC→Q5−Q1 传导", "warn",
+        return Check("ic_transmission", "IC→G5−G1 传导", "warn",
                      f"IC={ic:+.3f}，期望价差≈0", "—", "IC 接近 0，传导检验无意义")
     ratio = spread_gross / expected
     actual = (
@@ -170,11 +170,11 @@ def ic_spread_transmission(
         f"（IC {ic:+.3f}×σ {sigma:.1%}×{multiplier:.2f}），比值 {ratio:+.2f}"
     )
     if 0.5 <= ratio <= 1.5:
-        return Check("ic_transmission", "IC→Q5−Q1 传导", "pass", actual, "0.5 ≤ 实测/期望 ≤ 1.5", "")
+        return Check("ic_transmission", "IC→G5−G1 传导", "pass", actual, "0.5 ≤ 实测/期望 ≤ 1.5", "")
     if ratio < 0:
-        return Check("ic_transmission", "IC→Q5−Q1 传导", "warn", actual, "0.5 ≤ 实测/期望 ≤ 1.5",
+        return Check("ic_transmission", "IC→G5−G1 传导", "warn", actual, "0.5 ≤ 实测/期望 ≤ 1.5",
                      "符号相反说明 IC 与分组收益不是同一口径（重叠期/极值/复利）。")
-    return Check("ic_transmission", "IC→Q5−Q1 传导", "warn", actual, "0.5 ≤ 实测/期望 ≤ 1.5",
+    return Check("ic_transmission", "IC→G5−G1 传导", "warn", actual, "0.5 ≤ 实测/期望 ≤ 1.5",
                  f"传导比 {ratio:.2f}：IC 只兑现了 {ratio:.0%}，其余被成本与尾部稀释；"
                  "已按折价系数计入综合分，不触发否决。")
 
