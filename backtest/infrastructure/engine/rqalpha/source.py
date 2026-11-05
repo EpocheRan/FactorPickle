@@ -130,13 +130,19 @@ class RQAlphaDataSource(AbstractDataSource):
     # ------------------------------------------------------------------ query
     def get_instruments(self, id_or_syms=None, types=None):
         if id_or_syms is None:
-            return list(self.instruments)
-        wanted = {str(item) for item in id_or_syms}
-        return [
-            item
-            for item in self.instruments
-            if item.order_book_id in wanted or item.symbol in wanted
-        ]
+            if types is None:
+                return list(self.instruments)
+            allowed = set(types)
+            return [item for item in self.instruments if item.type in allowed]
+        result: list[Instrument] = []
+        seen: set[str] = set()
+        for item in id_or_syms:
+            key = str(item)
+            instrument = self._by_id.get(key) or self._by_code.get(key)
+            if instrument is not None and instrument.order_book_id not in seen:
+                result.append(instrument)
+                seen.add(instrument.order_book_id)
+        return result
 
     def get_trading_calendars(self):
         return {TRADING_CALENDAR_TYPE.CN_STOCK: self.dates}
