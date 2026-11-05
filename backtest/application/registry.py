@@ -42,6 +42,12 @@ def _csv_output(settings: BacktestSettings):
     return CsvOutput(settings.output_dir)
 
 
+def _html_output(settings: BacktestSettings):
+    from backtest.reporting.output import HtmlReportOutput
+
+    return HtmlReportOutput(settings.output_dir)
+
+
 def _rqalpha_engine():
     try:
         from backtest.infrastructure.engine.rqalpha_engine import RQAlphaEngine
@@ -55,6 +61,7 @@ def _rqalpha_engine():
 register_data_source("questdb", _questdb_source)
 register_output("console", _console_output)
 register_output("csv", _csv_output)
+register_output("html", _html_output)
 register_engine("rqalpha", _rqalpha_engine)
 
 
@@ -71,7 +78,7 @@ def create_outputs(names: tuple[str, ...], settings: BacktestSettings):
         factory = _OUTPUTS.get(str(name))
         if factory is None:
             raise ConfigError(f"未知输出: {name!r}，可选: {sorted(_OUTPUTS)}")
-        if name == "csv":
+        if name in ("csv", "html"):
             result.append(factory(settings))
         else:
             result.append(factory())

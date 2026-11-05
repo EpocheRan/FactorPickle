@@ -15,7 +15,7 @@ class BacktestSettings:
     engine: str = "rqalpha"
     data: str = "questdb"
     factor_source: str = "auto"
-    outputs: tuple[str, ...] = ("console",)
+    outputs: tuple[str, ...] = ("console", "html")
     output_dir: Path = Path("output/backtest")
     initial_cash: float = 1_000_000.0
     warmup_min_bars: int = 260

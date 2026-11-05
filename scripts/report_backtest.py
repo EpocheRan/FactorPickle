@@ -265,6 +265,16 @@ def main(argv: list[str] | None = None) -> int:
     if run_dir is None or not run_dir.exists():
         print("没有找到回测输出；先跑 python -m backtest run ... --out console,csv")
         return 1
+    data_path = run_dir / "report_data.json"
+    if data_path.exists():
+        from backtest.reporting.render import render_report
+
+        data = json.loads(data_path.read_text(encoding="utf-8"))
+        target = Path(args.out) if args.out else run_dir / "report.html"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(render_report(data), encoding="utf-8")
+        print(f"report: {target}")
+        return 0
     html_text = render(run_dir)
     target = Path(args.out) if args.out else run_dir / "report.html"
     target.parent.mkdir(parents=True, exist_ok=True)

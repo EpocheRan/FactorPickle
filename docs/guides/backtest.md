@@ -14,9 +14,9 @@
 | A 股规则（T+1 / 整手 / 涨跌停 / 停牌 / 费用） | ✅ |
 | 横截面（explicit universe + 候选集） | ✅ |
 | 自建账本 + 对账（诊断） | ✅ |
-| 输出 console / csv | ✅ |
+| 输出 console / csv / html | ✅ |
 | CLI（`list/validate/run/research/optimize`） | ✅ |
-| `all_a / index / file` universe | ⏳ 后续（需 PIT 成分/ST 历史） |
+| `all_a / index / file` universe | ✅ `all_a`/`index` 由数据源 PIT 解析；`file` 为显式池 |
 | 分红送转 / 复权 | ⏳ v1 未接，用原始价 |
 | 分钟线 / 日内止损 | ⚠️ 引擎支持 1m + `next_bar`；真实数据仅 2 只 × 1 月 |
 | benchmark（000300/000852） | ✅ `type='idx'` 已接；无数据时 `benchmark_used=False` |
@@ -139,6 +139,25 @@ RQAlpha 侧配置在 `rqalpha/engine.py::_config`：`sys_simulation` 开启涨�
 `sys_transaction_cost` 关闭并由 `FinBridgeCostDecider` 接管，`sys_analyser` 只收集结果不画图。
 
 ## 输出
+
+默认 `outputs=("console","html")`：每次回测都会写
+`output/backtest/<run_id>/report.html` 和 `report_data.json`。
+报告是单文件离线 HTML，不依赖 CDN/Plotly，含 7 个可交互 Tab：
+
+| Tab | 内容 |
+|---|---|
+| 概览 | 净值 vs 000300、回撤、Alpha/Beta KPI |
+| 绩效 | 月度热力、年度收益、滚动 Alpha/Beta、日收益散点 |
+| 风险 | 风险指标、最大回撤事件 |
+| 交易 | 收益分布、FIFO 回合交易表（筛选/排序/分页/CSV） |
+| 暴露 | 总仓位/现金 |
+| 归因 | 个股贡献、最新选股 |
+| 明细 | 运行配置、下载 report_data.json |
+
+`report_data.json` 是数据契约：`equity / benchmark / alpha_beta / monthly / rolling /
+drawdowns / exposure / trades / trade_summary / attribution`。
+`--out console,csv` 可关闭 HTML；`python scripts/report_backtest.py --latest` 可从
+`report_data.json` 重新渲染。
 
 `--out csv` 写 `output/backtest/<run_id>/`：
 

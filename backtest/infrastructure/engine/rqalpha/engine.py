@@ -308,6 +308,8 @@ class RQAlphaEngine:
             execution_report=report,
             corporate_actions=request.corporate_actions,
             meta=meta,
+            benchmark=request.benchmark,
+            positions=None if minute else (ledger.positions if self.last_ledger else None),
         )
 
     # ------------------------------------------------------------------ convert

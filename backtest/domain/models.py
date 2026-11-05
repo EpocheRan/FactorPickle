@@ -266,3 +266,6 @@ class BacktestResult:
     execution_report: ExecutionReport
     corporate_actions: pd.DataFrame | None = None
     meta: dict[str, Any] = field(default_factory=dict)
+    benchmark: pd.Series | None = None
+    round_trips: pd.DataFrame | None = None
+    positions: pd.DataFrame | None = None
