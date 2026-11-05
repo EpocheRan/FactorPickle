@@ -5,8 +5,12 @@
 - raw 表（行情/财务/分档/概念）仍由 ``data_interface`` 写，见 market/financial/moneyflow/concept schema。
 
 版本化约定：
-- ``factor_value_daily`` / ``factor_value_announce`` 的 DEDUP 键包含
-  ``version`` 与 ``source_version``，版本升级写新行，旧行保留。
+- ``factor_value_daily`` 的 DEDUP 键是 ``(ts, code, factor_id)``：同一
+  ``(交易日, 代码, 因子)`` 重算即覆盖（``version`` / ``source_version`` 只作
+  审计字段，不参与去重）。早期把 ``source_version`` 放进键，导致历史回填
+  每跑一次就多一版重复行。
+- ``factor_value_announce`` 仍保留 ``version`` 与 ``source_version``：公告类
+  因子按报告期多版本并存。
 - ``factor_value_latest`` 是读模型（最新日缓存），查询用
   ``LATEST ON ts PARTITION BY code, factor_id``，由 factor_engine 定期裁剪。
 """
@@ -177,7 +181,7 @@ def _ddl() -> list[str]:
             version SYMBOL,
             computed_at TIMESTAMP
         ) TIMESTAMP(ts) PARTITION BY MONTH WAL
-        DEDUP UPSERT KEYS(ts, code, factor_id, version, source_version)
+        DEDUP UPSERT KEYS(ts, code, factor_id)
         """,
         """
         CREATE TABLE IF NOT EXISTS "factor_value_announce" (
@@ -208,7 +212,7 @@ def _ddl() -> list[str]:
             version SYMBOL,
             computed_at TIMESTAMP
         ) TIMESTAMP(ts) PARTITION BY YEAR WAL
-        DEDUP UPSERT KEYS(ts, code, factor_id, version, source_version)
+        DEDUP UPSERT KEYS(ts, code, factor_id)
         """,
         """
         CREATE TABLE IF NOT EXISTS "factor_build_state" (

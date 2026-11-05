@@ -13,6 +13,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Sequence
 
@@ -213,9 +215,26 @@ class FundamentalComputer:
 
     def __init__(self, config: dict[str, Any] | None = None, repository: Any | None = None):
         self.config = config or get_config()
+        self._injected = repository is not None
         self.repository = repository or FinancialRepository(
             QuestDBClient(self.config, connect=False)
         )
+        # 逐票加载是 N+1 查询（每只 4 次），全市场串行要 10 分钟以上；
+        # 用线程池并发读取，每个工作线程持有自己的连接（psycopg 连接非线程安全）。
+        self._local = threading.local()
+
+    def _thread_repository(self) -> FinancialRepository:
+        repository = getattr(self._local, "repository", None)
+        if repository is None:
+            repository = FinancialRepository(QuestDBClient(self.config, connect=False))
+            self._local.repository = repository
+        return repository
+
+    def _load_workers(self, code_count: int) -> int:
+        if self._injected or code_count < 32:
+            return 1
+        configured = self.config.get("factor_engine", {}).get("load_workers")
+        return max(1, min(int(configured or 8), code_count))
 
     # ------------------------------------------------------------------ 数据
     def _report_snapshots(
@@ -299,20 +318,36 @@ class FundamentalComputer:
         trade_dates: Sequence | pd.DatetimeIndex,
     ) -> pd.DataFrame:
         frames: list[pd.DataFrame] = []
-        for code in codes:
-            code = str(code)
-            valuation = self.repository.get_valuation(
-                code, start_date=str(pd.Timestamp(start).date()), end_date=str(pd.Timestamp(end).date())
+        start_text = str(pd.Timestamp(start).date())
+        end_text = str(pd.Timestamp(end).date())
+
+        def _load_one(raw_code: str) -> pd.DataFrame:
+            code = str(raw_code)
+            repository = self.repository if self._injected else self._thread_repository()
+            valuation = repository.get_valuation(
+                code, start_date=start_text, end_date=end_text
             )
             val = pd.DataFrame(valuation) if valuation else pd.DataFrame()
             snaps = self._report_snapshots(
-                self.repository.get_statements(code, "IS"),
-                self.repository.get_statements(code, "BS"),
-                self.repository.get_statements(code, "CF"),
+                repository.get_statements(code, "IS"),
+                repository.get_statements(code, "BS"),
+                repository.get_statements(code, "CF"),
             )
-            frame = self._align_code(code, val, snaps, trade_dates)
-            if not frame.empty:
-                frames.append(frame)
+            return self._align_code(code, val, snaps, trade_dates)
+
+        code_list = [str(code) for code in codes]
+        workers = self._load_workers(len(code_list))
+        if workers > 1:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                loaded = pool.map(_load_one, code_list)
+                for frame in loaded:
+                    if not frame.empty:
+                        frames.append(frame)
+        else:
+            for code in code_list:
+                frame = _load_one(code)
+                if not frame.empty:
+                    frames.append(frame)
         if not frames:
             return pd.DataFrame(
                 columns=["ts", "code", "close", "total_share", "eps_ttm", "net_profit_ttm",
@@ -390,10 +425,20 @@ class FundamentalComputer:
         return base[ordered]
 
     # ------------------------------------------------------------------ 计算
-    def compute(self, metrics: pd.DataFrame) -> pd.DataFrame:
-        """metrics(ts, code, ...) -> 长表(ts, code, factor_id, value)。"""
+    def compute(
+        self,
+        metrics: pd.DataFrame,
+        materialize_from: Any | None = None,
+    ) -> pd.DataFrame:
+        """metrics(ts, code, ...) -> 长表(ts, code, factor_id, value)。
+
+        ``materialize_from``：只输出该日期之后的行。位移类因子（shift 252/63）
+        仍需完整历史面板才能算对，但没必要把整段历史都物化成行——全市场
+        458 个交易日 × 45 个因子约 2.2 亿行，rank 一步就要 1.7 GB 以上。
+        """
         if metrics is None or metrics.empty:
             return pd.DataFrame(columns=["ts", "code", "factor_id", "value"])
+        cutoff = pd.Timestamp(materialize_from) if materialize_from is not None else None
 
         frames: list[pd.DataFrame] = []
         factor_ids = [spec.factor_id for spec in FUNDAMENTAL_SPECS] + [
@@ -430,11 +475,23 @@ class FundamentalComputer:
                 "growth.asset_growth_qoq": g["total_asset"] / g["total_asset"].shift(1) - 1.0,
             }
             values.update(compute_ext(g))
+            if cutoff is not None:
+                keep = g.index >= cutoff
+                index = g.index[keep]
+                if index.empty:
+                    continue
+            else:
+                keep = None
+                index = g.index
             for factor_id in factor_ids:
+                array = values[factor_id]
+                array = array.to_numpy() if hasattr(array, "to_numpy") else array
+                if keep is not None:
+                    array = array[keep]
                 frames.append(
                     pd.DataFrame(
-                        {"ts": g.index, "code": code, "factor_id": factor_id,
-                         "value": values[factor_id].to_numpy()}
+                        {"ts": index, "code": code, "factor_id": factor_id,
+                         "value": array}
                     )
                 )
         long = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(

@@ -96,10 +96,14 @@ class ThsConceptSource:
     def fetch_board_daily(
         self, board: Board, start_date: str | date, end_date: str | date
     ) -> pd.DataFrame:
+        # 多取 10 天做缓冲：pct_chg 由 close.pct_change() 计算，窗口首日没有前收
+        # 会写成 NULL；增量同步时窗口首日往往正是最新交易日，会留下永久空洞。
+        start_ts = pd.Timestamp(start_date).normalize()
+        end_ts = pd.Timestamp(end_date).normalize()
         raw = self.ak.stock_board_concept_index_ths(
             symbol=board.name,
-            start_date=str(start_date)[:10].replace("-", ""),
-            end_date=str(end_date)[:10].replace("-", ""),
+            start_date=(start_ts - pd.Timedelta(days=10)).strftime("%Y%m%d"),
+            end_date=end_ts.strftime("%Y%m%d"),
         )
         if raw is None or raw.empty:
             return pd.DataFrame(
@@ -125,6 +129,7 @@ class ThsConceptSource:
         frame = frame.dropna(subset=["ts", "close"])
         frame = frame.sort_values("ts").drop_duplicates(subset=["ts"], keep="last")
         frame["pct_chg"] = frame["close"].pct_change()
+        frame = frame[(frame["ts"] >= start_ts) & (frame["ts"] <= end_ts)]
         return frame[
             ["ts", "open", "high", "low", "close", "volume", "amount", "pct_chg"]
         ].reset_index(drop=True)

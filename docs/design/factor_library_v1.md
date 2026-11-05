@@ -14,7 +14,7 @@
 |---|---|---|
 | 1 | 财务因子 `ts` 是报告期还是可用日未定义 | 拆成 **daily 时点表 + announce 事件表**；财务因子落 `factor_value_announce`，`ts = available_at`（公告日 + 披露滞后），另存 `report_period` / `announce_date` |
 | 2 | 长表缺 `source_version`，复权重算破坏可复现 | 两张值表都加 `source_version`；价格因子记录复权因子快照版本，财务记录报表版本，分档记录源口径版本 |
-| 3 | DEDUP 键不含版本，升级覆盖历史 | DEDUP 键加入 `version` + `source_version`；旧版本保留，查询默认取 registry 当前版本，可按版本回放 |
+| 3 | DEDUP 键不含版本，升级覆盖历史 | DEDUP 键加入 `version` + `source_version`；旧版本保留，查询默认取 registry 当前版本，可按版本回放（**2026-11-05 回退**：daily 键改回 `(ts, code, factor_id)`，重算即覆盖，版本字段仅作审计，见 §7.2） |
 | 4 | 增量只算末尾一天，递归/长窗因子会漂移 | `FactorSpec.update_mode`：`shift / window / recursive / event`；recursive 必须从锚点重算，window 带足 lookback；增量结果与全量抽检按 `FactorSpec.tolerance`（默认相对 1e-9） |
 | 5 | dependencies 命名空间与拓扑未定 | 依赖统一为 `raw:` / `factor:` / `ref:`；注册时建 DAG + 环检测；用拓扑层级替换 base/derived 两轮；行业用 `ref:industry`，不伪装成因子值 |
 | 6 | `screener_daily` 投影一致性只留一句“需要校验” | 硬性 `factor_projection_audit`：长表投影 vs 宽表现算，抽样 + 全量，按分因子容差（默认相对 1e-9），定时执行并阻断发布 |
@@ -297,12 +297,16 @@ CREATE TABLE IF NOT EXISTS "factor_value_daily" (
     version SYMBOL,             -- 公式版本
     computed_at TIMESTAMP
 ) TIMESTAMP(ts) PARTITION BY MONTH WAL
-DEDUP UPSERT KEYS(ts, code, factor_id, version, source_version)
+DEDUP UPSERT KEYS(ts, code, factor_id)
 ```
 
-- **版本化不可变**：换公式或换上游数据版本写新行，旧行保留。
-- 查询默认取 `factor_registry.version` 对应行；研究/回放可指定 `version` / `source_version`。
-- 存储增长只发生在版本切换，不随日常更新增长。
+- **重算即覆盖（2026-11-05 起）**：同一 `(交易日, 代码, 因子)` 只保留一行；
+  `version` / `source_version` 仍写在行上供审计，但不再参与去重。
+- 背景：早期把它们放进 DEDUP 键，历史回填每重跑一次就多一版重复行
+  （`fin:20261029` / `fin:20261030` 两次回填在 2024–2026 留下 240 万重复键，
+  且两个版本值不一致）。需要保留旧值做回放的场景，应另建版本快照表。
+- `factor_value_announce` 仍保留 `version` + `source_version`（公告类按报告期
+  多版本并存）。
 
 ### 7.3 `factor_build_state`
 

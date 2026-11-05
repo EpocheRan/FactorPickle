@@ -125,7 +125,10 @@ def test_legacy_service_build_writes_values():
 def test_all_legacy_ids_registered_once():
     service = FactorEngineService(config={})
     ids = [spec.factor_id for spec in service.list_factors()]
-    assert len(ids) == 56
-    assert len(set(ids)) == 56
+    # 目录必须覆盖全部内置因子（含 FIN_EXT 的 61 个），且与管道默认集合一致
+    assert len(ids) == 117
+    assert len(set(ids)) == 117
+    assert set(ids) == set(service.default_precompute_ids())
     for factor_id in LEGACY_COLUMNS:
         assert factor_id in ids
+    assert "quality.roe_ttm" in ids

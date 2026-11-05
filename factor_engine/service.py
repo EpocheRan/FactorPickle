@@ -87,11 +87,18 @@ class FactorEngineService:
         return register_all()
 
     def list_factors(self) -> list[FactorSpec]:
+        """引擎内置因子清单（目录）。
+
+        必须与 ``register_all()`` 的注册范围一致：此前漏了 ``FIN_EXT_SPECS``，
+        导致 ``build(ids=None)`` 的默认集合只有 56 个，而管道走的
+        ``default_precompute_ids()`` 是 117 个，两个入口对“全量”的定义不一致。
+        """
         return (
             [item.spec for item in PRICE_FACTORS]
             + list(LEGACY_SPECS)
             + list(FUNDAMENTAL_SPECS)
             + list(VALUATION_SPECS)
+            + list(FIN_EXT_SPECS)
         )
 
     def default_precompute_ids(self) -> list[str]:
@@ -217,7 +224,7 @@ class FactorEngineService:
                 selected_codes, load_start, end_date, trade_dates
             )
             if not metrics.empty:
-                long = self.fundamental.compute(metrics)
+                long = self.fundamental.compute(metrics, materialize_from=start_ts)
                 for row in long.itertuples(index=False):
                     stamp = pd.Timestamp(row.ts).normalize()
                     if stamp < start_ts or pd.isna(row.value):
