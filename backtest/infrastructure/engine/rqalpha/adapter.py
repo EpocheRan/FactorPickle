@@ -76,7 +76,9 @@ class StrategyAdapter:
                     )
                     continue
             try:
-                order_shares(oid, int(order.shares))
+                submitted = order_shares(oid, int(order.shares))
+                if submitted is not None:
+                    runtime.order_reasons[str(getattr(submitted, "order_id", ""))] = order.reason
             except Exception as exc:  # noqa: BLE001 - 记录拒单原因，不中断回测
                 runtime.rejected.append(
                     {"symbol": order.code, "reason": type(exc).__name__, "shares": order.shares}

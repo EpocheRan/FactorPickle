@@ -44,6 +44,7 @@ class Runtime:
     stops: dict[str, StopState] = field(default_factory=dict)
     bars_held: dict[str, int] = field(default_factory=dict)
     entry_dates: dict[str, date] = field(default_factory=dict)
+    order_reasons: dict[str, str] = field(default_factory=dict)
     rejected: list[dict[str, Any]] = field(default_factory=list)
 
 

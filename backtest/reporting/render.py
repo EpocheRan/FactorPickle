@@ -57,6 +57,15 @@ margin:2px 4px 0 0;color:var(--muted);font-size:11px}
 .heat td{padding:4px 6px;text-align:center;border:1px solid #0d1117;border-radius:3px;cursor:pointer}
 .heat th{text-align:center}
 .note{color:var(--muted);font-size:11.5px;margin:4px 0 0}
+.checks{display:flex;flex-direction:column;gap:7px}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:11.8px;line-height:1.45}
+.check .badge{flex:0 0 auto;border-radius:3px;padding:0 5px;font-size:10.5px;font-weight:600}
+.check.pass .badge{background:rgba(63,185,80,.16);color:var(--pos)}
+.check.warn .badge{background:rgba(212,162,76,.16);color:var(--acc)}
+.check.fail .badge{background:rgba(248,81,73,.16);color:var(--neg)}
+.check .detail{color:var(--muted)}
+.warnbox{border:1px solid rgba(212,162,76,.35);background:rgba(212,162,76,.08);color:var(--acc);
+border-radius:4px;padding:7px 9px;font-size:11.5px;margin:8px 0 0}
 .scroll{max-height:430px;overflow:auto;border:1px solid var(--line);border-radius:5px}
 input.filter{background:#0b1016;border:1px solid var(--line);color:var(--ink);
 border-radius:4px;padding:5px 8px;font-size:12px;min-width:150px}
@@ -98,7 +107,13 @@ __KPIS__
     <div class="chart"><svg id="drawdownChart"></svg><div class="tip" id="ddTip"></div></div></div>
   <div class="grid2">
     <div class="card"><div class="card-head"><h3>核心指标</h3></div><table class="meta"><tbody>__METRIC_ROWS__</tbody></table></div>
-    <div class="card"><div class="card-head"><h3>Alpha / Beta</h3></div><table class="meta"><tbody>__ALPHA_ROWS__</tbody></table></div>
+    <div class="card"><div class="card-head"><h3>Alpha / Beta</h3></div><table class="meta"><tbody>__ALPHA_ROWS__</tbody></table>__ALPHA_WARN__</div>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="card-head"><h3>已实现 / 未实现收益桥</h3></div>
+      <table class="meta"><tbody>__BRIDGE_ROWS__</tbody></table></div>
+    <div class="card"><div class="card-head"><h3>数据自检</h3></div>
+      <div class="checks">__CHECKS__</div></div>
   </div>
 </section>
 <section class="pane" id="tab-performance">
@@ -132,7 +147,7 @@ __KPIS__
     <div class="scroll"><table><thead><tr>
       <th data-sort="symbol">代码</th><th data-sort="entry_date">入场</th><th data-sort="exit_date">出场</th>
       <th data-sort="entry_price">入场价</th><th data-sort="exit_price">出场价</th><th data-sort="shares">股数</th>
-      <th data-sort="pnl">净盈亏</th><th data-sort="ret">收益率</th><th data-sort="days">天数</th></tr></thead>
+      <th data-sort="pnl">净盈亏</th><th data-sort="ret">收益率</th><th data-sort="fees">费用</th><th data-sort="days">天数</th></tr></thead>
       <tbody id="tradeBody"></tbody></table></div>
     <div class="controls" style="margin-top:8px"><button class="btn" id="tradePrev">上一页</button>
       <span class="muted" id="tradePage"></span><button class="btn" id="tradeNext">下一页</button></div>
@@ -142,12 +157,17 @@ __KPIS__
   <div class="card"><div class="card-head"><h3>总仓位 / 现金</h3></div>
     <div class="chart"><svg id="exposureChart"></svg><div class="tip" id="exposureTip"></div></div>
     <div class="legend"><span><i style="background:var(--acc)"></i>总仓位 %</span><span><i style="background:var(--blue)"></i>现金 %</span></div></div>
+  <div class="card"><div class="card-head"><h3>集中度（最新）</h3></div>
+    <table class="meta"><tbody>__CONC_ROWS__</tbody></table>
+    <p class="note">HHI = Σ(w_i²)，越接近 1 越集中；Top10 权重按组合权益计。</p></div>
 </section>
 <section class="pane" id="tab-attribution">
-  <div class="grid2"><div class="card"><div class="card-head"><h3>个股贡献 Top</h3></div>
+  <div class="grid2"><div class="card"><div class="card-head"><h3>个股贡献 Top</h3><span class="muted">合计 __ATTR_TOTAL__</span></div>
     <table><thead><tr><th>代码</th><th>净盈亏</th><th>回合数</th></tr></thead><tbody>__ATTR_ROWS__</tbody></table></div>
-  <div class="card"><div class="card-head"><h3>最新持仓 / 选股</h3></div>
-    <div class="scroll"><table><thead><tr><th>代码</th><th>score</th><th>rank</th><th>weight</th></tr></thead><tbody>__SEL_ROWS__</tbody></table></div></div></div>
+  <div class="card"><div class="card-head"><h3>个股贡献 Bottom</h3></div>
+    <table><thead><tr><th>代码</th><th>净盈亏</th><th>回合数</th></tr></thead><tbody>__ATTR_BOTTOM_ROWS__</tbody></table></div></div>
+  <div class="card"><div class="card-head"><h3>选股历史</h3><span class="muted">__SEL_COUNT__ 条</span></div>
+    <div class="scroll"><table><thead><tr><th>日期</th><th>代码</th><th>score</th><th>rank</th><th>weight</th></tr></thead><tbody>__SEL_ROWS__</tbody></table></div></div>
 </section>
 <section class="pane" id="tab-details">
   <div class="card"><div class="card-head"><h3>运行信息</h3><button class="btn" id="jsonCsv">下载 report_data.json</button></div>
@@ -448,7 +468,8 @@ function renderTrades(){
   $('tradeBody').innerHTML=slice.map(t=>`<tr>
     <td>${t.symbol}</td><td>${t.entry_date||''}</td><td>${t.exit_date||''}</td>
     <td>${fmtNum(t.entry_price,2)}</td><td>${fmtNum(t.exit_price,2)}</td><td>${fmtNum(t.shares,0)}</td>
-    <td class="${cls(t.pnl)}">${fmtMoney(t.pnl)}</td><td class="${cls(t.ret)}">${fmtPct((t.ret||0)*100)}</td><td>${t.days??''}</td></tr>`).join('');
+    <td class="${cls(t.pnl)}">${fmtMoney(t.pnl)}</td><td class="${cls(t.ret)}">${fmtPct((t.ret||0)*100)}</td>
+    <td>${fmtMoney(t.fees)}</td><td>${t.days??''}</td></tr>`).join('');
   $('tradeCount').textContent=`${rows.length} 笔`;
   $('tradePage').textContent=`${state.page+1}/${pages}`;
 }
@@ -550,6 +571,37 @@ def _table(headers: list[str], rows: list[str], empty: str = "无数据") -> str
     return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
 
 
+def _bridge_rows(data: dict[str, Any]) -> str:
+    bridge = data.get("pnl_bridge") or {}
+    if not bridge:
+        return "<tr><td class='muted'>无足够数据</td></tr>"
+    rows = [
+        ("期初权益", _plain(bridge.get("start_equity"), 0)),
+        ("已实现回合盈亏", _num(bridge.get("realized_pnl"), 2)),
+        ("未实现浮盈", _num(bridge.get("unrealized_pnl"), 2)),
+        ("未平仓费用（减项）", _num(bridge.get("open_fees"), 2)),
+        ("残差", f"{_num(bridge.get('residual'), 2)}（{_num(bridge.get('residual_pct'), 3)}%）"),
+        ("期末权益", _plain(bridge.get("end_equity"), 0)),
+        ("总费用（含已平仓）", _plain(bridge.get("fees_total"), 2)),
+        ("期末持仓", f"{_plain(bridge.get('open_positions'), 0)} 只 / {_plain(bridge.get('open_shares'), 0)} 股"),
+    ]
+    return _rows(rows)
+
+
+def _checks_html(data: dict[str, Any]) -> str:
+    checks = data.get("checks") or []
+    if not checks:
+        return "<p class='muted'>无自检结果</p>"
+    labels = {"pass": "通过", "warn": "警告", "fail": "失败"}
+    return "".join(
+        f"<div class='check {_esc(item.get('status'))}'>"
+        f"<span class='badge'>{_esc(labels.get(item.get('status'), item.get('status')))}</span>"
+        f"<span>{_esc(item.get('name'))}<span class='detail'> · {_esc(item.get('detail'))}</span></span>"
+        "</div>"
+        for item in checks
+    )
+
+
 def render_report(data: dict[str, Any]) -> str:
     meta = data.get("meta") or {}
     metrics = data.get("metrics") or {}
@@ -586,16 +638,33 @@ def render_report(data: dict[str, Any]) -> str:
             ("牛/熊 Beta", f"{_plain(alpha.get('bull_beta'), 2)} / {_plain(alpha.get('bear_beta'), 2)}"),
         ]
     )
+    risk = data.get("risk") or {}
     risk_rows = _rows(
         [
-            ("最大回撤", _num(metrics.get("max_drawdown_pct"), 2, "%")),
-            ("年化波动", _num(metrics.get("volatility_pct"), 2, "%")),
+            ("年化收益", _num(risk.get("annualized_return_pct"), 2, "%")),
+            ("12M 收益", _num(risk.get("return_12m_pct"), 2, "%")),
+            ("36M 收益", _num(risk.get("return_36m_pct"), 2, "%")),
+            ("年化波动", _num(risk.get("volatility_pct"), 2, "%")),
+            ("下行波动", _num(risk.get("downside_vol_pct"), 2, "%")),
+            ("最大回撤", _num(risk.get("max_drawdown_pct"), 2, "%")),
             ("Sharpe", _plain(metrics.get("sharpe"), 2)),
-            ("样本数", _plain(alpha.get("observations"), 0)),
-            ("基准", meta.get("benchmark", "—")),
-            ("拒绝订单", _plain(meta.get("rejected"), 0)),
+            ("Sortino", _plain(risk.get("sortino"), 2)),
+            ("Calmar", _plain(risk.get("calmar"), 2)),
+            ("VaR95（日）", _num(risk.get("var95_pct"), 2, "%")),
+            ("CVaR95（日）", _num(risk.get("cvar95_pct"), 2, "%")),
+            ("偏度 / 峰度", f"{_plain(risk.get('skew'), 2)} / {_plain(risk.get('kurtosis'), 2)}"),
+            ("月度胜率", _plain(risk.get("monthly_win_rate_pct"), 1, "%")),
+            ("样本数", _plain(risk.get("observations"), 0)),
         ]
     )
+    alpha_r2 = alpha.get("r2")
+    alpha_warn = ""
+    if alpha_r2 is not None and float(alpha_r2) < 0.5:
+        alpha_warn = (
+            f"<p class='warnbox'>R²={_plain(alpha_r2, 2)}：基准只解释 "
+            f"{_plain(float(alpha_r2) * 100.0, 1)}% 的组合波动，Alpha 的解释力有限；"
+            "建议换基准或重点看超额、捕获率与 IR。</p>"
+        )
     dd_rows = "".join(
         f"<tr><td>{_esc(item.get('start'))}</td><td>{_esc(item.get('trough'))}</td>"
         f"<td>{_esc(item.get('end') or '未修复')}</td><td class='neg'>{_num(item.get('depth_pct'), 2, '%')}</td>"
@@ -612,6 +681,8 @@ def render_report(data: dict[str, Any]) -> str:
             ("平均亏损", _num(summary.get("avg_loss_pct"), 2, "%")),
             ("期望", _num(summary.get("expectancy_pct"), 2, "%")),
             ("平均持仓", _plain(summary.get("avg_days"), 1, "天")),
+            ("总费用", _plain(summary.get("fees_total"), 0)),
+            ("年化单边换手", _plain(summary.get("turnover_one_way_pct"), 1, "%")),
         ]
     )
     attr_rows = "".join(
@@ -619,10 +690,29 @@ def render_report(data: dict[str, Any]) -> str:
         f"{_num(item.get('pnl'), 2)}</td><td>{_plain(item.get('trades'), 0)}</td></tr>"
         for item in ((data.get("attribution") or {}).get("by_symbol") or [])
     )
+    attr_bottom_rows = "".join(
+        f"<tr><td>{_esc(item.get('symbol'))}</td><td class='{cls_name(_num(item.get('pnl'), 2))}'>"
+        f"{_num(item.get('pnl'), 2)}</td><td>{_plain(item.get('trades'), 0)}</td></tr>"
+        for item in ((data.get("attribution") or {}).get("bottom") or [])
+    )
+    attr_total = _num((data.get("attribution") or {}).get("total_pnl"), 2)
     sel_rows = "".join(
-        f"<tr><td>{_esc(item.get('symbol'))}</td><td>{_plain(item.get('score'), 3)}</td>"
+        f"<tr><td>{_esc(item.get('date'))}</td><td>{_esc(item.get('symbol'))}</td>"
+        f"<td>{_plain(item.get('score'), 3)}</td>"
         f"<td>{_plain(item.get('rank'), 0)}</td><td>{_plain(item.get('weight'), 4)}</td></tr>"
         for item in (data.get("selections") or [])
+    )
+    sel_count = len(data.get("selections") or [])
+    concentration = data.get("concentration") or []
+    last_conc = concentration[-1] if concentration else {}
+    conc_rows = _rows(
+        [
+            ("Top10 权重", _plain(last_conc.get("top10_pct"), 1, "%")),
+            ("HHI", _plain(last_conc.get("hhi"), 3)),
+            ("最大单票", _plain(last_conc.get("max_position_pct"), 1, "%")),
+            ("持仓只数", _plain(last_conc.get("positions"), 0)),
+            ("总仓位", _plain(last_conc.get("gross_pct"), 1, "%")),
+        ]
     )
     meta_rows = _rows(
         [
@@ -636,6 +726,17 @@ def render_report(data: dict[str, Any]) -> str:
             ("基准可用", _esc(meta.get("benchmark_used"))),
             ("手续费/成交", _esc(meta.get("fill"))),
             ("最大仓位", _plain(meta.get("max_gross_exposure"), 2)),
+            ("股票池", f"{_esc(meta.get('universe'))} / {_plain(meta.get('universe_size'), 0)} 只"),
+            ("候选数", _plain(meta.get("candidate_count"), 0)),
+            ("调仓", _esc(meta.get("rebalance"))),
+            ("权重/TopN", f"{_esc(meta.get('weighting'))} / {_plain(meta.get('top_n'), 0)}"),
+            ("因子", _esc(", ".join(meta.get("factors") or []) or "—")),
+            ("参数", _esc(meta.get("params"))),
+            ("公司行为", _esc(meta.get("corporate_actions"))),
+            ("成本模型", _esc(meta.get("cost_model"))),
+            ("代码 commit", _esc(meta.get("code_commit"))),
+            ("数据源", _esc(meta.get("data_source"))),
+            ("score 定义", _esc(meta.get("score_note"))),
             ("订单/成交", f"{_plain(meta.get('orders'), 0)} / {_plain(meta.get('trades'), 0)}"),
             ("无风险利率", _plain(meta.get("risk_free_rate"), 3)),
         ]
@@ -649,11 +750,18 @@ def render_report(data: dict[str, Any]) -> str:
         .replace("__KPIS__", _kpis(data))
         .replace("__METRIC_ROWS__", metric_rows)
         .replace("__ALPHA_ROWS__", alpha_rows)
+        .replace("__ALPHA_WARN__", alpha_warn)
+        .replace("__BRIDGE_ROWS__", _bridge_rows(data))
+        .replace("__CHECKS__", _checks_html(data))
+        .replace("__CONC_ROWS__", conc_rows)
         .replace("__RISK_ROWS__", risk_rows)
         .replace("__DD_ROWS__", dd_rows or "<tr><td colspan='5' class='muted'>无回撤</td></tr>")
         .replace("__TRADE_KPIS__", trade_kpis)
         .replace("__ATTR_ROWS__", attr_rows)
-        .replace("__SEL_ROWS__", sel_rows or "<tr><td colspan='4' class='muted'>无选股快照</td></tr>")
+        .replace("__ATTR_BOTTOM_ROWS__", attr_bottom_rows)
+        .replace("__ATTR_TOTAL__", attr_total)
+        .replace("__SEL_ROWS__", sel_rows or "<tr><td colspan='5' class='muted'>无选股快照</td></tr>")
+        .replace("__SEL_COUNT__", str(sel_count))
         .replace("__META_ROWS__", meta_rows)
         .replace("__BENCH__", _esc(meta.get("benchmark") or "—"))
         .replace("__GENERATED__", _esc(meta.get("generated_at")))

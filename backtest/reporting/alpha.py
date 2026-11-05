@@ -232,11 +232,133 @@ def drawdown_episodes(equity: pd.DataFrame, top: int = 5) -> list[dict]:
     return episodes[:top]
 
 
-def exposure_table(equity: pd.DataFrame) -> list[dict]:
+def risk_stats(
+    equity: pd.DataFrame,
+    risk_free_rate: float = 0.0,
+    monthly: list[dict] | None = None,
+) -> dict[str, float]:
+    returns = _equity_returns(equity)
+    if returns is None or returns.empty:
+        return {}
+    n = len(returns)
+    annual = float((1.0 + returns).prod() ** (PERIODS_PER_YEAR / n) - 1.0)
+    vol = float(returns.std(ddof=1) * np.sqrt(PERIODS_PER_YEAR))
+    downside = returns[returns < 0]
+    downside_vol = (
+        float(downside.std(ddof=1) * np.sqrt(PERIODS_PER_YEAR)) if len(downside) > 1 else float("nan")
+    )
+    frame = equity.copy()
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
+    frame = frame.dropna(subset=["date", "equity"]).set_index("date").sort_index()
+    values = pd.to_numeric(frame["equity"], errors="coerce")
+    dd = values / values.cummax() - 1.0
+    max_dd = float(dd.min()) if len(dd) else float("nan")
+    rf = float(risk_free_rate)
+    sortino = (annual - rf) / downside_vol if downside_vol and np.isfinite(downside_vol) else float("nan")
+    calmar = annual / abs(max_dd) if max_dd < 0 else float("nan")
+    var95 = float(returns.quantile(0.05) * 100.0)
+    tail = returns[returns <= returns.quantile(0.05)]
+    cvar95 = float(tail.mean() * 100.0) if len(tail) else float("nan")
+    monthly_values = [item["ret"] for item in (monthly or []) if item.get("ret") is not None]
+    monthly_win = (
+        float(sum(1 for value in monthly_values if value > 0) / len(monthly_values) * 100.0)
+        if monthly_values
+        else float("nan")
+    )
+
+    def _period_return(window: int) -> float | None:
+        if len(values) <= window:
+            return None
+        base = float(values.iloc[-1 - window])
+        return (float(values.iloc[-1]) / base - 1.0) * 100.0 if base else None
+
+    return {
+        "annualized_return_pct": annual * 100.0,
+        "return_12m_pct": _period_return(252),
+        "return_36m_pct": _period_return(756),
+        "volatility_pct": vol * 100.0,
+        "downside_vol_pct": downside_vol * 100.0 if np.isfinite(downside_vol) else None,
+        "max_drawdown_pct": max_dd * 100.0,
+        "sortino": sortino,
+        "calmar": calmar,
+        "var95_pct": var95,
+        "cvar95_pct": cvar95,
+        "skew": float(returns.skew()),
+        "kurtosis": float(returns.kurtosis()),
+        "monthly_win_rate_pct": monthly_win,
+        "observations": n,
+    }
+
+
+def concentration_table(
+    positions: pd.DataFrame | None,
+    equity: pd.DataFrame,
+) -> list[dict]:
+    if positions is None or positions.empty or "date" not in positions.columns:
+        return []
+    pos = positions.copy()
+    pos["date"] = pd.to_datetime(pos["date"], errors="coerce").dt.normalize()
+    pos = pos.dropna(subset=["date"])
+    value_col = "market_value" if "market_value" in pos.columns else "close"
+    pos["_value"] = pd.to_numeric(pos[value_col], errors="coerce").fillna(0.0)
+    eq = equity.copy()
+    eq["date"] = pd.to_datetime(eq["date"], errors="coerce").dt.normalize()
+    eq = eq.dropna(subset=["date"]).set_index("date")["equity"].astype(float)
+    rows = []
+    for dt, group in pos.groupby("date"):
+        values = group["_value"].clip(lower=0.0)
+        total = float(values.sum())
+        equity_value = float(eq.get(dt, 0.0) or 0.0)
+        if total <= 0 or equity_value <= 0:
+            continue
+        weights = values / total
+        top10 = float(weights.nlargest(10).sum() * 100.0)
+        hhi = float((weights**2).sum())
+        rows.append(
+            {
+                "date": str(pd.Timestamp(dt).date()),
+                "top10_pct": top10,
+                "hhi": hhi,
+                "max_position_pct": float(weights.max() * 100.0),
+                "positions": int((values > 0).sum()),
+                "gross_pct": total / equity_value * 100.0,
+            }
+        )
+    return rows
+
+
+def exposure_table(
+    equity: pd.DataFrame,
+    orders: pd.DataFrame | None = None,
+    positions: pd.DataFrame | None = None,
+) -> list[dict]:
     if equity is None or equity.empty:
         return []
     frame = equity.copy()
     frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
+    frame = frame.dropna(subset=["date"]).sort_values("date")
+    dates = list(frame["date"])
+    counts: dict[pd.Timestamp, int] = {}
+    if positions is not None and not positions.empty and "date" in positions.columns:
+        pos = positions.copy()
+        pos["date"] = pd.to_datetime(pos["date"], errors="coerce").dt.normalize()
+        if "shares" in pos.columns:
+            pos = pos[pd.to_numeric(pos["shares"], errors="coerce").fillna(0.0) > 0]
+        counts = pos.groupby("date")["symbol"].nunique().to_dict()
+    elif orders is not None and not orders.empty and {"date", "symbol", "type", "shares"} <= set(orders.columns):
+        frame_orders = orders.copy()
+        frame_orders["date"] = pd.to_datetime(frame_orders["date"], errors="coerce").dt.normalize()
+        frame_orders = frame_orders.dropna(subset=["date"]).sort_values("date")
+        events: dict[pd.Timestamp, list[tuple[str, float]]] = {}
+        for row in frame_orders.itertuples(index=False):
+            shares = float(getattr(row, "shares", 0.0) or 0.0)
+            signed = shares if str(row.type).lower() == "buy" else -shares
+            events.setdefault(pd.Timestamp(row.date), []).append((str(row.symbol), signed))
+        holdings: dict[str, float] = {}
+        for dt in dates:
+            for symbol, signed in events.get(dt, []):
+                holdings[symbol] = holdings.get(symbol, 0.0) + signed
+            counts[dt] = sum(1 for value in holdings.values() if value > 1e-9)
     rows = []
     for row in frame.itertuples(index=False):
         total = float(getattr(row, "equity", 0.0) or 0.0)
@@ -247,7 +369,7 @@ def exposure_table(equity: pd.DataFrame) -> list[dict]:
                 "date": str(pd.Timestamp(row.date).date()),
                 "gross_pct": market / total * 100.0 if total else 0.0,
                 "cash_pct": cash / total * 100.0 if total else 0.0,
-                "positions": int(getattr(row, "positions", 0) or 0),
+                "positions": int(counts.get(pd.Timestamp(row.date), 0)),
             }
         )
     return rows

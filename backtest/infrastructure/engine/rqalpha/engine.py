@@ -203,7 +203,9 @@ class RQAlphaEngine:
         trades = analyser.get("trades")
 
         minute = bool(getattr(runtime.source, "is_minute", False))
-        orders, trades_out = self._orders_from_trades(trades, minute=minute)
+        orders, trades_out = self._orders_from_trades(
+            trades, minute=minute, reasons=runtime.order_reasons
+        )
         engine_equity = self._equity_from_portfolio(
             portfolio, request.spec.initial_cash, minute=minute
         )
@@ -315,11 +317,14 @@ class RQAlphaEngine:
     # ------------------------------------------------------------------ convert
     @staticmethod
     def _orders_from_trades(
-        trades: pd.DataFrame | None, *, minute: bool = False
+        trades: pd.DataFrame | None,
+        *,
+        minute: bool = False,
+        reasons: dict[str, str] | None = None,
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         if trades is None or len(trades) == 0:
             return (
-                pd.DataFrame(columns=["type", "symbol", "date", "shares", "fill_price", "fees", "created", "status"]),
+                pd.DataFrame(columns=["type", "symbol", "date", "shares", "fill_price", "fees", "created", "status", "reason"]),
                 pd.DataFrame(),
             )
         frame = trades.reset_index(drop=True) if "datetime" in trades.columns else trades.reset_index()
@@ -328,6 +333,8 @@ class RQAlphaEngine:
         dt = pd.to_datetime(frame["datetime"], errors="coerce")
         if not minute:
             dt = dt.dt.normalize()
+        reason_map = reasons or {}
+        order_ids = frame["order_id"].astype(str) if "order_id" in frame.columns else pd.Series("", index=frame.index)
         orders = pd.DataFrame(
             {
                 "type": order_type,
@@ -338,6 +345,7 @@ class RQAlphaEngine:
                 "fees": frame["transaction_cost"].astype(float),
                 "created": dt,
                 "status": "FILLED",
+                "reason": order_ids.map(reason_map).fillna("unknown"),
             }
         )
         return orders, frame
