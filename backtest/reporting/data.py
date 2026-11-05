@@ -217,6 +217,12 @@ class ReportDataBuilder:
             "data_source": spec.data_source,
             "score_note": "score 为策略 rank() 原始输出，越大越优先；低换手策略 score=-turnover_ma_20d。",
             "cost_model": _safe(asdict(spec.rules)),
+            "cost_model_text": (
+                f"佣金 {spec.rules.commission_rate*100:.3f}%（最低 {spec.rules.min_commission:.0f}）/ "
+                f"印花税 {spec.rules.stamp_tax_schedule[-1][1]*100:.3f}% / "
+                f"过户费 {spec.rules.transfer_fee_rate*100:.4f}% / "
+                f"{'T+1' if spec.rules.t_plus_1 else 'T+0'} / 整手 {spec.rules.lot_size}"
+            ),
             "code_commit": _git_commit(),
             "rejected": int(meta.get("rejected", 0) or 0),
             "orders": int(len(result.orders)) if result.orders is not None else 0,

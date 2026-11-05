@@ -44,7 +44,9 @@ table{width:100%;border-collapse:collapse;font-size:12.5px}
 th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
 th{color:var(--muted);font-weight:500;background:#11161d;position:sticky;top:0}
-table.meta th{width:160px;text-align:left}
+table.meta{table-layout:fixed}
+table.meta th{width:165px;text-align:left;vertical-align:top}
+table.meta td{white-space:normal;overflow-wrap:anywhere;word-break:break-word;vertical-align:top}
 .btn{background:#1c2430;border:1px solid var(--line);color:var(--ink);border-radius:4px;
 padding:5px 9px;font-size:11.5px;cursor:pointer}
 .btn.active{border-color:var(--acc);color:var(--acc)}
@@ -735,7 +737,7 @@ def render_report(data: dict[str, Any]) -> str:
             ("基准", _esc(meta.get("benchmark"))),
             ("基准可用", _esc(meta.get("benchmark_used"))),
             ("手续费/成交", _esc(meta.get("fill"))),
-            ("最大仓位", _plain(meta.get("max_gross_exposure"), 2)),
+            ("目标仓位上限", _plain(meta.get("max_gross_exposure"), 2)),
             ("股票池", f"{_esc(meta.get('universe'))} / {_plain(meta.get('universe_size'), 0)} 只"),
             ("候选数", _plain(meta.get("candidate_count"), 0)),
             ("调仓", _esc(meta.get("rebalance"))),
@@ -743,7 +745,7 @@ def render_report(data: dict[str, Any]) -> str:
             ("因子", _esc(", ".join(meta.get("factors") or []) or "—")),
             ("参数", _esc(meta.get("params"))),
             ("公司行为", _esc(meta.get("corporate_actions"))),
-            ("成本模型", _esc(meta.get("cost_model"))),
+            ("成本模型", _esc(meta.get("cost_model_text") or meta.get("cost_model"))),
             ("代码 commit", _esc(meta.get("code_commit"))),
             ("数据源", _esc(meta.get("data_source"))),
             ("score 定义", _esc(meta.get("score_note"))),
