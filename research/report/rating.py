@@ -238,9 +238,19 @@ def rate(report) -> dict:
     ]
     vetoes = [f"{v['rule']}：{v['actual']}（阈值 {v['threshold']}）" for v in veto_rules if v["triggered"]]
 
+    # 价差闸门（先算，供定级与兑现两处使用）
+    _net_mean = float((report.spread_net or {}).get("mean", np.nan))
+    _cost_mean = float(report.cost_mean) if np.isfinite(report.cost_mean) else float("nan")
+    under_water = bool(np.isfinite(_net_mean) and _net_mean <= 0)
+    cannot_pay = bool(np.isfinite(_net_mean) and np.isfinite(_cost_mean)
+                      and _net_mean < _cost_mean * 0.2)
+
     grade = raw_grade
     capped = False
     if vetoes and grade in ("A", "B"):
+        grade = "C"
+        capped = True
+    if (under_water or cannot_pay) and grade in ("A", "B"):
         grade = "C"
         capped = True
 
@@ -268,7 +278,9 @@ def rate(report) -> dict:
     # ---- 第三维：兑现率（IC 隐含价差 vs 实测净价差）
     # 不再一票否决，改为折价系数：ratio≥0.8 记满分，线性折算，最低 0。
     _ratio = float(ic_spread_ratio) if np.isfinite(ic_spread_ratio) else float("nan")
-    realization = 100.0 * _clip01(_ratio / 0.8) if np.isfinite(_ratio) else 50.0
+    # 硬闸门：扣完成本不赚钱，兑现一律 0（不能靠时间/空间把评级撑起来）
+    realization = 0.0 if (under_water or cannot_pay) else (
+        100.0 * _clip01(_ratio / 0.8) if np.isfinite(_ratio) else 50.0)
     transmission_note = (
         f"实测净价差 / IC 隐含价差 = {_ratio:.2f}（≥0.8 视为完全兑现）"
         if np.isfinite(_ratio) else "传导比不可计算（IC 或截面波动缺失）"
@@ -288,9 +300,9 @@ def rate(report) -> dict:
         + 0.3 * min(1.0, max(0.0, _net_t) / 2.0)
     )
 
-    # 权威口径：时间 30 + 空间 20 + 兑现 20 + 增量 15 + 可交易 15
-    total = (0.30 * time_score + 0.20 * space_score + 0.20 * realization
-             + 0.15 * incremental_score + 0.15 * tradability_score)
+    # 权威口径：时间 25 + 空间 20 + 兑现 30 + 增量 10 + 可交易 15
+    total = (0.25 * time_score + 0.20 * space_score + 0.30 * realization
+             + 0.10 * incremental_score + 0.15 * tradability_score)
     raw_grade = "A" if total >= 85 else "B" if total >= 72 else "C" if total >= 55 else "D"
     # 综合分重算后重新定级，其余否决项仍然封顶
     grade = raw_grade
@@ -345,6 +357,9 @@ def rate(report) -> dict:
         "time_score": round(time_score, 1),
         "space_score": round(space_score, 1),
         "realization_score": round(realization, 1),
+        "edge_gate": {"under_water": under_water, "cannot_pay": cannot_pay,
+                      "net_mean": round(_net_mean, 5) if np.isfinite(_net_mean) else None,
+                      "cost_mean": round(_cost_mean, 5) if np.isfinite(_cost_mean) else None},
         "incremental_score": round(incremental_score, 1),
         "reverse_eval": reverse_eval,
         "tradability_score": round(tradability_score, 1),
