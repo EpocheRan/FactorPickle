@@ -28,6 +28,9 @@ class BacktestSettings:
     drift_threshold: float = 0.02
     seed: int = 0
     corporate_actions: CorporateActionMode = "off"
+    cache: bool = True
+    cache_dir: Path = Path("output/cache/backtest")
+    cache_max_symbols: int = 500
     rules: ExecutionRules = field(default_factory=ExecutionRules)
 
     @classmethod
@@ -45,6 +48,7 @@ class BacktestSettings:
         if not outputs:
             raise ConfigError("backtest.outputs 不能为空")
         output_dir = Path(str(payload.pop("output_dir", "output/backtest")))
+        cache_dir = Path(str(payload.pop("cache_dir", "output/cache/backtest")))
         rules = ExecutionRules.from_dict(payload.pop("rules", None))
 
         fill = str(payload.get("fill", "next_open")).strip().lower()
@@ -71,6 +75,7 @@ class BacktestSettings:
         return cls(
             outputs=outputs,
             output_dir=output_dir,
+            cache_dir=cache_dir,
             rules=rules,
             **payload,
         )

@@ -57,6 +57,9 @@ class MemoryDataSource:
             raise DataError("memory explicit universe 不能为空")
         return explicit_schedule(codes)
 
+    def cache_version(self, freq: str = "d") -> str:
+        return make_snapshot(self.name, self.frame).hash
+
     def load(
         self,
         symbols: Sequence[str],

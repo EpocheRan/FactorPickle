@@ -79,6 +79,19 @@ python -m backtest optimize strategies/models/atr_trend.py \
 
 另外两处固定开销：股票查询用 id/symbol 映射（O(1)），matplotlib 字体缓存指到可写目录。
 
+## 缓存
+
+`BacktestSettings.cache=True`（默认）会按「数据版本 + 股票池 + 因子声明」缓存
+`(DataBundle, FactorPanel)` 到 `output/cache/backtest/`：
+
+- QuestDB 版本 = 表级 `max(ts)`；内存源 = snapshot hash；
+- `cache_max_symbols=500`，全 A 池默认跳过（pickle 太大）；
+- 同一数据下只改 `top_n` / `weighting` 会命中缓存；改因子、日期、股票池会失效；
+- stored 因子更新后需手动清缓存：`rm -rf output/cache/backtest`。
+
+实测 200 只池、2020–2026：首次 19.0s，命中缓存 16.2s；剩余时间主要在
+RQAlpha 事件循环与账本，数据/面板已不是瓶颈。
+
 ## 写策略
 
 策略文件只定义模块级 `STRATEGY`（类或工厂）：

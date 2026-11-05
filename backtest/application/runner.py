@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import os
+import pickle
 from dataclasses import replace
 from datetime import date
 from importlib.metadata import PackageNotFoundError, version
@@ -16,7 +19,7 @@ from backtest.application.corporate_actions import derive_approximate_actions
 from backtest.application.cross_section import plan_cross_section
 from backtest.application.loader import LoadedStrategy, load_strategy
 from backtest.application.ports import EnginePort, OutputPort
-from backtest.application.run_id import compute_run_id
+from backtest.application.run_id import canonical, compute_run_id
 from backtest.application.universe import (
     UniverseSchedule,
     explicit_schedule,
@@ -163,6 +166,7 @@ class BacktestRunner:
         self.data_source = data_source
         self.engine = engine
         self.outputs = list(outputs)
+        self._cache: dict[str, tuple[Any, Any]] = {}
 
     # ------------------------------------------------------------------ 入口
     def run(
@@ -370,23 +374,32 @@ class BacktestRunner:
     def _prepare(self, loaded, spec, factors, start, end, freq, *, schedule: UniverseSchedule | None = None):
         warmup = max(required_warmup(factors), self.settings.warmup_for(factors))
         extras = _extras_for(factors)
-        data = self.data_source.load(
-            spec.symbols, start, end, warmup=warmup, freq=freq, extras=extras
+        cache_key = self._cache_key(
+            spec, factors, start, end, warmup, freq, extras, schedule
         )
-        if schedule is not None and schedule.has_membership:
-            # 成分快照进 run_id：指数调仓/成分变更后旧 run 不可复用。
-            data = replace(
-                data,
-                universe=Universe.from_codes(
-                    schedule.codes,
-                    as_of=pd.Timestamp(start).date(),
-                    fingerprint=schedule.fingerprint(),
-                ),
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            data, panel = cached
+            logger.info("cache hit %s", cache_key)
+        else:
+            data = self.data_source.load(
+                spec.symbols, start, end, warmup=warmup, freq=freq, extras=extras
             )
-        stored_frame = self._build_stored_frame(
-            data, factors, spec, start, end, warmup
-        )
-        panel = build_panel(data.frame, factors, start, end, stored=stored_frame)
+            if schedule is not None and schedule.has_membership:
+                # 成分快照进 run_id：指数调仓/成分变更后旧 run 不可复用。
+                data = replace(
+                    data,
+                    universe=Universe.from_codes(
+                        schedule.codes,
+                        as_of=pd.Timestamp(start).date(),
+                        fingerprint=schedule.fingerprint(),
+                    ),
+                )
+            stored_frame = self._build_stored_frame(
+                data, factors, spec, start, end, warmup
+            )
+            panel = build_panel(data.frame, factors, start, end, stored=stored_frame)
+            self._cache_put(cache_key, (data, panel))
         benchmark = None
         if spec.benchmark:
             loader = getattr(self.data_source, "load_benchmark", None)
@@ -423,6 +436,88 @@ class BacktestRunner:
             spec.benchmark if benchmark is not None else "none",
         )
         return data, panel, run_id, benchmark, corporate_actions
+
+    # ------------------------------------------------------------------ 缓存
+    def _cache_key(self, spec, factors, start, end, warmup, freq, extras, schedule) -> str:
+        """按数据版本 + 股票池 + 因子声明做缓存键。
+
+        数据版本来自数据源（QuestDB 表级 max(ts)；内存源用 snapshot hash）。
+        超过 ``cache_max_symbols`` 的全 A 池不缓存，避免几百 MB 的 pickle。
+        """
+        if not self.settings.cache:
+            return ""
+        symbols = tuple(str(item) for item in spec.symbols)
+        if len(symbols) > int(self.settings.cache_max_symbols):
+            return ""
+        provider = getattr(self.data_source, "cache_version", None)
+        if provider is None:
+            return ""
+        try:
+            version = str(provider(freq))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("cache_version 失败: %s", exc)
+            return ""
+        if not version:
+            return ""
+        payload = {
+            "source": self.data_source.name,
+            "version": version,
+            "symbols": symbols,
+            "start": str(start),
+            "end": str(end),
+            "warmup": int(warmup),
+            "freq": str(freq),
+            "extras": tuple(str(item) for item in extras),
+            "factors": [
+                item.to_payload() if hasattr(item, "to_payload") else repr(item)
+                for item in factors
+            ],
+            "factor_source": spec.factor_source,
+            "schedule": (
+                schedule.fingerprint()
+                if schedule is not None and hasattr(schedule, "fingerprint")
+                else ""
+            ),
+            "engine": self.engine.name,
+        }
+        return hashlib.sha256(canonical(payload).encode("utf-8")).hexdigest()[:20]
+
+    def _cache_get(self, key: str):
+        if not key:
+            return None
+        if key in self._cache:
+            return self._cache[key]
+        path = Path(self.settings.cache_dir) / f"{key}.pkl"
+        if not path.exists():
+            return None
+        try:
+            with path.open("rb") as handle:
+                value = pickle.load(handle)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("cache 读取失败 %s: %s", path, exc)
+            try:
+                path.unlink()
+            except OSError:
+                pass
+            return None
+        if not isinstance(value, tuple) or len(value) != 2:
+            return None
+        self._cache[key] = value
+        return value
+
+    def _cache_put(self, key: str, value) -> None:
+        if not key:
+            return
+        self._cache[key] = value
+        path = Path(self.settings.cache_dir) / f"{key}.pkl"
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temp = path.with_suffix(".tmp")
+            with temp.open("wb") as handle:
+                pickle.dump(value, handle, protocol=4)
+            os.replace(temp, path)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("cache 写入失败 %s: %s", path, exc)
 
     def _build_stored_frame(self, data, factors, spec, start, end, warmup):
         _ensure_registry()

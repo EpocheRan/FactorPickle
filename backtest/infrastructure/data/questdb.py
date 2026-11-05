@@ -278,6 +278,20 @@ class QuestDBDataSource:
             logger.info("%s 已合入面板: +%d 列", dataset, len(mapping))
         return frame
 
+    def cache_version(self, freq: str = "d") -> str:
+        """数据版本：表级 max(ts)。用于回测缓存失效，不替代 snapshot 哈希。"""
+        table = ohlc_table_name(normalize_frequency(freq))
+        try:
+            frame = self.db.query_dataframe(
+                f'SELECT max(ts) AS max_ts FROM "{table}"'
+            )
+        except Exception:  # noqa: BLE001 - 缓存版本失败时退回不缓存
+            return ""
+        if frame is None or frame.empty:
+            return ""
+        value = frame.iloc[0, 0]
+        return "" if pd.isna(value) else str(value)
+
     def load(
         self,
         symbols: Sequence[str],
