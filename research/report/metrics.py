@@ -1584,3 +1584,189 @@ def _cost_sensitivity(
             "mdd": perf.get("mdd", np.nan),
         }
     return pd.DataFrame(rows).T
+
+
+
+_LS_COST = 0.002
+_LS_STARTS = ("2022-01-01", "2023-01-01", "2024-01-01", "2025-01-01")
+_LS_INDEX = ((5e10, "000300"), (1e10, "000905"), (0.0, "000852"))
+
+
+def _norm_code(c) -> str:
+    c = str(c).strip()
+    if c.endswith(".0"):
+        c = c[:-2]
+    return c.zfill(6) if c.isdigit() else c
+
+
+def _index_series(panel, code):
+    try:
+        from research.eval.data import _query
+
+        df = _query(f"select ts, close from ohlcv_1d where code='{code}' and type='idx' order by ts")
+        if df is None or df.empty:
+            return None
+        df["ts"] = pd.to_datetime(df["ts"]).dt.tz_localize(None)
+        return df.set_index("ts")["close"].astype("float64").reindex(panel.close.index).ffill()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _industry_lookup(panel):
+    try:
+        from research.eval.data import _query
+
+        df = _query(
+            "select code, last(industry) as name from stock_basic_info "
+            "where industry is not null group by code")
+        if df is not None and not df.empty:
+            return {_norm_code(c): str(n) for c, n in zip(df["code"], df["name"])}
+    except Exception:  # noqa: BLE001
+        pass
+    imap = panel.industry
+    if isinstance(imap, pd.DataFrame):
+        imap = imap.iloc[-1]
+    if imap is None:
+        return {}
+    return {_norm_code(k): str(v) for k, v in imap.items()}
+
+
+def _ls_periods(factor, panel, direction, horizon, groups):
+    sig = (factor * int(direction)).reindex(index=panel.close.index, columns=panel.close.columns)
+    close, open_ = panel.close, panel.open
+    out = []
+    for i in range(0, len(close) - horizon - 2, horizon):
+        entry, exit_ = open_.iloc[i + 1], close.iloc[i + horizon]
+        ret = (exit_ / entry - 1.0).replace([np.inf, -np.inf], np.nan)
+        s = sig.iloc[i]
+        ok = s.notna() & ret.notna()
+        if ok.sum() < 200:
+            continue
+        q = pd.qcut(s[ok].rank(method="first"), groups, labels=False)
+        top = ret[ok][q == groups - 1].index
+        out.append({"i": i, "top": top, "ret": ret[ok],
+                    "r_top": float(ret[top].mean()) - 2 * _LS_COST, "date": close.index[i]})
+    return out
+
+
+def _ls_stats(r_top, r_bench):
+    a = np.asarray(r_top, dtype="float64")
+    b = np.asarray(r_bench, dtype="float64")
+    ex = a - b
+    eq = np.cumprod(1 + a)
+    years = len(a) / 12
+    beta = np.cov(a, b)[0, 1] / np.var(b, ddof=1) if len(a) > 2 else np.nan
+    return {
+        "cagr": float(eq[-1] ** (1 / years) - 1),
+        "bench": float(np.cumprod(1 + b)[-1] ** (1 / years) - 1),
+        "excess": float(ex.mean() * 12),
+        "te": float(ex.std(ddof=1) * np.sqrt(12)),
+        "ir": float(ex.mean() / ex.std(ddof=1) * np.sqrt(12)) if ex.std(ddof=1) else np.nan,
+        "beta": float(beta),
+        "alpha": float((a.mean() - beta * b.mean()) * 12),
+        "t": float(ex.mean() / (ex.std(ddof=1) / np.sqrt(len(ex)))) if ex.std(ddof=1) else np.nan,
+        "mdd": float((eq / np.maximum.accumulate(eq) - 1).min()),
+        "win": float((ex > 0).mean()),
+        "n": int(len(a)),
+    }
+
+
+# ---------------- 多头视角：三层基准 / 多起点 / 容量 / 持仓分布
+def long_only_stats(factor, panel, direction, horizon=20, groups=5) -> dict:
+    per = _ls_periods(factor, panel, direction, horizon, groups)
+    if len(per) < 12:
+        return {}
+
+    cap = panel.market_cap
+    amount = panel.amount
+    ind_map = _industry_lookup(panel)
+
+    # 每期持仓的市值中位数 → 决定指数基准
+    med_caps = []
+    for p in per:
+        if cap is not None:
+            v = cap.iloc[p["i"]][p["top"]]
+            med_caps.append(float(np.nanmedian(v)) if len(v) else np.nan)
+    med_cap = float(np.nanmedian(med_caps)) if med_caps else np.nan
+    idx_code = next(c for th, c in _LS_INDEX if med_cap > th) if med_cap == med_cap else "000905"
+    idx = _index_series(panel, idx_code)
+
+    r_top, r_ew, r_idx, r_style = [], [], [], []
+    for p in per:
+        r_top.append(p["r_top"])
+        r_ew.append(float(p["ret"].mean()))
+        i = p["i"]
+        if idx is not None and np.isfinite(idx.iloc[i + horizon]) and np.isfinite(idx.iloc[i + 1]):
+            r_idx.append(float(idx.iloc[i + horizon] / idx.iloc[i + 1] - 1))
+        else:
+            r_idx.append(float(p["ret"].mean()))
+        # 风格基准：按持仓的市值分桶比例，从全市场同桶里取等权收益
+        if cap is not None:
+            allv = cap.iloc[i].reindex(p["ret"].index)
+            topv = allv.reindex(p["top"])
+            bins = pd.cut(topv, [-np.inf, 5e9, 1e10, 5e10, np.inf])
+            allbins = pd.cut(allv, [-np.inf, 5e9, 1e10, 5e10, np.inf])
+            w = bins.value_counts(normalize=True)
+            val, wsum = 0.0, 0.0
+            for b, wt in w.items():
+                sub = p["ret"][allbins == b]
+                if len(sub) > 20:
+                    val += float(sub.mean()) * float(wt)
+                    wsum += float(wt)
+            r_style.append(val / wsum if wsum > 0 else float(p["ret"].mean()))
+        else:
+            r_style.append(float(p["ret"].mean()))
+
+    dates = [p["date"] for p in per]
+    res = {
+        "periods": len(per),
+        "holdings": int(np.median([len(p["top"]) for p in per])),
+        "index_code": idx_code,
+        "median_cap": med_cap,
+        "ew": _ls_stats(r_top, r_ew),
+        "index": _ls_stats(r_top, r_idx),
+        "style": _ls_stats(r_top, r_style),
+        "capacity": float(np.nanmedian([float(amount.iloc[p["i"]][p["top"]].median()) for p in per])) * 0.05 * int(np.median([len(p["top"]) for p in per]))
+        if amount is not None else np.nan,
+        "oos": [],
+    }
+
+    for st in _LS_STARTS:
+        mask = [d >= pd.Timestamp(st) for d in dates]
+        if sum(mask) < 12:
+            continue
+        sub = lambda arr: [v for v, m in zip(arr, mask) if m]
+        s = _ls_stats(sub(r_top), sub(r_ew))
+        s["start"] = st
+        res["oos"].append(s)
+
+    # 持仓分布
+    cnt: dict[str, int] = {}
+    for p in per:
+        for c in p["top"]:
+            cnt[c] = cnt.get(c, 0) + 1
+    total = sum(cnt.values()) or 1
+    inds: dict[str, int] = {}
+    for c, n in cnt.items():
+        inds[ind_map.get(_norm_code(c), "未映射")] = inds.get(ind_map.get(_norm_code(c), "未映射"), 0) + n
+    res["industry"] = sorted(((k, v / total) for k, v in inds.items()), key=lambda x: -x[1])[:8]
+    res["unmapped"] = inds.get("未映射", 0) / total
+
+    if cap is not None:
+        last = cap.iloc[-1]
+        buckets = {"小盘<100亿": 0, "中盘100-500亿": 0, "大盘>500亿": 0, "未知": 0}
+        for c, n in cnt.items():
+            v = last.get(c, np.nan)
+            if v != v:
+                buckets["未知"] += n
+            elif v > 5e10:
+                buckets["大盘>500亿"] += n
+            elif v > 1e10:
+                buckets["中盘100-500亿"] += n
+            else:
+                buckets["小盘<100亿"] += n
+        res["size"] = [(k, v / total) for k, v in buckets.items() if v]
+    else:
+        res["size"] = []
+    return res
+

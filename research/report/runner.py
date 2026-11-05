@@ -319,6 +319,10 @@ def generate(
     if verify_repro:
         # 复现检查已在 metrics.build_report 内部用同一因子对象与参数完成
         report.attribution = diag.attribute_failure(report)
+    try:
+        report.extra = metrics.long_only_stats(factor, panel, direction, horizon)
+    except Exception:  # noqa: BLE001 - 附加层失败不影响主报告正文
+        report.extra = None
     score = rating_mod.rate(report)
 
     run_hash = hashlib.sha1(

@@ -304,6 +304,13 @@ def rate(report) -> dict:
     total = (0.25 * time_score + 0.20 * space_score + 0.30 * realization
              + 0.10 * incremental_score + 0.15 * tradability_score)
     raw_grade = "A" if total >= 85 else "B" if total >= 72 else "C" if total >= 55 else "D"
+    # 同风格超额不显著 → 不评 A（避免"评级 A 但没有真超额"）
+    _ex = getattr(report, "extra", None) or {}
+    _style_t = ((_ex.get("style") or {})).get("t")
+    if (_style_t is not None and _style_t == _style_t and _style_t < 1.5
+            and raw_grade == "A"):
+        raw_grade = "B"
+
     # 综合分重算后重新定级，其余否决项仍然封顶
     grade = raw_grade
     capped = False

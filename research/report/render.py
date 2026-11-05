@@ -1018,6 +1018,45 @@ def render(report, rating: dict, meta: dict) -> str:
     # 行业暴露表单独一整行（原与市值三分组并排；市值表已合并进分层 IC）
     size_block = industry_table if industry_rows else ""
 
+    ex = getattr(report, "extra", None)
+    extra_block = ""
+    if ex:
+        def _r(d, k, pct=False):
+            v = (d or {}).get(k)
+            if v is None or v != v:
+                return "—"
+            return f"{v*100:+.2f}%" if pct else f"{v:.2f}"
+
+        rows = [
+            ["全 A 等权", _r(ex["ew"], "excess", True), _r(ex["ew"], "te", True),
+             _r(ex["ew"], "ir"), _r(ex["ew"], "beta"), _r(ex["ew"], "alpha", True), _r(ex["ew"], "t")],
+            ["指数 " + str(ex.get("index_code", "—")), _r(ex["index"], "excess", True),
+             _r(ex["index"], "te", True), _r(ex["index"], "ir"), _r(ex["index"], "beta"),
+             _r(ex["index"], "alpha", True), _r(ex["index"], "t")],
+            ["同风格（市值匹配）", _r(ex["style"], "excess", True), _r(ex["style"], "te", True),
+             _r(ex["style"], "ir"), _r(ex["style"], "beta"), _r(ex["style"], "alpha", True), _r(ex["style"], "t")],
+        ]
+        oos_rows = [[o["start"][:7], f"{o['n']} 期", _r(o, "excess", True), _r(o, "ir"), _r(o, "t")]
+                    for o in ex.get("oos", [])]
+        ind_txt = "；".join(f"{k} {v*100:.1f}%" for k, v in ex.get("industry", [])[:6])
+        size_txt = "；".join(f"{k} {v*100:.1f}%" for k, v in ex.get("size", []))
+        cap = ex.get("capacity")
+        cap_txt = (f"<p class='small'>容量：持仓成交额中位 × 5% × 10 只 ≈ {cap/1e8:.2f} 亿</p>"
+                   if cap == cap else "")
+        size_html = f"<p class='small'>持仓市值：{_esc(size_txt)}</p>" if size_txt else ""
+        ind_html = (f"<p class='small'>持仓行业：{_esc(ind_txt)}（未映射 "
+                    f"{ex.get('unmapped', 0)*100:.0f}%）</p>" if ind_txt else "")
+        oos_html = (("<h4>多起点样本外（只报起点之后）</h4>"
+                     + _table(["起点", "期数", "年化超额", "IR", "t"], oos_rows, ""))
+                    if oos_rows else "")
+        extra_block = (
+            "<h3>多头视角与样本外（三层基准）</h3>"
+            + _table(["基准", "年化超额", "跟踪误差", "IR", "beta", "alpha", "t"], rows,
+                     "注：多头 = 信号最强组等权、扣双边 20bp；三层基准分别为全 A 等权、"
+                     "按持仓中位市值选择的指数、按持仓市值分桶构造的同风格组合。")
+            + cap_txt + size_html + ind_html + oos_html
+        )
+
     inc_block = ""
     if inc_rows:
         inc_block = f"<h3>增量性：与同类因子有多像</h3><p>{_esc(inc_summary)}</p>{inc_table}{inc_note}"
@@ -1203,6 +1242,7 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 {horizon_block}{strat_block}{neutral_block}
 {size_block}
 {inc_block}
+{extra_block}
 {trade_block}
 {sell_block}
 {cost_block}
