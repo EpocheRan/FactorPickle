@@ -67,8 +67,11 @@ class FactorRank(CrossSectionStrategy):
             return
         fid = str(self.params["factor"])
         root = Path(__file__).resolve().parents[2]
-        for cand in (root / "output" / "factor_reports" / f"{fid.replace('.', '_')}.json",
-                     root / "output" / "factor_reports_29" / f"{fid.replace('.', '_')}.json"):
+        name = f"{fid.replace('.', '_')}.json"
+        # 报告可能落在任意 factor_reports* 目录，一律取最新的一份
+        candidates = sorted(root.glob(f"output/factor_reports*/{name}"),
+                            key=lambda x: x.stat().st_mtime, reverse=True)
+        for cand in candidates:
             if not cand.exists():
                 continue
             try:
