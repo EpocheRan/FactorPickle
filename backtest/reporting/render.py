@@ -125,7 +125,7 @@ __KPIS__
 <section class="pane" id="tab-trades">
   <div class="kpis">__TRADE_KPIS__</div>
   <div class="card"><div class="card-head"><h3>收益分布（%）</h3></div>
-    <div class="chart"><svg id="histChart"></svg></div></div>
+    <div class="chart"><svg id="histChart"></svg><div class="tip" id="histTip"></div></div></div>
   <div class="card"><div class="card-head"><h3>回合交易</h3>
     <div class="controls"><input class="filter" id="tradeFilter" placeholder="按代码筛选">
     <span class="muted" id="tradeCount"></span><button class="btn" id="tradeCsv">下载 CSV</button></div></div>
@@ -395,7 +395,8 @@ function drawYearly(){
 }
 
 function drawHist(){
-  const trades=D.trades||[];const svg=$('histChart');const W=900,H=220,pl=40,pr=14,pt=14,pb=26;
+  const trades=D.trades||[];const svg=$('histChart');const tip=$('histTip');
+  const W=900,H=220,pl=40,pr=14,pt=14,pb=26;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
   if(!trades.length){svg.innerHTML='';return;}
   const bins={};for(let b=-20;b<20;b+=2)bins[b]=0;
@@ -406,10 +407,24 @@ function drawHist(){
   let g=`<line x1="${pl}" y1="${H-pb}" x2="${W-pr}" y2="${H-pb}" stroke="#444"/>`;
   keys.forEach((k,i)=>{
     const h=(H-pt-pb)*bins[k]/max, x=pl+i*bw+1;
-    g+=`<rect x="${x}" y="${H-pb-h}" width="${bw-2}" height="${h}" fill="${k>=0?'#3fb950':'#f85149'}" opacity=".8"><title>${k}%~${k+2}%: ${bins[k]}</title></rect>`;
+    g+=`<rect class="hist-bar" data-bin="${k}" data-count="${bins[k]}" x="${x}" y="${H-pb-h}" width="${bw-2}" height="${h}" fill="${k>=0?'#3fb950':'#f85149'}" opacity=".82" style="cursor:pointer"/>`;
     if(i%2===0)g+=`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle" fill="#8b949e" font-size="9">${k}%</text>`;
   });
   svg.innerHTML=g;
+  const total=trades.length;
+  svg.querySelectorAll('rect.hist-bar').forEach(rect=>{
+    rect.addEventListener('mousemove',e=>{
+      const bin=Number(rect.dataset.bin), count=Number(rect.dataset.count);
+      const pct=total?count/total*100:0;
+      tip.innerHTML=`<b>${bin}% ~ ${bin+2}%</b><div>交易数：${count}</div><div>占比：${pct.toFixed(1)}%</div>`;
+      tip.style.display='block';
+      const box=svg.parentElement.getBoundingClientRect();
+      tip.style.left=Math.min(box.width-150,Math.max(0,e.clientX-box.left+12))+'px';
+      tip.style.top=Math.max(0,e.clientY-box.top-8)+'px';
+      rect.setAttribute('opacity','1');
+    });
+    rect.addEventListener('mouseleave',()=>{tip.style.display='none';rect.setAttribute('opacity','.82');});
+  });
 }
 
 function drawExposure(){
