@@ -228,7 +228,7 @@ def _direction_banner(report) -> str:
     return (
         f'<div class="banner"><b>方向口径（必读）：</b>因子原值不取负，评估信号 = 原值 × direction'
         f'（{direction:+d}，来源：{source_text}）。{head}。'
-        f"Q1 = 信号最弱（本因子：因子值{q1}），Q5 = 信号最强（因子值{q5}）。"
+        f"G1 = 信号最弱（本因子：因子值{q1}），G5 = 信号最强（因子值{q5}）。"
         "若 IC 为负，说明方向与先验相反，本报告<b>不翻转</b>，而是记为「方向错」并给出 D 级归因。"
         "</div>"
     )
@@ -362,10 +362,10 @@ def render(report, rating: dict, meta: dict) -> str:
     # ---------------- 图 3-1：分组平均收益（带 95% CI 与 y 轴）
     nav_fig = ""
     if report.quantile_returns:
-        labels = list(report.quantile_returns)
-        values = [report.quantile_returns[k] * 100 for k in labels]
+        labels = [str(k).replace("Q", "G") for k in report.quantile_returns]
+        values = [v * 100 for v in report.quantile_returns.values()]
         errors = []
-        for k in labels:
+        for k in report.quantile_ci:
             lo, hi = report.quantile_ci.get(k, (np.nan, np.nan))
             errors.append((hi - lo) / 2 * 100 if np.isfinite(hi) else 0.0)
         svg = charts.bar_chart(
@@ -379,7 +379,7 @@ def render(report, rating: dict, meta: dict) -> str:
         q5 = "最低" if report.direction < 0 else "最高"
         nav_fig = _figure(
             "3-1", f"五分组平均持有期收益（h={primary}，T+1 开盘买入，已扣双边 20bp）", svg,
-            f"注：分组按<b>评估信号</b>（原值×direction）从弱到强排列；本因子 Q1=因子值{q1}、Q5=因子值{q5}。"
+            f"注：分组按<b>评估信号</b>（原值×direction）从弱到强排列；本因子 G1=因子值{q1}、G5=因子值{q5}。"
             "误差棒为每期收益均值的 95% 置信区间。用「每期收益均值」而非复利终值衡量分层，"
             "避免波动拖累污染单调性；图中为已扣费的净收益，毛收益见下表。",
         )
@@ -390,7 +390,7 @@ def render(report, rating: dict, meta: dict) -> str:
     net_means = report.quantile_returns or {}
     for col, value in net_means.items():
         qrows.append([
-            col,
+            str(col).replace("Q", "G"),
             (f"{gross_means.get(col, float('nan')) * 100:+.2f}%", _cls(gross_means.get(col, np.nan))),
             (f"{value * 100:+.2f}%", _cls(value)),
         ])
@@ -401,7 +401,7 @@ def render(report, rating: dict, meta: dict) -> str:
         (f"{(report.spread_net or {}).get('mean', float('nan')) * 100:+.2f}%",
          _cls((report.spread_net or {}).get("mean", np.nan))),
     ])
-    qrows.append(["单期成本（Q5+Q1 换手×20bp）", "—", f"{report.cost_mean * 100:.2f}%"])
+    qrows.append(["单期成本（G5+G1 换手×20bp）", "—", f"{report.cost_mean * 100:.2f}%"])
     qrows.append(["单调性 ρ（毛收益，有符号）", f"{report.monotonicity:.2f}", f"（净收益 ρ={report.monotonicity_net:.2f}）"])
     qrows.append(["Top 组换手（每期 5 日）", "—", f"{report.turnover:.1%}"])
     qrows.append(["年化换手（×242/5）", "—", f"{report.turnover * 242 / 5:.0%}"])
@@ -419,7 +419,7 @@ def render(report, rating: dict, meta: dict) -> str:
         perf_fig = _figure(
             "3-2", "多空组合净值与回撤（5 日非重叠，T+1 开盘调仓，成本按换手扣除）", svg,
             "注：上图为 5 日非重叠多空净值（起点 1.0），下图为回撤；与分层表同一策略，"
-            "Q5 为调整后信号最强组、Q1 为最弱组。",
+            "G5 为调整后信号最强组、G1 为最弱组。",
         )
 
     # ---------------- 表：绩效与分年收益
@@ -506,7 +506,6 @@ def render(report, rating: dict, meta: dict) -> str:
             "注：按当日流通市值截面三分位划分。三组同号只说明方向一致；"
             "若小市值组显著高于大市值组，因子带强规模暴露，需结合增量性表判断是否独立。"
         )
-    size_table = _table(["市值分组", f"IC（h={primary}）"], size_rows or [["—", "—"]], size_note)
     industry_rows = []
     if report.ic_by_industry is not None:
         top = report.ic_by_industry
@@ -555,7 +554,7 @@ def render(report, rating: dict, meta: dict) -> str:
             "分组绝对收益有正有负，不能把某组的正收益当成 alpha；"
         )
         filter_table = _table(
-            ["检验项", "Q1（拟剔除）", "Q2–Q5 等权", "全组等权"],
+            ["检验项", "G1（拟剔除）", "G2–G5 等权", "全组等权"],
             [
                 ["每期收益", _pct(ft.get("q1_mean", np.nan)), _pct(ft.get("rest_mean", np.nan)), _pct(ft.get("all_mean", np.nan))],
                 ["折年收益（算术，×242/5）", _pct(ft.get("q1_ann", np.nan), 1), _pct(ft.get("rest_ann", np.nan), 1), _pct(ft.get("all_ann", np.nan), 1)],
@@ -864,6 +863,14 @@ def render(report, rating: dict, meta: dict) -> str:
     meta_table = _table(["运行信息", "取值"], meta_rows)
 
 
+    _rev = rating.get("reverse_eval") or {}
+    if _rev:
+        rev_note = (f"若把信号取反：IC {_rev['ic']:+.4f}、独立 t {_rev['t']:+.1f}、"
+                    f"单调性 {_rev['mono']:+.2f}、净价差 {_rev['spread_net']*100:+.2f}%/期"
+                    + ("　→ <b>方向待复核</b>（反向显著）" if _rev.get("suspect")
+                       else "　→ 反向也不成立"))
+    else:
+        rev_note = "—"
     _real = rating.get("realization_score", float("nan"))
     _advice = []
     if rating["grade"] in ("A", "B"):
@@ -956,13 +963,22 @@ def render(report, rating: dict, meta: dict) -> str:
              f"{rec['t']:.1f}" if np.isfinite(rec["t"]) else "—", f"{int(rec['n_days'])}"]
             for _, rec in _strat.iterrows()
         ]
-        _labels = [str(rec["stratum"]) for _, rec in _strat.iterrows()]
-        _vals = [float(rec["ic"]) for _, rec in _strat.iterrows()]
+        def _mini(mask, title, caption):
+            sub = _strat[mask]
+            if sub.empty:
+                return ""
+            return (f"<h4>{title}</h4>"
+                    + charts.bar_chart([str(r["stratum"]) for _, r in sub.iterrows()],
+                                       [float(r["ic"]) for _, r in sub.iterrows()],
+                                       height=200, formatter=lambda v: f"{v:+.3f}",
+                                       caption=caption))
+
         strat_block = (
-            "<h3>分层 IC：流动性 / 市值 / 行业</h3>"
-            + charts.bar_chart(_labels, _vals, height=250,
-                               formatter=lambda v: f"{v:+.3f}",
-                               caption="各层内部单独计算秩相关；L=流动性分层，S=市值五等分，行业为东财一级。")
+            "<h3>分层 IC</h3>"
+            + _mini(_strat["stratum"].astype(str).str.startswith("流动性"),
+                    "流动性分层", "L1–L3 按日均成交额三分位；各层内部单独计算秩相关。")
+            + _mini(_strat["stratum"].astype(str).str.startswith("市值"),
+                    "市值分层", "S1（最小）–S5（最大）按流通市值五等分，与上文市值三分组表二选一。")
         )
 
 
@@ -980,7 +996,7 @@ def render(report, rating: dict, meta: dict) -> str:
                    for _, rec in _hs.iterrows()]
         _vals = [float(rec["gross"]) * 100 for _, rec in _hs.iterrows()]
         horizon_block = (
-            "<h3>多持有期对比：5 / 10 / 20 日的 G5−G1</h3>"
+            "<h3>多持有期对比：5 / 10 / 20 日</h3>"
             + charts.bar_chart(_labels, _vals, height=220,
                                formatter=lambda v: f"{v:+.2f}%",
                                caption="毛价差/期（未扣多空两条腿成本）；「·中性」为 10 日持有期做市值中性化后的对照，"
@@ -990,11 +1006,9 @@ def render(report, rating: dict, meta: dict) -> str:
     neutral_block = ""
     if report.ic_neutral is not None and not report.ic_neutral.empty:
         neutral_block = f"<h3>市值 / 行业中性化后的 IC</h3>{neutral_table}"
-    size_block = ""
-    if size_rows:
-        size_block = f"<div class=\"grid2\">{size_table}{industry_table if industry_rows else ''}</div>"
-    elif industry_rows:
-        size_block = industry_table
+    # 行业暴露表单独一整行（原与市值三分组并排；市值表已合并进分层 IC）
+    size_block = industry_table if industry_rows else ""
+
     inc_block = ""
     if inc_rows:
         inc_block = f"<h3>增量性：与同类因子有多像</h3><p>{_esc(inc_summary)}</p>{inc_table}{inc_note}"
@@ -1193,6 +1207,7 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
     <p><b>失效归因：</b>{_esc(rating.get('attribution', {}).get('label', '—'))}
     —— {_esc(rating.get('attribution', {}).get('reason', '—'))}</p>
     <p><b>评级说明：</b>{_esc(cap_note)}</p>
+    <p><b>反向评估：</b>{_esc(rev_note)}</p>
     <p><b>一票否决项：</b></p>
     <ul>{verdict_items}</ul>
     <p><b>关键判断：</b></p>

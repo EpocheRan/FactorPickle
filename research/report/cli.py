@@ -121,7 +121,12 @@ def main() -> int:
         from research.report.panel_adapter import load_panel as _load_panel
 
         _t0 = time.time()
-        shared_panel = _load_panel(args.pool_date, args.pool, args.start, args.end)
+        _needs = any(f.startswith("sentiment.") for f in factors)
+        shared_panel = _load_panel(
+            args.pool_date, args.pool, args.start, args.end,
+            extras=("fin_valuation_daily", "margin_detail", "moneyflow_daily") if _needs
+            else ("fin_valuation_daily",),
+        )
         print(f"共享面板就绪：{len(shared_panel.symbols)} 只 / {len(shared_panel.close)} 天"
               f"（{time.time() - _t0:.1f}s），{len(factors)} 个因子复用")
 

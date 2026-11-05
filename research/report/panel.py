@@ -183,12 +183,19 @@ def price_factor_panel(factor_id: str, panel: Panel) -> pd.DataFrame:
 
     fn, _window, _unit = lookup(factor_id)
     frame = panel.frame()
+    # 防御：frame 可能带重复的 "ts" 列（索引与列同名时 reset_index 会产生两份），
+    # 这会让 g["ts"] 变成二维数组，最终把 "ts" 这个字符串当日期解析。
+    if frame.index.name == "ts":
+        frame = frame.reset_index(drop=True)
+    frame = frame.loc[:, ~frame.columns.duplicated()]
     wide = frame.groupby("symbol", group_keys=False).apply(
-        lambda g: pd.Series(fn(g.reset_index(drop=True)).to_numpy(), index=g["ts"].values),
+        lambda g: pd.Series(fn(g.reset_index(drop=True)).to_numpy(),
+                            index=pd.to_datetime(g["ts"], errors="coerce")),
         include_groups=False,
     )
     packed = wide.T
-    packed.index = pd.to_datetime(packed.index)
+    packed.index = pd.to_datetime(packed.index, errors="coerce")
+    packed = packed.loc[packed.index.notna()]
     out = packed.reindex(index=panel.close.index, columns=panel.close.columns)
     if panel.eval_start is not None:
         out = out.loc[out.index >= panel.eval_start]
@@ -200,6 +207,7 @@ def peer_panels(factor_id: str, panel: Panel) -> dict[str, pd.DataFrame]:
     from .definitions import peers_for
 
     peers: dict[str, pd.DataFrame] = {}
+    _start = panel.close.index.min()
     for pid in peers_for(factor_id):
         try:
             if pid.split(".", 1)[0] in ("quality", "value", "growth", "valuation"):
@@ -208,7 +216,13 @@ def peer_panels(factor_id: str, panel: Panel) -> dict[str, pd.DataFrame]:
                 )
             else:
                 peers[pid] = price_factor_panel(pid, panel)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - 对照组算不出来不应阻断报告，但要留痕
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "同类因子 %s 计算失败，已跳过：%s\n%s", pid, type(exc).__name__,
+                __import__("traceback").format_exc(limit=3)
+            )
             continue
     if panel.market_cap is not None:
         with np.errstate(divide="ignore", invalid="ignore"):

@@ -357,8 +357,17 @@ class F:
 
                 try:
                     _fn, window, unit = delta_lookup(name)
-                except KeyError as exc:
-                    raise ValueError(f"未知因子: {name!r}（价量/情绪/Delta 算子库都没有）") from exc
+                except KeyError:
+                    from .ops.lowfreq import lookup as lowfreq_lookup
+
+                    try:
+                        _fn, window, unit = lowfreq_lookup(name)
+                    except KeyError as exc:
+                        raise ValueError(
+                            f"未知因子: {name!r}（价量/情绪/Delta/低频 算子库都没有）"
+                        ) from exc
+                    registered = CUSTOM_FACTORS.get(name)
+                    inputs = tuple(getattr(registered, "factor_inputs", ()) or ()) or inputs
                 registered = CUSTOM_FACTORS.get(name)
                 inputs = tuple(getattr(registered, "factor_inputs", ()) or ()) or inputs
             else:

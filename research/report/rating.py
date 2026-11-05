@@ -248,6 +248,23 @@ def rate(report) -> dict:
     time_score = 100.0 * (0.4 * year_base + 0.3 * regime_base + 0.3 * rolling_base)
     space_score = 100.0 * _clip01(0.7 * max(mono, 0.0) + 0.3 * min(1.0, ic_pos / 0.06))
 
+    # ---- 反向评估：若把信号取反，指标会全部反号（秩相关与分组收益的对偶性）
+    # 不重算，直接由解析关系得到；仅用于标记「方向可能反了」的因子。
+    _rev_ic = -ic_mean
+    _rev_t = -t_indep
+    _rev_mono = -mono
+    _rev_net = -float((report.spread_net or {}).get("mean", np.nan))
+    direction_suspect = bool(
+        np.isfinite(_rev_t) and _rev_t >= 3.0 and _rev_mono >= 0.8
+    )
+    reverse_eval = {
+        "ic": round(_rev_ic, 4),
+        "t": round(_rev_t, 2),
+        "mono": round(_rev_mono, 3),
+        "spread_net": round(_rev_net, 5),
+        "suspect": direction_suspect,
+    }
+
     # ---- 第三维：兑现率（IC 隐含价差 vs 实测净价差）
     # 不再一票否决，改为折价系数：ratio≥0.8 记满分，线性折算，最低 0。
     _ratio = float(ic_spread_ratio) if np.isfinite(ic_spread_ratio) else float("nan")
@@ -329,6 +346,7 @@ def rate(report) -> dict:
         "space_score": round(space_score, 1),
         "realization_score": round(realization, 1),
         "incremental_score": round(incremental_score, 1),
+        "reverse_eval": reverse_eval,
         "tradability_score": round(tradability_score, 1),
         "transmission_note": transmission_note,
         "quadrant": quadrant[0],

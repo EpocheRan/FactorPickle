@@ -1206,7 +1206,10 @@ def build_report(
             elif isinstance(industry, pd.DataFrame):
                 _map = industry.iloc[-1]
             if isinstance(_map, pd.Series):
-                for name in _map.dropna().unique()[:12]:
+                # 按成分股数量从多到少取前 12 个行业（原来按 unique 顺序取，
+                # 前 12 个可能都是小行业，导致全部被 30 只的门槛过滤掉）
+                _counts = _map.reindex(analysis_factor.columns).dropna().value_counts()
+                for name in _counts[_counts >= 30].index[:12]:
                     cols = [c for c in analysis_factor.columns if _map.get(c) == name]
                     if len(cols) >= 30:
                         _strata[f"行业 {name}"] = pd.DataFrame(

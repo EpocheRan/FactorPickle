@@ -35,6 +35,9 @@ _RULES: tuple[tuple[str, int], ...] = (
     ("sentiment.margin", -1),
     ("sentiment.flow_large", -1),
     ("sentiment.main_net", +1),
+    ("sentiment.holder_num", -1),
+    ("event.unlock", -1),
+    ("event.repurchase", +1),
     ("sentiment.retail_net", -1),
     ("sentiment.flow_retail", -1),
 )

@@ -190,6 +190,7 @@ def load_panel(
         open=open_,
         industry=_industry_map(),
         market_cap=_market_cap_from_extras(_extras_map, close.index, columns),
+        extras=_extras_map,
         regime=_regime_for(close.index),
         symbols=list(columns),
         high=high,
