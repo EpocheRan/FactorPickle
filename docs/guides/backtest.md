@@ -120,6 +120,9 @@ STRATEGY = RankMom20
 单股策略实现 `on_bar(ctx)`，用 `ctx.target_weight(...)` / `ctx.set_stop(...)`；
 横截面实现 `rank(panel, dt)`，开仓由 `CrossSectionPlan` 统一执行。
 
+**横截面执行**：只在调仓日换仓；非调仓日不因排名漂移清仓
+（旧版 `buffer_out` 日频清仓已移除，`buffer` 只在调仓日保留旧仓）。
+
 ## 引擎配置
 
 `BacktestSettings` 关键字段：
@@ -167,6 +170,9 @@ drawdowns / exposure / concentration / trades / trade_summary / pnl_bridge / che
 - **归因**：个股贡献 Top/Bottom/合计、全量选股历史；
 - **R²<0.5** 时 Alpha 卡给出“基准解释力不足”警告；
 - **口径表**：年化/Sharpe/IR/超额/捕获率/牛熊β/回合/费用定义。
+
+报告还接入：行业暴露/行业贡献、000852 对比、滚动 12M/36M、70/30 样本外、
+HAC Alpha t、成本敏感性、选股前瞻收益、集中度（占权益/占持仓双口径）。
 `--out console,csv` 可关闭 HTML；`python scripts/report_backtest.py --latest` 可从
 `report_data.json` 重新渲染。
 

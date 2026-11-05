@@ -280,6 +280,11 @@ class RQAlphaEngine:
             "rejected": int(len(rejected)),
             "universe_size": int(runtime.universe_size),
             "candidate_count": int(len(runtime.symbols)),
+            "eligible_count": int(
+                getattr(request.cross_plan, "eligible_count", 0)
+                if request.cross_plan is not None
+                else len(runtime.symbols)
+            ),
             "stops": "strategy_managed",
             "t_plus_1": bool(request.rules.t_plus_1),
             "price_limit": bool(request.rules.limit_up_down),

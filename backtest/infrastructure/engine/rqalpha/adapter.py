@@ -159,13 +159,9 @@ class StrategyAdapter:
                     self._queue_sell(code, min(-delta, sellable), "rebalance_trim")
             return
 
-        top_n = int(getattr(plan, "top_n", 0))
-        buffer = int(getattr(plan, "buffer", 0))
-        for oid, position in positions.items():
-            code = code_of(oid)
-            rank = plan.rank_at(dt, code)
-            if rank is not None and float(rank) > top_n + buffer:
-                self._queue_sell(code, self._sellable(position, code), "buffer_out")
+        # 非调仓日不做“排名漂移”卖出：横截面策略只在调仓日换仓，
+        # buffer 的保留逻辑应由调仓日目标构建处理，不能每天清仓。
+        return
 
     # ------------------------------------------------------------------ stops
     def _manage_stops(self, context, bar_dict) -> None:

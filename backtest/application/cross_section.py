@@ -31,6 +31,7 @@ class CrossSectionPlan:
     universe_size: int
     top_n: int
     buffer: int
+    eligible_count: int = 0
 
     def target_for(self, dt: Any) -> Mapping[str, float] | None:
         return self.targets.get(pd.Timestamp(dt).normalize())
@@ -158,6 +159,8 @@ def plan_cross_section(
             )
 
     candidates = tuple(sorted({symbol for target in targets.values() for symbol in target}))
+    eligible_counts = [int(scores.notna().sum()) for scores in scores_by_date.values()]
+    eligible_count = int(pd.Series(eligible_counts).median()) if eligible_counts else 0
     if not candidates:
         raise ConfigError(
             "横截面计划为空：没有可执行的调仓目标。"
@@ -188,4 +191,5 @@ def plan_cross_section(
         universe_size=len(universe),
         top_n=int(top_n),
         buffer=int(buffer),
+        eligible_count=eligible_count,
     )

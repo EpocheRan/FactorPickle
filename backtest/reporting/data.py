@@ -20,11 +20,20 @@ from .alpha import (
     drawdown_episodes,
     exposure_table,
     monthly_returns,
+    normalized_capm,
+    oos_stats,
     risk_stats,
+    rolling_returns,
     rolling_stats,
     yearly_returns,
 )
 from .trades import build_round_trips, remaining_lots
+from .industry import (
+    industry_attribution,
+    industry_exposure,
+    load_index_close,
+    load_industry_map,
+)
 
 
 def _num(value: Any, digits: int | None = None) -> float | None:
@@ -96,6 +105,7 @@ class ReportDataBuilder:
     def __init__(self, result: BacktestResult, *, risk_free_rate: float = 0.0):
         self.result = result
         self.risk_free_rate = float(risk_free_rate or result.spec.risk_free_rate)
+        self.industry_map: dict[str, str] | None = None
 
     def build(self) -> dict[str, Any]:
         result = self.result
@@ -117,16 +127,41 @@ class ReportDataBuilder:
                     trades[column] = pd.to_datetime(trades[column], errors="coerce")
 
         alpha_beta = capm_stats(equity, result.benchmark, self.risk_free_rate)
+        exposure = exposure_table(equity, orders, result.positions)
+        alpha_beta.update(
+            normalized_capm(equity, result.benchmark, exposure, self.risk_free_rate)
+        )
+        alternative_benchmarks: dict[str, Any] = {}
+        if result.positions is not None and not result.positions.empty:
+            for code in ("000852",):
+                series = load_index_close(code, result.spec.start, result.spec.end)
+                if series.empty:
+                    continue
+                stats = capm_stats(equity, series, self.risk_free_rate)
+                if stats:
+                    alternative_benchmarks[code] = {
+                        key: _num(value) for key, value in stats.items()
+                    }
         metrics = {key: _num(value) for key, value in (result.metrics or {}).items()}
         geo_excess = self._geometric_excess(equity, result.benchmark)
         if geo_excess is not None:
             metrics["excess_geometric_pct"] = geo_excess
         meta = self._meta()
         monthly = monthly_returns(equity, result.benchmark)
+        monthly_excess = self._monthly_excess(monthly)
+        monthly_summary = self._monthly_summary(monthly_excess)
         risk = risk_stats(equity, self.risk_free_rate, monthly)
-        exposure = exposure_table(equity, orders, result.positions)
+        risk_payload = {key: _num(value) for key, value in risk.items()}
+        if risk.get("annualization_note"):
+            risk_payload["annualization_note"] = risk["annualization_note"]
         concentration = concentration_table(result.positions, equity)
+        if self.industry_map is None:
+            self.industry_map = load_industry_map() if result.positions is not None else {}
+        industry_rows = industry_exposure(result.positions, equity, self.industry_map)
+        industry_pnl = industry_attribution(trades, self.industry_map)
+        selection_forward = self._selection_forward(result.selections, result.positions)
         summary = self._trade_summary(trades, orders, equity)
+        cost_sensitivity = self._cost_sensitivity(summary)
         bridge = self._pnl_bridge(equity, orders, trades)
         checks = self._checks(
             trades,
@@ -136,29 +171,114 @@ class ReportDataBuilder:
             orders,
             self.result.spec.end,
             self.result.spec.max_gross_exposure,
+            self.result.selections,
+            int(self.result.spec.top_n or 0),
         )
+        warnings = self._warnings(equity, monthly_summary, alpha_beta, result.spec)
         return {
             "meta": meta,
             "metrics": metrics,
             "alpha_beta": {key: _num(value) for key, value in alpha_beta.items()},
-            "risk": {key: _num(value) for key, value in risk.items()},
+            "alternative_benchmarks": alternative_benchmarks,
+            "risk": risk_payload,
+            "warnings": warnings,
             "equity": self._equity_rows(equity),
             "benchmark": benchmark_series,
             "monthly": _safe(monthly),
+            "monthly_excess": _safe(monthly_excess),
+            "monthly_summary": _safe(monthly_summary),
+            "cost_sensitivity": cost_sensitivity,
+            "oos": _safe(oos_stats(equity)),
+            "rolling_returns": _safe(rolling_returns(equity)),
             "yearly": _safe(yearly_returns(equity)),
             "rolling": _safe(rolling_stats(equity, result.benchmark, self.risk_free_rate)),
             "drawdowns": _safe(drawdown_episodes(equity)),
             "exposure": _safe(exposure),
             "concentration": _safe(concentration),
+            "industry_exposure": _safe(industry_rows),
+            "industry_attribution": _safe(industry_pnl),
             "trades": self._trade_rows(trades),
             "trade_summary": summary,
             "pnl_bridge": bridge,
             "checks": checks,
             "attribution": self._attribution(trades),
             "selections": self._selection_rows(result.selections),
+            "selection_forward": selection_forward,
         }
 
     # ------------------------------------------------------------------ parts
+    @staticmethod
+    def _monthly_excess(monthly: list[dict]) -> list[dict]:
+        rows = []
+        for item in monthly or []:
+            ret = item.get("ret")
+            bench = item.get("bench_ret")
+            if ret is None or bench is None:
+                continue
+            rows.append(
+                {
+                    "year": int(item.get("year")),
+                    "month": int(item.get("month")),
+                    "ret": _num(ret),
+                    "bench_ret": _num(bench),
+                    "excess": _num(float(ret) - float(bench)),
+                }
+            )
+        return rows
+
+    @staticmethod
+    def _monthly_summary(rows: list[dict]) -> dict[str, Any]:
+        values = [float(item["excess"]) for item in rows if item.get("excess") is not None]
+        if not values:
+            return {}
+        series = pd.Series(values, dtype="float64")
+        std = float(series.std(ddof=1)) if len(series) > 1 else 0.0
+        return {
+            "months": len(values),
+            "win_rate_pct": _num(float((series > 0).mean() * 100.0)),
+            "mean_pct": _num(float(series.mean())),
+            "std_pct": _num(std),
+            "ir": _num(float(series.mean() / std * math.sqrt(12.0))) if std > 0 else None,
+        }
+
+    @staticmethod
+    def _warnings(
+        equity: pd.DataFrame,
+        monthly_summary: dict[str, Any],
+        alpha: dict[str, Any],
+        spec: Any,
+    ) -> list[dict[str, str]]:
+        warnings: list[dict[str, str]] = []
+        observations = len(equity) if equity is not None else 0
+        if observations < 756:
+            months = (
+                pd.to_datetime(equity["date"], errors="coerce").dt.to_period("M").nunique()
+                if equity is not None and not equity.empty
+                else 0
+            )
+            t_value = alpha.get("alpha_t")
+            warnings.append(
+                {
+                    "level": "warn",
+                    "text": (
+                        f"样本不足 3 年：{observations} 个交易日 / {months} 个月，"
+                        f"Alpha t={_num(t_value, 2)}，月度 IR={_num(monthly_summary.get('ir'), 2)}；"
+                        "统计显著性有限，结论不宜外推。"
+                    ),
+                }
+            )
+        if str(getattr(spec, "corporate_actions", "off")) == "off":
+            warnings.append(
+                {
+                    "level": "warn",
+                    "text": (
+                        "公司行为未启用：分红、送转、除权除息未计入净值；"
+                        "对高股息组合可能产生 3–5pp 量级偏差。"
+                    ),
+                }
+            )
+        return warnings
+
     @staticmethod
     def _geometric_excess(equity: pd.DataFrame, benchmark) -> float | None:
         if equity is None or equity.empty or "equity" not in equity.columns:
@@ -208,6 +328,7 @@ class ReportDataBuilder:
             "universe": spec.universe,
             "universe_size": int(meta.get("universe_size", len(spec.symbols)) or 0),
             "candidate_count": int(meta.get("candidate_count", len(spec.symbols)) or 0),
+            "eligible_count": int(meta.get("eligible_count", 0) or 0),
             "rebalance": spec.rebalance,
             "top_n": spec.top_n,
             "weighting": spec.weighting,
@@ -332,7 +453,11 @@ class ReportDataBuilder:
             )
             buy_amount = float(frame.loc[frame["type"].astype(str).str.lower() == "buy", "amount"].sum())
             sell_amount = float(frame.loc[frame["type"].astype(str).str.lower() == "sell", "amount"].sum())
-        one_way = buy_amount / avg_equity / years * 100.0 if avg_equity > 0 else None
+        one_way = (
+            (buy_amount + sell_amount) / 2.0 / avg_equity / years * 100.0
+            if avg_equity > 0
+            else None
+        )
         two_way = (buy_amount + sell_amount) / avg_equity / years * 100.0 if avg_equity > 0 else None
         fees_bps = fees_total / avg_equity / years * 10000.0 if avg_equity > 0 else None
         return {
@@ -410,6 +535,8 @@ class ReportDataBuilder:
         orders: pd.DataFrame,
         end,
         max_gross_exposure: float = 0.98,
+        selections: pd.DataFrame | None = None,
+        top_n: int = 0,
     ) -> list[dict[str, str]]:
         checks: list[dict[str, str]] = []
 
@@ -422,6 +549,88 @@ class ReportDataBuilder:
             "pass" if count == len(trades) else "fail",
             f"表格 {len(trades)} 条 / 汇总 {count} 条",
         )
+
+        if selections is not None and not selections.empty and "date" in selections.columns:
+            frame = selections.copy()
+            frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+            if "weight" in frame.columns:
+                frame = frame[pd.to_numeric(frame["weight"], errors="coerce").fillna(0.0) > 0]
+            counts = frame.groupby("date")["symbol"].nunique()
+            if top_n > 0 and len(counts):
+                median_count = float(counts.median())
+                status = "pass" if median_count >= top_n else "warn" if median_count >= top_n - 1 else "fail"
+                add(
+                    "调仓持仓数",
+                    status,
+                    f"目标 {top_n} 只 / 实际中位 {median_count:.0f} 只",
+                )
+                gross_map = {
+                    str(item.get("date")): float(item.get("gross_pct") or 0.0)
+                    for item in exposure
+                }
+                gross_values = [
+                    gross_map[str(pd.Timestamp(dt).date())]
+                    for dt in counts.index
+                    if str(pd.Timestamp(dt).date()) in gross_map
+                ]
+                target_pct = float(max_gross_exposure or 0.0) * 100.0
+                if gross_values and target_pct > 0:
+                    median_gross = float(pd.Series(gross_values).median())
+                    status = (
+                        "pass"
+                        if median_gross >= target_pct * 0.95
+                        else "warn"
+                        if median_gross >= target_pct * 0.85
+                        else "fail"
+                    )
+                    add(
+                        "调仓仓位",
+                        status,
+                        f"目标 {target_pct:.0f}% / 调仓日中位 {median_gross:.1f}%",
+                    )
+                if exposure:
+                    exp = pd.DataFrame(exposure)
+                    exp["date"] = pd.to_datetime(exp["date"], errors="coerce")
+                    exp = exp.dropna(subset=["date"]).sort_values("date")
+                    after_counts = []
+                    for dt in counts.index:
+                        end_dt = pd.Timestamp(dt) + pd.Timedelta(days=10)
+                        window = exp[(exp["date"] >= pd.Timestamp(dt)) & (exp["date"] <= end_dt)]
+                        if not window.empty:
+                            after_counts.append(int(window.iloc[0]["positions"]))
+                    if after_counts:
+                        median_hold = float(pd.Series(after_counts).median())
+                        status = (
+                            "pass"
+                            if median_hold >= top_n
+                            else "warn"
+                            if median_hold >= top_n - 1
+                            else "fail"
+                        )
+                        add(
+                            "调仓后持仓数",
+                            status,
+                            f"目标 {top_n} 只 / 调仓后中位 {median_hold:.0f} 只",
+                        )
+                if exposure:
+                    exp = pd.DataFrame(exposure)
+                    exp["date"] = pd.to_datetime(exp["date"], errors="coerce")
+                    exp = exp.dropna(subset=["date"]).set_index("date")
+                    month_end = exp["gross_pct"].resample("ME").last().dropna()
+                    if len(month_end) and target_pct > 0:
+                        median_me = float(month_end.median())
+                        status = (
+                            "pass"
+                            if median_me >= target_pct * 0.90
+                            else "warn"
+                            if median_me >= target_pct * 0.80
+                            else "fail"
+                        )
+                        add(
+                            "月末仓位",
+                            status,
+                            f"目标 {target_pct:.0f}% / 月末中位 {median_me:.1f}%",
+                        )
 
         if trades is not None and not trades.empty and orders is not None and not orders.empty:
             sell_shares = float(
@@ -493,6 +702,19 @@ class ReportDataBuilder:
         return checks
 
     @staticmethod
+    def _cost_sensitivity(summary: dict[str, Any]) -> list[dict]:
+        turnover = summary.get("turnover_one_way_pct")
+        if turnover is None:
+            return []
+        return [
+            {
+                "bps_per_side": int(bps),
+                "annual_drag_pct": _num(float(turnover) / 100.0 * bps / 100.0),
+            }
+            for bps in (0, 5, 10, 20, 30)
+        ]
+
+    @staticmethod
     def _attribution(trades: pd.DataFrame) -> dict[str, Any]:
         if trades is None or trades.empty:
             return {"by_symbol": [], "bottom": [], "total_pnl": 0.0, "symbols": 0}
@@ -518,6 +740,54 @@ class ReportDataBuilder:
             "bottom": bottom_rows,
             "total_pnl": _num(float(pnl.sum()), 2),
             "symbols": len(rows),
+        }
+
+    @staticmethod
+    def _selection_forward(
+        selections: pd.DataFrame | None,
+        positions: pd.DataFrame | None,
+    ) -> dict[str, Any]:
+        if (
+            selections is None
+            or selections.empty
+            or positions is None
+            or positions.empty
+            or "close" not in positions.columns
+        ):
+            return {}
+        sel = selections.copy()
+        sel["date"] = pd.to_datetime(sel["date"], errors="coerce")
+        if "weight" in sel.columns:
+            sel = sel[pd.to_numeric(sel["weight"], errors="coerce").fillna(0.0) > 0]
+        sel_dates = sorted(pd.Timestamp(d) for d in sel["date"].dropna().unique())
+        if len(sel_dates) < 2:
+            return {}
+        pos = positions.copy()
+        pos["date"] = pd.to_datetime(pos["date"], errors="coerce").dt.normalize()
+        pos["symbol"] = pos["symbol"].astype(str)
+        pivot = pos.pivot_table(index="date", columns="symbol", values="close", aggfunc="last")
+        returns = []
+        for idx, dt in enumerate(sel_dates[:-1]):
+            next_dt = sel_dates[idx + 1]
+            if dt not in pivot.index or next_dt not in pivot.index:
+                continue
+            symbols = sel.loc[sel["date"] == dt, "symbol"].astype(str).tolist()
+            for symbol in symbols:
+                if symbol not in pivot.columns:
+                    continue
+                start = pivot.at[dt, symbol]
+                end = pivot.at[next_dt, symbol]
+                if pd.notna(start) and pd.notna(end) and float(start) > 0:
+                    returns.append(float(end) / float(start) - 1.0)
+        if not returns:
+            return {}
+        series = pd.Series(returns, dtype="float64")
+        return {
+            "periods": len(sel_dates) - 1,
+            "observations": len(series),
+            "mean_ret_pct": _num(float(series.mean() * 100.0)),
+            "win_rate_pct": _num(float((series > 0).mean() * 100.0)),
+            "median_ret_pct": _num(float(series.median() * 100.0)),
         }
 
     @staticmethod
