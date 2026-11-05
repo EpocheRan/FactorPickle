@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 from datetime import date
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import rqalpha
-from rqalpha import run_func
+
+# RQAlpha 会触发 matplotlib 字体扫描；把缓存放到可写目录，避免每次 run 重建。
+_MPL_DIR = Path(tempfile.gettempdir()) / "finbridge-mpl"
+_MPL_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("MPLCONFIGDIR", str(_MPL_DIR))
+os.environ.setdefault("MPLBACKEND", "Agg")
+
+import rqalpha  # noqa: E402
+from rqalpha import run_func  # noqa: E402
 
 from backtest.application.ports import EngineRequest
 from backtest.domain.errors import EngineError
@@ -43,14 +53,44 @@ class RQAlphaEngine:
 
     def run(self, request: EngineRequest) -> BacktestResult:
         frame = request.data.frame
-        symbols = tuple(sorted({str(item) for item in frame["symbol"].unique()}))
+        all_symbols = tuple(sorted({str(item) for item in frame["symbol"].unique()}))
+        if request.cross_plan is not None:
+            # 横截面只把候选集交给 RQAlpha；全 A 5000+ 只全订阅会把事件循环放大 50–200 倍。
+            trade_symbols = tuple(
+                sorted({str(item) for item in request.cross_plan.candidates})
+            )
+            universe_size = int(request.cross_plan.universe_size)
+        else:
+            trade_symbols = tuple(
+                sorted(
+                    {
+                        str(item)
+                        for item in (
+                            getattr(request.strategy, "symbols", ())
+                            or request.spec.symbols
+                            or all_symbols
+                        )
+                    }
+                )
+            )
+            universe_size = len(trade_symbols)
+        if not trade_symbols:
+            trade_symbols = all_symbols
+            universe_size = len(all_symbols)
+        trade_set = set(trade_symbols)
+        trade_frame = frame[frame["symbol"].astype(str).isin(trade_set)].copy()
+        if trade_frame.empty:
+            trade_frame = frame.copy()
+            trade_symbols = all_symbols
+            universe_size = len(all_symbols)
+
         instruments = build_instruments(
-            symbols,
+            trade_symbols,
             request.data.security_status,
             lot_size=int(request.rules.lot_size),
         )
         source = RQAlphaDataSource(
-            frame,
+            trade_frame,
             instruments,
             request.calendar.dates,
             request.rules,
@@ -71,7 +111,8 @@ class RQAlphaEngine:
             rules=request.rules,
             cross_plan=request.cross_plan,
             initial_cash=float(request.spec.initial_cash),
-            symbols=symbols,
+            symbols=trade_symbols,
+            universe_size=universe_size,
             selections=selections,
             start=request.spec.start,
             end=request.spec.end,
@@ -187,6 +228,7 @@ class RQAlphaEngine:
             ledger_frame = ledger_frame[
                 (ledger_frame["date"] >= pd.Timestamp(request.spec.start))
                 & (ledger_frame["date"] <= pd.Timestamp(request.spec.end))
+                & (ledger_frame["symbol"].astype(str).isin(set(runtime.symbols)))
             ]
             ledger_data = ledger_frame[["date", "symbol", "close"]].copy()
             ledger_runner = PortfolioLedger(
@@ -234,7 +276,7 @@ class RQAlphaEngine:
             "orders_filled": int(len(orders)),
             "trades": int(len(trades_out)),
             "rejected": int(len(rejected)),
-            "universe_size": int(len(runtime.symbols)),
+            "universe_size": int(runtime.universe_size),
             "candidate_count": int(len(runtime.symbols)),
             "stops": "strategy_managed",
             "t_plus_1": bool(request.rules.t_plus_1),

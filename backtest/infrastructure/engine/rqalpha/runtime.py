@@ -38,6 +38,7 @@ class Runtime:
     start: date
     end: date
     max_gross_exposure: float = 0.98
+    universe_size: int = 0
     last_date: date | None = None
     pending: list[PendingOrder] = field(default_factory=list)
     stops: dict[str, StopState] = field(default_factory=dict)

@@ -66,6 +66,19 @@ python -m backtest optimize strategies/models/atr_trend.py \
     --grid k=1.0,2.0,3.0 --metric sharpe
 ```
 
+## 性能
+
+横截面只把 `CrossPlan.candidates` 交给 RQAlpha；全 A 5000+ 只全订阅会把事件循环放大
+50–200 倍。实测（本机，all-A 5187/5587 只）：
+
+| 区间 | 耗时 |
+|---|---:|
+| 2024-01（1 个月） | ~1–2s |
+| 2024 全年 | ~36s |
+| 2020–2026（6.8 年） | ~73s |
+
+另外两处固定开销：股票查询用 id/symbol 映射（O(1)），matplotlib 字体缓存指到可写目录。
+
 ## 写策略
 
 策略文件只定义模块级 `STRATEGY`（类或工厂）：
