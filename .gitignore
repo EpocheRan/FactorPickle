@@ -20,3 +20,9 @@ config.local.json
 # --- 分析中间物（可再生成）---
 /analysis/data/
 /analysis/out/
+/scripts/analysis
+/scripts/maintenance
+
+# --- 本地缓存 ---
+/.mplconfig/
+/finbridge-mpl/
