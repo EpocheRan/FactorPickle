@@ -173,9 +173,18 @@ __KPIS__
   <div class="card"><div class="card-head"><h3>运行信息</h3><button class="btn" id="jsonCsv">下载 report_data.json</button></div>
     <table class="meta"><tbody>__META_ROWS__</tbody></table></div>
   <div class="card"><div class="card-head"><h3>口径</h3></div>
-    <p class="note">Alpha/Beta 用日收益 OLS；无风险利率见运行信息。回合交易由 fills 按 FIFO 配对，
-    费用按股数分摊。月度收益为月末净值环比。报告由 scripts/report_backtest.py 的同源
-    backtest.reporting 生成，不重跑回测。</p></div>
+    <table class="meta"><tbody>
+      <tr><th>年化</th><td>252 个交易日；回撤天数用日历天</td></tr>
+      <tr><th>Sharpe</th><td>日收益算术均值 / 标准差 × √252，无风险利率见运行信息</td></tr>
+      <tr><th>IR</th><td>主动收益算术均值 / 跟踪误差；不是 Alpha/TE</td></tr>
+      <tr><th>超额</th><td>“超额收益”为累计收益简单差；“几何超额”为 (1+Rp)/(1+Rb)−1</td></tr>
+      <tr><th>捕获率</th><td>上涨/下跌日的策略平均收益 ÷ 基准平均收益</td></tr>
+      <tr><th>牛熊 β</th><td>上涨/下跌日分别回归的斜率，与捕获率不是同一指标</td></tr>
+      <tr><th>回合</th><td>fills 按 FIFO 批次配对，一笔买入可拆成多个回合</td></tr>
+      <tr><th>费用/换手</th><td>双边佣金+印花税+过户费；换手为年化单边买入额 / 平均权益</td></tr>
+      <tr><th>Alpha</th><td>日收益 OLS 截距 ×252；R²&lt;0.5 时报告给出警告</td></tr>
+    </tbody></table>
+    <p class="note">报告由 backtest.reporting 同源生成，不重跑回测；回合交易与净值桥接见“概览”。</p></div>
 </section>
 </main>
 <p class="note">generated __GENERATED__ · __RUN_ID__</p>
@@ -623,6 +632,7 @@ def render_report(data: dict[str, Any]) -> str:
             ("期末权益", _plain(metrics.get("final_equity"), 0)),
             ("基准收益", _num(metrics.get("benchmark_return_pct"), 2, "%")),
             ("超额收益", _num(metrics.get("excess_return_pct"), 2, "%")),
+            ("几何超额", _num(metrics.get("excess_geometric_pct"), 2, "%")),
         ]
     )
     alpha_rows = _rows(

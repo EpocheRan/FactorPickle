@@ -154,8 +154,19 @@ RQAlpha 侧配置在 `rqalpha/engine.py::_config`：`sys_simulation` 开启涨�
 | 归因 | 个股贡献、最新选股 |
 | 明细 | 运行配置、下载 report_data.json |
 
-`report_data.json` 是数据契约：`equity / benchmark / alpha_beta / monthly / rolling /
-drawdowns / exposure / trades / trade_summary / attribution`。
+`report_data.json` 是数据契约：`equity / benchmark / alpha_beta / risk / monthly / rolling /
+drawdowns / exposure / concentration / trades / trade_summary / pnl_bridge / checks / attribution`。
+
+报告还包含：
+
+- **数据自检**：回合表=汇总、卖出股数配平、交易覆盖期末、已实现/未实现桥残差、
+  持仓只数、仓位上限、卖出原因；
+- **收益桥**：已实现 + 未实现 − 未平仓费用 + 残差 = 期末权益；
+- **费用/换手**：总费用、年化费用 bps、年化单边/双边换手；
+- **风险**：Sortino、Calmar、下行波动、VaR95/CVaR95、偏度/峰度、月度胜率、12M/36M；
+- **归因**：个股贡献 Top/Bottom/合计、全量选股历史；
+- **R²<0.5** 时 Alpha 卡给出“基准解释力不足”警告；
+- **口径表**：年化/Sharpe/IR/超额/捕获率/牛熊β/回合/费用定义。
 `--out console,csv` 可关闭 HTML；`python scripts/report_backtest.py --latest` 可从
 `report_data.json` 重新渲染。
 

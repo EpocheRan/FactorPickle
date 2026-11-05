@@ -118,6 +118,9 @@ class ReportDataBuilder:
 
         alpha_beta = capm_stats(equity, result.benchmark, self.risk_free_rate)
         metrics = {key: _num(value) for key, value in (result.metrics or {}).items()}
+        geo_excess = self._geometric_excess(equity, result.benchmark)
+        if geo_excess is not None:
+            metrics["excess_geometric_pct"] = geo_excess
         meta = self._meta()
         monthly = monthly_returns(equity, result.benchmark)
         risk = risk_stats(equity, self.risk_free_rate, monthly)
@@ -156,6 +159,33 @@ class ReportDataBuilder:
         }
 
     # ------------------------------------------------------------------ parts
+    @staticmethod
+    def _geometric_excess(equity: pd.DataFrame, benchmark) -> float | None:
+        if equity is None or equity.empty or "equity" not in equity.columns:
+            return None
+        frame = equity.copy()
+        frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+        frame = frame.dropna(subset=["date"]).sort_values("date")
+        if len(frame) < 2:
+            return None
+        portfolio = float(frame.iloc[-1]["equity"]) / float(frame.iloc[0]["equity"]) - 1.0
+        if benchmark is None:
+            return None
+        if isinstance(benchmark, pd.DataFrame):
+            if benchmark.empty:
+                return None
+            bench = benchmark.copy()
+            if "date" in bench.columns:
+                bench = bench.set_index("date")
+            column = "close" if "close" in bench.columns else bench.columns[-1]
+            series = pd.to_numeric(bench[column], errors="coerce").dropna()
+        else:
+            series = pd.to_numeric(benchmark.copy(), errors="coerce").dropna()
+        if len(series) < 2:
+            return None
+        bench_total = float(series.iloc[-1]) / float(series.iloc[0]) - 1.0
+        return _num(((1.0 + portfolio) / (1.0 + bench_total) - 1.0) * 100.0)
+
     def _meta(self) -> dict[str, Any]:
         result = self.result
         spec = result.spec
