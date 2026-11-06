@@ -20,7 +20,7 @@
 | 上游 | `factors` | 因子面板（`build_panel`） |
 | 上游 | `factor_engine` | 读 STORED 因子 |
 | 上游 | `data_interface` | 行情、交易日历、证券状态 |
-| 下游 | `output/backtest/<run_id>/` | orders/trades/equity/metrics |
+| 下游 | `output/reports/backtest/<生成日>/<run_id>/` | orders/trades/equity/metrics |
 
 ### 1.3 关键文件
 

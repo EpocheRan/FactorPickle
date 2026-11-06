@@ -68,7 +68,7 @@ def main() -> int:
     parser.add_argument("--cost-bps", type=float, default=10.0)
     parser.add_argument("--quantile", type=float, default=0.2)
     parser.add_argument("--min-names", type=int, default=50)
-    parser.add_argument("--out", default="output/factor_reports/eval")
+    parser.add_argument("--out", default="output/reports/factor")
     args = parser.parse_args()
 
     ids = [item.strip() for item in args.factors.split(",") if item.strip()]
@@ -124,7 +124,7 @@ def main() -> int:
     if meta["not_selected"]:
         print(f"未启用评估项: {', '.join(meta['not_selected'])}")
 
-    out_dir = Path(args.out)
+    out_dir = Path(args.out) / time.strftime("%Y-%m-%d")
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / f"eval_{time.strftime('%Y%m%dT%H%M')}.csv"
     table.to_csv(target, index=False, encoding="utf-8-sig")

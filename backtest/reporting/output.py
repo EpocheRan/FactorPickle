@@ -8,17 +8,18 @@ from pathlib import Path
 from backtest.domain.models import BacktestResult, OutputArtifact
 
 from .data import ReportDataBuilder
+from .paths import dated_dir
 from .render import render_report
 
 
 class HtmlReportOutput:
     name = "html"
 
-    def __init__(self, output_dir: str | Path = "output/backtest"):
+    def __init__(self, output_dir: str | Path = "output/reports/backtest"):
         self.output_dir = Path(output_dir)
 
     def emit(self, result: BacktestResult) -> list[OutputArtifact]:
-        run_dir = self.output_dir / result.run_id
+        run_dir = dated_dir(self.output_dir) / result.run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         data = ReportDataBuilder(result).build()
         json_path = run_dir / "report_data.json"

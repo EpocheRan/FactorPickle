@@ -9,6 +9,7 @@ from typing import Any
 import pandas as pd
 
 from backtest.domain.models import BacktestResult, OutputArtifact
+from backtest.reporting.paths import dated_dir
 
 
 def _json_safe(value: Any) -> Any:
@@ -30,11 +31,11 @@ def _json_safe(value: Any) -> Any:
 class CsvOutput:
     name = "csv"
 
-    def __init__(self, output_dir: str | Path = "output/backtest"):
+    def __init__(self, output_dir: str | Path = "output/reports/backtest"):
         self.output_dir = Path(output_dir)
 
     def emit(self, result: BacktestResult) -> list[OutputArtifact]:
-        run_dir = self.output_dir / result.run_id
+        run_dir = dated_dir(self.output_dir) / result.run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         artifacts: list[OutputArtifact] = []
 

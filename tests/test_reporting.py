@@ -131,7 +131,7 @@ def test_builder_and_html_report(tmp_path):
     assert 'id="tab-trades"' in html
     assert "<script src=" not in html
     artifacts = HtmlReportOutput(tmp_path).emit(_result())
-    run_dir = tmp_path / "report123"
+    run_dir = tmp_path / date.today().isoformat() / "report123"
     assert (run_dir / "report.html").exists()
     assert (run_dir / "report_data.json").exists()
     assert len(artifacts) == 2

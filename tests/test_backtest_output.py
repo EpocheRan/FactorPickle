@@ -1,6 +1,5 @@
 import json
 from datetime import date
-
 import pandas as pd
 
 from backtest.domain.models import BacktestResult, ExecutionReport, RunSpec
@@ -43,7 +42,7 @@ def _result() -> BacktestResult:
 def test_csv_output_writes_expected_files(tmp_path):
     output = CsvOutput(tmp_path)
     artifacts = output.emit(_result())
-    run_dir = tmp_path / "run123"
+    run_dir = tmp_path / date.today().isoformat() / "run123"
     for name in (
         "metrics.json",
         "equity.csv",

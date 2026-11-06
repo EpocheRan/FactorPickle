@@ -104,7 +104,7 @@ def main() -> int:
     parser.add_argument("--horizon", type=int, default=5, help="主持有期（交易日）")
     parser.add_argument("--groups", type=int, default=5, help="分组数")
     parser.add_argument("--neutralize", action="store_true", help="横截面市值中性化后再评估")
-    parser.add_argument("--out", default="output/factor_reports")
+    parser.add_argument("--out", default="output/reports/factor")
     parser.add_argument("--category", default=None)
     parser.add_argument("--direction", type=int, default=None)
     parser.add_argument("--profile", default="default", help="评估 profile（决定评估项）")
@@ -170,7 +170,7 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001 - 申明失败不影响报告正文
                 print(f"    申明注入失败（报告正文不受影响）: {type(exc).__name__}: {exc}")
         if args.png:
-            png = Path(args.out) / (factor.replace('.', '_').replace('@', '_') + ".png")
+            png = Path(result["html"]).parent / (factor.replace('.', '_').replace('@', '_') + ".png")
             if shoot(result["html"], png, height=args.height):
                 print(f"    预览图: {png}")
     return 0

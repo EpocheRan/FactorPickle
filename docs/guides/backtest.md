@@ -56,7 +56,7 @@ python -m backtest run strategies/models/atr_trend.py \
 python -m backtest run strategies/models/turnover_regime.py \
     --start 2024-01-01 --end 2024-03-29 --data questdb --out console
 
-# 落盘：output/backtest/<run_id>/
+# 落盘：output/reports/backtest/<生成日>/<run_id>/
 python -m backtest run strategies/models/atr_trend.py \
     --start 2024-03-01 --end 2024-06-28 --out console,csv
 
@@ -144,7 +144,7 @@ RQAlpha 侧配置在 `rqalpha/engine.py::_config`：`sys_simulation` 开启涨�
 ## 输出
 
 默认 `outputs=("console","html")`：每次回测都会写
-`output/backtest/<run_id>/report.html` 和 `report_data.json`。
+`output/reports/backtest/<生成日>/<run_id>/report.html` 和 `report_data.json`。
 报告是单文件离线 HTML，不依赖 CDN/Plotly，含 7 个可交互 Tab：
 
 | Tab | 内容 |
@@ -176,7 +176,7 @@ HAC Alpha t、成本敏感性、选股前瞻收益、集中度（占权益/占�
 `--out console,csv` 可关闭 HTML；`python scripts/report_backtest.py --latest` 可从
 `report_data.json` 重新渲染。
 
-`--out csv` 写 `output/backtest/<run_id>/`：
+`--out csv` 写 `output/reports/backtest/<生成日>/<run_id>/`：
 
 ```
 metrics.json       # metrics + meta + factor_meta

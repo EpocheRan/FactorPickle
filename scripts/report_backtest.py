@@ -1,10 +1,10 @@
-"""从 ``output/backtest/<run_id>/`` 生成单页 HTML 回测报告。
+"""从 ``output/reports/backtest/<日期>/<run_id>/`` 生成单页 HTML 回测报告。
 
 用法::
 
     python scripts/report_backtest.py --latest
     python scripts/report_backtest.py --run-id 7e873d43ee277cb7
-    python scripts/report_backtest.py --latest --out output/backtest/report.html
+    python scripts/report_backtest.py --latest --out output/reports/backtest/report.html
 
 只读 CSV/JSON，不重跑回测；没有 matplotlib 依赖。
 """
@@ -45,7 +45,11 @@ def _read_csv(path: Path) -> pd.DataFrame:
 def _latest_run(base: Path) -> Path | None:
     if not base.exists():
         return None
-    runs = [item for item in base.iterdir() if item.is_dir() and (item / "metrics.json").exists()]
+    runs = {
+        item.parent
+        for pattern in ("metrics.json", "report_data.json")
+        for item in base.rglob(pattern)
+    }
     return max(runs, key=lambda item: item.stat().st_mtime) if runs else None
 
 
@@ -260,8 +264,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--latest", action="store_true")
     parser.add_argument("--out", default="")
     args = parser.parse_args(argv)
-    base = ROOT / "output" / "backtest"
-    run_dir = base / args.run_id if args.run_id else _latest_run(base) if args.latest else None
+    base = ROOT / "output" / "reports" / "backtest"
+    legacy = ROOT / "output" / "backtest"
+    if not base.exists():
+        base = legacy
+    if args.run_id:
+        matches = list(base.rglob(args.run_id)) if base.exists() else []
+        if not matches and legacy.exists():
+            matches = list(legacy.rglob(args.run_id))
+        run_dir = matches[0] if matches else None
+    else:
+        run_dir = _latest_run(base) if args.latest else None
     if run_dir is None or not run_dir.exists():
         print("没有找到回测输出；先跑 python -m backtest run ... --out console,csv")
         return 1

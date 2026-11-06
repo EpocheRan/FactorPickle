@@ -16,7 +16,7 @@ class BacktestSettings:
     data: str = "questdb"
     factor_source: str = "auto"
     outputs: tuple[str, ...] = ("console", "html")
-    output_dir: Path = Path("output/backtest")
+    output_dir: Path = Path("output/reports/backtest")
     initial_cash: float = 1_000_000.0
     warmup_min_bars: int = 260
     fill: FillMode = "next_open"
@@ -47,7 +47,7 @@ class BacktestSettings:
         outputs = tuple(str(item) for item in outputs)
         if not outputs:
             raise ConfigError("backtest.outputs 不能为空")
-        output_dir = Path(str(payload.pop("output_dir", "output/backtest")))
+        output_dir = Path(str(payload.pop("output_dir", "output/reports/backtest")))
         cache_dir = Path(str(payload.pop("cache_dir", "output/cache/backtest")))
         rules = ExecutionRules.from_dict(payload.pop("rules", None))
 

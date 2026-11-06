@@ -214,8 +214,8 @@ backtest/reporting/
 `HtmlReportOutput.emit(result)`：
 
 1. `ReportDataBuilder.build(result)`；
-2. 写 `output/backtest/<run_id>/report_data.json`；
-3. 渲染 `output/backtest/<run_id>/report.html`；
+2. 写 `output/reports/backtest/<生成日>/<run_id>/report_data.json`；
+3. 渲染 `output/reports/backtest/<生成日>/<run_id>/report.html`；
 4. 返回 `OutputArtifact(kind="file", path=...)`。
 
 ### 7.3 与引擎集成

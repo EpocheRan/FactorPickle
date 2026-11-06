@@ -247,7 +247,7 @@ def generate(
     universe: str | None = None,
     category: str | None = None,
     direction: int | None = None,
-    out_dir: str | Path = "output/factor_reports",
+    out_dir: str | Path = "output/reports/factor",
     with_peers: bool = True,
     robustness: bool = True,
     run_id: str | None = None,
@@ -336,7 +336,10 @@ def generate(
     }
 
     html = render.render(report, score, meta)
-    target = Path(out_dir)
+    base = Path(out_dir)
+    target = base if len(base.name) == 10 and base.name[4] == "-" and base.name[7] == "-" else (
+        base / now_cn().date().isoformat()
+    )
     target.mkdir(parents=True, exist_ok=True)
     safe = factor_id.replace(".", "_").replace("@", "_")
     html_path = target / f"{safe}.html"

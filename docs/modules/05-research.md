@@ -22,7 +22,7 @@
 | 上游 | `data_interface` | 只读 `common.config` / `timeutil` 建连接 |
 | 上游 | `factor_value_daily` | 财务因子从物化表读 |
 | 下游 | HTML 报告 + JSON | 报告与评分同源落盘 |
-| 下游 | `output/factor_reports/` | HTML 报告 + 汇总 CSV |
+| 下游 | `output/reports/factor/<生成日>/` | HTML 报告 + 汇总 CSV |
 
 ### 1.3 关键文件
 
@@ -49,7 +49,7 @@ factor 面板（date × symbol）
 build_report(factor, close, open, ...)          # 4 个持有期 IC + 分层 + 衰减
       │
 rate(report)                                    # 评分 + 否决 + 象限
-      ├─ render → output/factor_reports/<id>.html
+      ├─ render → output/reports/factor/<生成日>/<id>.html
       └─ rating.rate → 五维评分（写入报告）
 ```
 

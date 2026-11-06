@@ -1,40 +1,55 @@
 # output 目录约定
 
 > 运行时产物目录，**整个 `output/` 已在 `.gitignore` 中忽略**，不进版本库。
-> 规则只有一条：**只放可交付产物，不放脚本、临时文件、半成品图**。
+> 报告按生成日期分组：回测报告与因子评估报告各自独立目录。
 
 ```
 output/
-├── factor_reports/     # 因子研究报告（正式产物）
-│   ├── <factor_id>.html          单因子报告（内联 SVG，可打印）
-│   ├── <factor_id>.json          同报告的元数据/评级
-│   └── scorecard_<run_id>.csv    本批次全部因子的评级汇总
-├── research/           # 研究结论与运行日志
-│   ├── *.log                     长任务日志（回填/评分卡）
-│   └── *.csv                     研究结论表（如反转密度阈值）
-└── backtest/           # 回测引擎产物（按 run_id 分目录）
-    └── <run_id>/{orders,trades,equity,metrics,...}
+├── reports/
+│   ├── backtest/
+│   │   └── YYYY-MM-DD/
+│   │       └── <run_id>/
+│   │           ├── report.html
+│   │           ├── report_data.json
+│   │           ├── metrics.json
+│   │           ├── equity.csv
+│   │           ├── orders.csv
+│   │           └── ...
+│   └── factor/
+│       └── YYYY-MM-DD/
+│           ├── <factor_id>.html
+│           ├── <factor_id>.json
+│           └── eval_YYYYMMDDTHHMM.csv
+├── logs/YYYY-MM-DD/*.log
+├── screenshots/YYYY-MM-DD/*.png
+├── tmp/YYYY-MM-DD/                 # 一次性脚本/临时文件
+├── cache/                          # 回测/因子缓存
+├── concept/                        # 概念数据
+├── composite/                      # 合成因子实验
+└── ...                             # 其他研究中间数据
 ```
 
 ## 规则
 
-1. **一个因子一份报告**：`factor_reports/<factor_id>.html`，重跑覆盖，不产生 `_v2`、`_final`。
-2. **不落中间图**：预览截图、调试柱状图一律不写进 `output/`（写到系统临时目录或直接不落盘）。
-3. **日志归 research**：跑批日志与结果表放 `research/`，文件名带 `run_id` 或日期。
-4. **回测产物按 run_id 分目录**：由回测引擎自动管理，不手工搬动。
+1. **回测报告**：`reports/backtest/<生成日>/<run_id>/`，报告、JSON、CSV 同目录；由 `CsvOutput` / `HtmlReportOutput` 自动写入。
+2. **因子报告**：`reports/factor/<生成日>/<factor_id>.html/json`；由 `research.report.runner.generate` 自动加日期目录。
+3. **评估 CSV**：`reports/factor/<生成日>/eval_*.csv`；由 `research.eval.cli` 写入。
+4. **日志/截图/临时文件**：分别写 `logs/`、`screenshots/`、`tmp/` 的日期子目录，不落 `output/` 根目录。
+5. **日期取生成日**，不是回测区间；同一 `run_id` 跨日重跑会进入不同日期目录。
 
 ## 生成命令
 
 ```bash
-# 单因子报告
-python scripts/factor_report.py --factor momentum.ret@20 --pool 500
+# 回测（默认 console + html）
+python -m backtest run strategies/models/low_turnover_top10.py \
+    --start 2020-01-01 --end 2026-10-29
 
-# 全量评分卡（写 factor_scorecard 表 + 汇总 CSV）
-python scripts/factor_scorecard.py --source price --pool 200 --render
+# 重新渲染最新回测报告
+python scripts/report_backtest.py --latest
 
-# 财务因子物化（STORED）
-python scripts/backfill_factors.py --codes 120 --start 2024-01-01
+# 因子研究报告
+python -m research.report.cli --factor momentum.rsrs --pool 200
 
-# 方向校准（默认只报告）
-python scripts/calibrate_directions.py
+# 批量因子评估 CSV
+python -m research.eval.cli --factors momentum.rsrs,liquidity.turnover_std_bias_42_252
 ```
