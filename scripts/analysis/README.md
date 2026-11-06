@@ -4,8 +4,18 @@
 
 ## 目录约定
 
-- `analysis/*.py`：**当前在跑的**专题脚本；
-- `analysis/archive/<YYYYMMDD>/`：已完结的一次性研究，只归档不删除（用于复现历史结论）。
+- `scripts/analysis/*.py`：**当前在跑的**专题脚本；
+- `scripts/analysis/archive/<YYYYMMDD>/`：已完结的一次性研究，只归档不删除（用于复现历史结论）。
+
+## 当前专题：161226 白银 LOF
+
+| 脚本 | 作用 |
+|---|---|
+| `fund_161226.py` | 抓净值/场内价/沪银期货，算溢价与 beta，写 `output/161226/premium.csv` |
+| `diag_161226.py` | 净值/白银相关性、周频 beta、溢价峰值区间 |
+| `plot_161226.py` | 价格 vs 净值 vs 溢价图 |
+| `prob_161226.py` | 未来 20 日涨跌概率，按溢价/回撤/动量分桶 |
+| `prob_161226_robust.py` | 非重叠样本 + Wilson 区间复算 |
 
 ## 归档
 
