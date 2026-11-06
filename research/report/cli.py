@@ -47,6 +47,8 @@ def main() -> int:
                         help="跳过多池稳健性重算，报告更快")
     parser.add_argument("--no-cache", action="store_true",
                         help="不使用 Panel 本地缓存，强制重新取数")
+    parser.add_argument("--continue-on-error", action="store_true",
+                        help="批量模式下单个因子失败后继续")
     parser.add_argument("--out", default="output/reports/factor")
     parser.add_argument("--category", default=None)
     parser.add_argument("--direction", type=int, default=None)
@@ -78,22 +80,28 @@ def main() -> int:
         )
 
     for factor in factors:
-        result = generate(
-            factor,
-            start=args.start,
-            end=args.end,
-            universe=args.universe,
-            category=args.category,
-            direction=args.direction,
-            out_dir=args.out,
-            neutralize=args.neutralize,
-            horizon=args.horizon,
-            groups=args.groups,
-            panel=shared_panel,
-            profile=args.profile,
-            robustness=not args.no_robustness,
-            use_cache=not args.no_cache,
-        )
+        try:
+            result = generate(
+                factor,
+                start=args.start,
+                end=args.end,
+                universe=args.universe,
+                category=args.category,
+                direction=args.direction,
+                out_dir=args.out,
+                neutralize=args.neutralize,
+                horizon=args.horizon,
+                groups=args.groups,
+                panel=shared_panel,
+                profile=args.profile,
+                robustness=not args.no_robustness,
+                use_cache=not args.no_cache,
+            )
+        except Exception as exc:  # noqa: BLE001
+            if not args.continue_on_error:
+                raise
+            print(f"[{factor}] FAILED: {type(exc).__name__}: {exc}")
+            continue
         rating = result["rating"]
         print(
             f"[{factor}] 评级 {rating['grade']} / {rating['score']} 分"
