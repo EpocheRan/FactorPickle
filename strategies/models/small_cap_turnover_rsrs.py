@@ -1,7 +1,8 @@
 """小市值 + 换手波动偏离 + RSRS 三因子横截面策略。
 
 - 小市值：``size.float_mv``，方向 +1（值越大 = 市值越小）；
-- 换手波动偏离：``liquidity.turnover_std_bias_21_504``，方向 -1；
+- 换手波动偏离：默认 ``liquidity.turnover_std_bias_42_252``，方向 -1；
+  可通过 ``--param turnover_factor=...`` 切回 21_504 做对照；
 - RSRS：``momentum.rsrs``，方向 +1；
 - 股票池：全 A（剔除 ST），在 rank 中显式剔除北交所 920/8/4 号段；
 - 三因子先转横截面百分位，再按权重合成，月度调仓 top_n。
@@ -18,7 +19,7 @@ from strategies.base import CrossSectionStrategy
 from strategies.universe import Rebalance, Universe, UniverseSpec
 from strategies.weighting import EqualWeight, InverseVolWeight
 
-TURNOVER = "liquidity.turnover_std_bias_21_504"
+TURNOVER_DEFAULT = "liquidity.turnover_std_bias_42_252"
 RSRS = "momentum.rsrs"
 SIZE = "size.float_mv"
 AMOUNT = "liquidity.amount_ma_20d"
@@ -45,6 +46,7 @@ class SmallCapTurnoverRsrs(CrossSectionStrategy):
         "rsrs_weight": 1.0 / 3.0,
         "min_amount": 1e8,
         "exclude_bse": True,
+        "turnover_factor": TURNOVER_DEFAULT,
     }
 
     def __init__(self, params=None):
@@ -57,10 +59,16 @@ class SmallCapTurnoverRsrs(CrossSectionStrategy):
             self.weighting = EqualWeight()
 
     def factors(self):
-        return [F.ts(TURNOVER), F.ts(RSRS), F.ts(SIZE), F.ts(AMOUNT), F.vol(20)]
+        return [
+            F.ts(str(self.params["turnover_factor"])),
+            F.ts(RSRS),
+            F.ts(SIZE),
+            F.ts(AMOUNT),
+            F.vol(20),
+        ]
 
     def rank(self, panel, dt: pd.Timestamp) -> pd.Series:
-        turnover = panel.at(dt, TURNOVER) * -1.0
+        turnover = panel.at(dt, str(self.params["turnover_factor"])) * -1.0
         rsrs = panel.at(dt, RSRS)
         size = panel.at(dt, SIZE)
         amount = panel.at(dt, AMOUNT)
