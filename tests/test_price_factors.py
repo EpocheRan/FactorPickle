@@ -88,6 +88,19 @@ def test_rsi_bounds():
     assert len(rsi) > 50
     assert rsi.min() >= 0 and rsi.max() <= 100
 
+
+def test_zjfz_factor_nonnegative_and_capped():
+    fn, window, unit = lookup("reversal.zjfz")
+    assert (window, unit) == (13, "ratio")
+    frame = _frame(days=220)
+    frame["hfq_close"] = frame["close"]
+    frame["hfq_high"] = frame["high"]
+    frame["hfq_low"] = frame["low"]
+    out = fn(frame).dropna()
+    assert len(out) > 100
+    assert out.min() >= 0
+    assert out.max() <= 500
+
 def test_high_low_ratio():
     ratio = _series(house_id("risk", "high_low_21d"), _frame()).dropna()
     assert (ratio >= 1 - 1e-9).all()

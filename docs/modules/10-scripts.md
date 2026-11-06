@@ -1,4 +1,4 @@
-﻿# 10 · scripts（运维与研究脚本）
+# 10 · scripts（运维与研究脚本）
 
 ## 1. 架构与依赖
 
@@ -36,7 +36,6 @@
 | `verify_p0_p2.py` | 校验分时/板块/披露三条链路 | `python scripts/verify_p0_p2.py` |
 | `backfill_disclosure.py` | 披露日历与公告 | `python scripts/backfill_disclosure.py` |
 | `backfill_history.py` | **历史数据补齐（分阶段）** | 见下表 |
-| `factor_report.py` | 单因子 HTML 报告 | `--factor momentum.return_21d --pool 200` |
 | `calibrate_directions.py` | 用实测 IC 校准方向 | `--min-abs-ic 0.02 --apply` |
 | `research_reversal_density.py` | 反转信号密度阈值研究 | `--codes 500` |
 | `research_reversal_regimes.py` | 分市场状态的最优阈值 | `--codes 500` |
@@ -79,7 +78,7 @@ powershell -ExecutionPolicy Bypass -File D:\FinBridge\scripts\compact-docker-vhd
 
 ```
 backfill_*.py  →  acquisition/data_interface  →  QuestDB
-factor_*.py    →  factors/research/factor_engine  →  output/factor_reports + factor_scorecard
+research.report  →  factors/research/factor_engine  →  output/factor_reports + factor_scorecard
 research_*.py  →  只读 QuestDB  →  output/research/*.csv
 ```
 
@@ -137,7 +136,7 @@ python scripts/factor_scorecard.py --source financial --pool 200 --start 2024-01
 python scripts/calibrate_directions.py --min-abs-ic 0.02
 
 # 5) 单因子报告
-python scripts/cli/factor_report.py --factor liquidity.amount_ma_20d --pool 200 --start 2019-01-01
+python -m research.report --factor liquidity.amount_ma_20d --universe pool:2022-01-04:200 --start 2019-01-01
 ```
 
 ### 2.2 注意事项（坑）

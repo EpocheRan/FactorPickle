@@ -101,6 +101,7 @@ def test_inline_compute_registry_excludes_stored_only():
     assert set(INLINE_COMPUTE_REGISTRY) == {
         "momentum.ret",
         "reversal.short",
+        "reversal.zjfz",
         "technical.atr",
         "risk.vol",
     }

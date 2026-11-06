@@ -1,7 +1,7 @@
-"""评估口径的唯一事实源。
+"""报告数据面板的运行参数。
 
-任何「这个因子行不行」的结论都必须落到这个 dataclass 上；
-逐因子覆盖参数（改窗口、改 horizon、改池子）会让横向比较失效，桥一律不提供。
+股票池、区间、horizon、成本、分位等运行参数集中在这里；
+profile 只描述报告章节，不承担这些运行参数。
 """
 
 from __future__ import annotations
@@ -10,8 +10,8 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class EvalSpec:
-    """统一的评估口径。
+class PanelSpec:
+    """报告数据面板的统一参数。
 
     ``universe`` 三种写法：
 

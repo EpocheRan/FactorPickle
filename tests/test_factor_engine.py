@@ -85,6 +85,18 @@ def make_service(frame=None):
     return FactorEngineService(store=store, data=data, config={}), store, data
 
 
+def test_zjfz_is_registered_as_inline_builtin():
+    from factors.direction import direction_of
+
+    mapping = builtin_map()
+    assert "reversal.zjfz" in mapping
+    spec = mapping["reversal.zjfz"].spec
+    assert spec.aliases == ("zjfz",)
+    assert spec.category.value == "reversal"
+    assert spec.window == 13
+    assert direction_of("reversal.zjfz") == 1
+
+
 def test_builtin_definitions_have_three_tags():
     mapping = builtin_map()
     assert "momentum.ret" in mapping

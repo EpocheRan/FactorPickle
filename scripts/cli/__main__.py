@@ -1,6 +1,6 @@
-"""统一 CLI 入口：python -m scripts.cli <command> [args...]
+"""辅助命令入口：python -m scripts.cli <command> [args...]
 
-每个子命令都是薄封装，实现在 research/ 对应模块的 ``cli.main``。
+因子报告已迁到 ``python -m research.report``；这里只保留 profile 和股票池导出。
 """
 
 from __future__ import annotations
@@ -10,11 +10,8 @@ import importlib
 import sys
 
 COMMANDS = {
-    "factor-report": ("scripts.cli.factor_report", "单因子报告 / 批量报告"),
-    "factor-eval": ("scripts.cli.factor_eval", "批量因子评估（IC/价差/换手）"),
-    "profile": ("scripts.cli.profile", "评估 profile 管理"),
+    "profile": ("scripts.cli.profile", "报告章节 profile 管理"),
     "export-pool": ("scripts.cli.export_pool", "导出股票池"),
-    "verify-equivalence": ("scripts.cli.verify_equivalence", "新旧评估口径等价性回放"),
 }
 
 

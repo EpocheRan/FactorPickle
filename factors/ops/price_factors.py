@@ -195,6 +195,58 @@ def _price_dist(f):
             out[i] = (np.ceil(price / 100.0) * 100.0 - price) / price
     return pd.Series(out, index=close.index)
 
+
+def _tdx_sma(series: pd.Series, n: int, m: int = 1) -> pd.Series:
+    """通达信 SMA(X,N,M)：Y = (M*X + (N-M)*Y_prev) / N。
+
+    等价于 alpha=m/n 的指数加权；用 pandas ``ewm`` 避免逐日 Python 循环。
+    """
+    values = pd.to_numeric(series, errors="coerce")
+    return values.ewm(alpha=float(m) / float(n), adjust=False).mean()
+
+
+def _tdx_ema(series: pd.Series, n: int) -> pd.Series:
+    """通达信 EMA(X,N)：Y = (2*X + (N-1)*Y_prev) / (N+1)。"""
+    values = pd.to_numeric(series, errors="coerce")
+    return values.ewm(alpha=2.0 / (float(n) + 1.0), adjust=False).mean()
+
+
+def zjfz(f: pd.DataFrame) -> pd.Series:
+    """ZJFZ 追击反转的连续值 VAR8（不含红/黄柱颜色条件）。
+
+    源码（通达信副图）::
+
+        VAR2:=REF(LOW,1);
+        VAR3:=SMA(ABS(LOW-VAR2),3,1)/SMA(MAX(LOW-VAR2,0),3,1)*100;
+        VAR4:=EMA(VAR3*10,3);
+        VAR5:=LLV(LOW,13);
+        VAR6:=HHV(VAR4,13);
+        VAR7:=EMA(IF(LOW<=VAR5,(VAR4+VAR6*2)/2,0),3)/618;
+        VAR8:=IF(VAR7>500,500,VAR7);
+
+    红柱：VAR8>1 且 KDJ.J 由跌转升；黄柱：0.1<VAR8<1 且 KDJ.J 由跌转升。
+    本函数只返回 VAR8，颜色条件留给报告/信号层。
+    """
+    low = _col(f, "hfq_low") if "hfq_low" in f.columns else _col(f, "low")
+    low = pd.to_numeric(low, errors="coerce")
+    delta = low - low.shift(1)
+    numerator = _tdx_sma(delta.abs(), 3, 1)
+    denominator = _tdx_sma(delta.clip(lower=0), 3, 1)
+    var3 = (numerator / denominator.replace(0, np.nan) * 100).replace(
+        [np.inf, -np.inf], np.nan
+    )
+    var4 = _tdx_ema(var3 * 10, 3)
+    var5 = low.rolling(13, min_periods=13).min()
+    var6 = var4.rolling(13, min_periods=13).max()
+    raw = pd.Series(
+        np.where(low <= var5, (var4 + var6 * 2) / 2.0, 0.0),
+        index=low.index,
+        dtype="float64",
+    )
+    var7 = _tdx_ema(raw, 3) / 618.0
+    var8 = var7.clip(lower=0.0, upper=500.0)
+    return var8.replace([np.inf, -np.inf], np.nan)
+
 # ---------------------------------------------------------------- Risk
 def _f_return_std(n: int):
     return lambda f: _ret(f).rolling(n, min_periods=max(10, n // 4)).std()
@@ -304,6 +356,11 @@ REVERSAL["small_cap_reversal_21d"] = (
 REVERSAL["rsi"] = (_rsi, 14, "pct")
 REVERSAL["price_dist"] = (_price_dist, 1, "ratio")
 
+#: 不在 `GROUPS` 里的补充算子：保留独立命名/元数据，不混入 86 个价量库因子。
+EXTRA_FACTORS: dict[str, tuple] = {
+    "reversal.zjfz": (zjfz, 13, "ratio"),
+}
+
 RISK["days_beyond_upper_lower_21d"] = (_days_beyond, 21, "days")
 for _n in (21, 42, 63, 126, 252):
     RISK[f"return_std_{_n}d"] = (_f_return_std(_n), _n, "ratio")
@@ -348,10 +405,15 @@ def register_price_ops() -> list[str]:
             factor_id = house_id(category, name)
             factor(factor_id, unit=unit, window=int(window), warmup=int(window))(fn)
             registered.append(factor_id)
+    for factor_id, (fn, window, unit) in EXTRA_FACTORS.items():
+        factor(factor_id, unit=unit, window=int(window), warmup=int(window))(fn)
+        registered.append(factor_id)
     return registered
 
 def lookup(factor_id: str) -> tuple:
     """按**自研 factor_id** 查 (fn, window, unit)。"""
+    if factor_id in EXTRA_FACTORS:
+        return EXTRA_FACTORS[factor_id]
     for category, group in GROUPS.items():
         for name, spec in group.items():
             if house_id(category, name) == factor_id:
@@ -361,6 +423,7 @@ def lookup(factor_id: str) -> tuple:
 __all__ = [
     "ALL_NAMES",
     "CROSS_SECTION_ONLY",
+    "EXTRA_FACTORS",
     "GROUPS",
     "LIQUIDITY",
     "MOMENTUM",
@@ -369,4 +432,5 @@ __all__ = [
     "SIZE",
     "lookup",
     "register_price_ops",
+    "zjfz",
 ]

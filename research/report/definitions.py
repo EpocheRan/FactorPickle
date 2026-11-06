@@ -239,6 +239,36 @@ def describe(factor_id: str) -> Definition:
             economic=econ,
         )
 
+    if category == "reversal" and short == "zjfz":
+        return Definition(
+            factor_id=key,
+            name="ZJFZ追击反转",
+            category=category,
+            formula=(
+                "VAR3=SMA(ABS(LOW-REF(LOW,1)),3,1)/SMA(MAX(LOW-REF(LOW,1),0),3,1)*100；"
+                "VAR4=EMA(VAR3*10,3)；VAR5=LLV(LOW,13)；VAR6=HHV(VAR4,13)；"
+                "VAR7=EMA(IF(LOW<=VAR5,(VAR4+2*VAR6)/2,0),3)/618；VAR8=MIN(VAR7,500)。"
+                "因子值=VAR8；红柱=VAR8>1且KDJ.J由跌转升；黄柱=0.1<VAR8<1且KDJ.J由跌转升。"
+            ),
+            source="ohlcv_1d.high/low/close（后复权）",
+            unit="比值（无量纲）",
+            transform="原值；颜色条件不进入因子值",
+            window=13,
+            direction=1,
+            direction_text=_direction_text(1, category),
+            economic=(
+                "ZJFZ（追击反转）是通达信特色型反转指标：用13周期新低和下跌强度构造 VAR8，"
+                "再用 KDJ.J 拐头给红/黄柱。它捕捉的是超跌后的短线反弹，不是趋势启动；"
+                "在下跌趋势中会反复触发，必须叠加趋势与价格确认。"
+            ),
+            notes=(
+                "本因子只登记连续值 VAR8，红/黄柱是信号层，不是因子值。"
+                "因此报告检验的是“VAR8 的横截面预测力”，不等价于“红柱交易信号”。"
+                "红柱：VAR8>1 且 J_t>J_{t-1} 且 J_{t-1}<J_{t-2}；"
+                "黄柱：0.1<VAR8<1 且同样的 KDJ 条件。"
+            ),
+        )
+
     if category in ("quality", "value", "growth", "valuation"):
         return Definition(
             factor_id=key, name=short or key, category=category,

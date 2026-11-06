@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -21,8 +20,10 @@ import pandas as pd
 
 from data_interface.common.timeutil import now_cn
 
-from . import definitions, diagnostics as diag, metrics, rating as rating_mod, render
-from .db import query as _query  # noqa: F401 - 兼容旧调用点
+from research import profile as profile_mod
+from research.report_sections import validate
+
+from . import definitions, diagnostics as diag, metrics, rating as rating_mod, render, sensitivity
 from .panel import flow_factor_panel, Panel, financial_factor_panel, load_panel, peer_panels, price_factor_panel
 
 logger = logging.getLogger("Research.Report")
@@ -91,8 +92,11 @@ def _slice_to_eval(panel, factor, start: str):
 
 
 def _resolve_panel(factor_id: str, pool_date: str, pool_size: int, start: str,
-                   end: str | None, extras: tuple[str, ...] = ()) -> tuple[Panel, pd.DataFrame]:
-    panel = load_panel(pool_date, pool_size, start, end, extras=extras)
+                   end: str | None, extras: tuple[str, ...] = (),
+                   universe: str | None = None) -> tuple[Panel, pd.DataFrame]:
+    panel = load_panel(
+        pool_date, pool_size, start, end, extras=extras, universe=universe
+    )
     # 同类因子必须在「未切片的全样本面板」上算：切片后的 Panel 只剩评估期的宽表，
     # 长表重建后行情字段会缺失，导致对照组全空、增量性退化成只看规模。
     _peers = None
@@ -124,7 +128,7 @@ def _attach_peers(pair, peers):
 
 def _pool_symbols(panel: Panel, pool_date: str, pool_size: int) -> tuple[str, ...]:
     """按基准日成交额取前 N；代码由 B 模块按日查询（超集只覆盖评估期，不能用它取历史池）。"""
-    from research.eval.data import _pool_codes
+    from research.data.loader import _pool_codes
 
     return tuple(_pool_codes(pool_date, int(pool_size)))
 
@@ -257,12 +261,21 @@ def generate(
     horizon: int = 5,
     groups: int = 5,
     eval_horizon: int | None = None,
+    profile: str = "default",
 ) -> dict:
+    profile_spec = profile_mod.load(profile)
+    sections = validate(profile_spec["items"])
+    need_cross_extra = "cross_section" in sections
+    need_rating = "rating" in sections
+    need_cross_core = need_cross_extra or need_rating
+
     # 批量场景由调用方预加载面板，避免每个因子重复取数
     if panel is None:
         _extras = (("margin_detail", "moneyflow_daily") if factor_id.startswith("sentiment.") else ()) + ("fin_valuation_daily",)
-        panel, factor = _resolve_panel(factor_id, pool_date, pool_size, start, end,
-                                       extras=_extras)
+        panel, factor = _resolve_panel(
+            factor_id, pool_date, pool_size, start, end,
+            extras=_extras, universe=universe,
+        )
     else:
         category = factor_id.split(".", 1)[0]
         factor = (
@@ -276,16 +289,26 @@ def generate(
                 else price_factor_panel(factor_id, panel)
             )
         )
+    n_symbols = len(panel.close.columns)
+    min_symbols = int(groups) * 5
+    if n_symbols < min_symbols:
+        raise ValueError(
+            f"股票池只有 {n_symbols} 只，少于 {groups} 组 × 5 只 = {min_symbols} 只；"
+            "分层/多空/评级无法计算。请扩大 --universe 或减少 --groups。"
+        )
+
+    logger.info("generate: panel ready, factor rows=%s", getattr(factor, "shape", None))
     definition = definitions.describe(factor_id)
     if direction is None:
         direction = definition.direction
-    peers = getattr(panel, "_peers", None) if with_peers else None
-    if peers is None and with_peers:
+    peers = getattr(panel, "_peers", None) if with_peers and need_cross_core else None
+    if peers is None and with_peers and need_cross_core:
         try:
             peers = peer_panels(factor_id, panel)
         except Exception:  # noqa: BLE001
             peers = None
 
+    logger.info("generate: peers ready, building report")
     report = metrics.build_report(
         factor, panel.close, panel.open,
         factor_id=factor_id, category=category or definition.category,
@@ -300,8 +323,25 @@ def generate(
         neutralize=neutralize,
         primary_horizon=horizon,
         groups=groups,
+        sections=sections,
     )
-    if robustness:
+    logger.info("generate: report built, robustness=%s", robustness and need_cross_extra)
+    if need_cross_extra:
+        try:
+            report.sensitivity = sensitivity.compute(
+                panel,
+                factor,
+                groups=groups,
+                horizon=horizon,
+                cost_bps=20.0,
+                start=report.start,
+                end=report.end,
+            )
+            logger.info("generate: sensitivity done")
+        except Exception as exc:  # noqa: BLE001 - 敏感性失败不阻断报告
+            logger.warning("不同样本敏感性计算失败: %s: %s", type(exc).__name__, exc)
+            report.sensitivity = []
+    if robustness and need_cross_extra:
         report.pool_robustness = _pool_robustness(
             factor_id,
             pool_size=pool_size,
@@ -324,18 +364,21 @@ def generate(
     except Exception:  # noqa: BLE001 - 附加层失败不影响主报告正文
         report.extra = None
     score = rating_mod.rate(report)
+    logger.info("generate: rating done, rendering")
 
     run_hash = hashlib.sha1(
-        f"{factor_id}|{start}|{panel.data_cutoff.date()}|{pool_size}|{len(panel.close)}".encode()
+        f"{factor_id}|{start}|{panel.data_cutoff.date()}|{pool_size}|{len(panel.close)}|{profile}".encode()
     ).hexdigest()[:8]
     meta = {
         "generated_at": f"{panel.freshness.get('generated_at', now_cn().strftime('%Y-%m-%d %H:%M:%S'))}"
                         f"（{panel.freshness.get('timezone', 'UTC+8')}）",
         "run_id": run_id or f"{now_cn().strftime('%Y%m%dT%H%M')}_{run_hash}",
         "data_version": f"ohlcv_1d:{panel.data_cutoff.date()}",
+        "profile": profile_spec,
+        "sections": sections,
     }
 
-    html = render.render(report, score, meta)
+    html = render.render(report, score, meta, sections=sections)
     base = Path(out_dir)
     target = base if len(base.name) == 10 and base.name[4] == "-" and base.name[7] == "-" else (
         base / now_cn().date().isoformat()
@@ -345,62 +388,8 @@ def generate(
     html_path = target / f"{safe}.html"
     html_path.write_text(html, encoding="utf-8")
 
-    payload = build_payload(report, score, meta, definition.as_dict(), panel)
-    json_path = target / f"{safe}.json"
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-
     logger.info("报告已生成: %s（评级 %s / %s 分）", html_path, score["grade"], score["score"])
-    return {"html": html_path, "json": json_path, "rating": score, "report": report, "meta": meta}
+    return {"html": html_path, "rating": score, "report": report, "meta": meta}
 
 
-def build_payload(report, score: dict, meta: dict, definition: dict, panel) -> dict:
-    """HTML 与 JSON 必须同源：同一个 ``run_id``、同一组报告对象。"""
-    return {
-        "run_id": meta["run_id"],
-        "generated_at": meta.get("generated_at", ""),
-        "data_version": meta.get("data_version", ""),
-        "factor": report.factor_id,
-        "category": report.category,
-        "family": diag.family_of(report.factor_id),
-        "direction": report.direction,
-        "direction_source": report.direction_source,
-        "definition": definition,
-        "rating": {k: v for k, v in score.items() if k not in ("items", "rules")},
-        "attribution": score.get("attribution") or report.attribution,
-        "diagnostics": [c.as_dict() for c in (report.diagnostics or [])],
-        "checks_status": diag.overall_status(report.diagnostics or []),
-        "ic_stats": report.ic_stats.round(6).to_dict(orient="index"),
-        "ic_half": report.ic_half,
-        "ic_by_year": report.ic_by_year.round(6).to_dict() if report.ic_by_year is not None else {},
-        "ic_neutral": report.ic_neutral.round(6).to_dict(orient="index") if report.ic_neutral is not None else {},
-        "monotonicity": report.monotonicity,
-        "monotonicity_net": report.monotonicity_net,
-        "quantile_returns": report.quantile_returns,
-        "quantile_returns_gross": report.quantile_returns_gross,
-        "spread_gross": report.spread_gross,
-        "spread_net": report.spread_net,
-        "cost_mean": report.cost_mean,
-        "sigma_5d": report.sigma_5d,
-        "transmission": report.transmission,
-        "perf": report.perf,
-        "long_short": report.long_short,
-        "annual_returns": report.annual_returns.round(6).to_dict() if report.annual_returns is not None else {},
-        "tradeability": report.tradeability,
-        "sell_side": report.sell_side,
-        "capacity": report.capacity,
-        "incrementality": {k: v for k, v in report.incrementality.items() if k not in ("peers", "residual")},
-        "warnings": report.warnings,
-        "pool": report.pool,
-        "freshness": report.freshness,
-        "sample": {
-            "start": str(report.start.date()),
-            "end": str(report.end.date()),
-            "n_symbols": report.n_symbols,
-            "n_dates": report.n_dates,
-            "coverage": report.coverage,
-            "universe": report.universe,
-        },
-    }
-
-
-__all__ = ["Panel", "build_payload", "compute_factor", "generate", "load_panel"]
+__all__ = ["Panel", "compute_factor", "generate", "load_panel"]

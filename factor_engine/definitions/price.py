@@ -8,6 +8,7 @@ from typing import Callable
 import pandas as pd
 
 from factors.ops import atr_wilder, pct_change, realized_volatility
+from factors.ops.price_factors import zjfz
 from factors.spec import Dependency, FactorSpec, Materialization, SourceSpec
 from factors.taxonomy import Category
 
@@ -24,6 +25,10 @@ def _momentum(df: pd.DataFrame) -> pd.Series:
 
 def _reversal(df: pd.DataFrame) -> pd.Series:
     return -pct_change(df["hfq_close"], 5)
+
+
+def _zjfz(df: pd.DataFrame) -> pd.Series:
+    return zjfz(df)
 
 
 def _atr(df: pd.DataFrame) -> pd.Series:
@@ -86,6 +91,42 @@ PRICE_FACTORS: tuple[BuiltinFactor, ...] = (
             materialization=Materialization.AUTO,
         ),
         compute=_reversal,
+    ),
+    BuiltinFactor(
+        spec=FactorSpec(
+            factor_id="reversal.zjfz",
+            name="ZJFZ追击反转",
+            category=Category.REVERSAL,
+            subcategory="short",
+            source=SourceSpec(
+                "ohlcv_1d",
+                "questdb",
+                ("high", "low", "close", "adj_factor"),
+                "trade_date",
+            ),
+            window=13,
+            freq="1d",
+            value_kind="daily",
+            update_mode="recursive",
+            unit="ratio",
+            direction="positive",
+            price_basis="hfq",
+            version="v1",
+            source_version_policy="ohlcv_1d",
+            dependencies=(
+                Dependency("raw", "hfq_high"),
+                Dependency("raw", "hfq_low"),
+                Dependency("raw", "hfq_close"),
+            ),
+            warmup=13,
+            formula=(
+                "VAR8=EMA(IF(LOW<=LLV(LOW,13),(VAR4+2*HHV(VAR4,13))/2,0),3)/618; "
+                "red=VAR8>1 & KDJ.J turn; yellow=0.1<VAR8<1 & KDJ.J turn"
+            ),
+            aliases=("zjfz",),
+            materialization=Materialization.INLINE,
+        ),
+        compute=_zjfz,
     ),
     BuiltinFactor(
         spec=FactorSpec(

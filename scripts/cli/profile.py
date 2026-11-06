@@ -18,7 +18,7 @@ import argparse
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -28,11 +28,11 @@ except Exception:  # noqa: BLE001
     pass
 
 from research import profile as profile_mod  # noqa: E402
-from research.eval_items import catalog  # noqa: E402
+from research.report_sections import catalog  # noqa: E402
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="评估 profile 管理")
+    parser = argparse.ArgumentParser(description="报告章节 profile 管理")
     parser.add_argument("--seed", action="store_true", help="把内置 profile 灌进库")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--show", default=None)
@@ -61,7 +61,7 @@ def main() -> int:
 
     if args.show:
         payload = profile_mod.load(args.show)
-        print(f"name={payload['name']} version={payload['version']} source={payload['source']}")
+        print(f"name={payload['name']} source={payload['source']}")
         print(f"items={list(payload['items'])}")
         print(f"reference={payload['reference']}")
         print(f"hash={payload['profile_hash']}")
@@ -85,7 +85,7 @@ def main() -> int:
             reference=reference,
             description=args.description or f"来自 {args.base}",
         )
-        print(f"saved {result['name']} v{result['version']} hash={result['profile_hash']}")
+        print(f"saved {result['name']} hash={result['profile_hash']}")
         return 0
 
     parser.print_help()

@@ -1,22 +1,28 @@
 """统一取数：股票池解析、PIT 成分、面板帧（含可选辅助数据列）。
 
-取数只走 ``research.report.db.query``（唯一 REST 入口），不 import backtest，
-避免报告层与回测层互相绑死。
+取数只走 ``research.data.db.query``，不 import backtest；
+本模块是报告层的数据底座，不再属于 eval 入口。
 """
 
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass
 from typing import Mapping
 
 import numpy as np
 import pandas as pd
 
-from research.report.db import query as _query
+from research.data.db import query as _query
 
-from .spec import EvalSpec
+from .spec import PanelSpec
 
-_CHUNK = 300
+logger = logging.getLogger("Research.Data.Loader")
+
+# 全市场一次拉完，避免 20 次大结果集之间 PG 连接/游标偶发卡死；
+# 内存实测 1,100 万行 + 宽表在 32GB 机器上可承受。
+_CHUNK = 6000
 
 _EXTRA_SQL: dict[str, dict[str, str]] = {
     "margin_detail": {
@@ -122,7 +128,7 @@ def _all_a_codes(start: str, end: str) -> list[str]:
     return sorted(str(code) for code in frame["code"])
 
 
-def _resolve_universe(spec: EvalSpec) -> tuple[list[str], Membership, str]:
+def _resolve_universe(spec: PanelSpec) -> tuple[list[str], Membership, str]:
     text = str(spec.universe).strip()
     if text in ("all_a", "all"):
         return _all_a_codes(spec.start, spec.end or _today()), Membership(), "all_a (whole market)"
@@ -149,12 +155,15 @@ def _load_ohlcv(codes: list[str], start: str, end: str, warmup_days: int) -> pd.
     frames: list[pd.DataFrame] = []
     for offset in range(0, len(codes), _CHUNK):
         chunk = codes[offset : offset + _CHUNK]
+        _t0 = time.time()
         frame = _query(
             "select ts, code, open, high, low, close, volume, amount, turnover, adj_factor "
             f"from ohlcv_1d where type='stock' and code in ({_literal(chunk)}) "
             f"and ts between '{start_ts}' and '{end}'",
             timeout=600,
         )
+        logger.info("ohlcv chunk %d/%d rows=%d %.1fs", offset // _CHUNK + 1,
+                    (len(codes) + _CHUNK - 1) // _CHUNK, len(frame), time.time() - _t0)
         if not frame.empty:
             frames.append(frame)
     if not frames:
@@ -184,16 +193,13 @@ def _apply_listing_filter(frame):
         info = info.set_index("code")
         listed = pd.to_datetime(info["list_date"], errors="coerce")
         delisted = pd.to_datetime(info["delist_date"], errors="coerce")
-        keep = []
-        for symbol, date in zip(frame["symbol"].astype(str), frame["date"]):
-            lo, hi = listed.get(symbol), delisted.get(symbol)
-            if pd.notna(lo) and date < lo:
-                keep.append(False)
-            elif pd.notna(hi) and date > hi:
-                keep.append(False)
-            else:
-                keep.append(True)
-        return frame[pd.Series(keep, index=frame.index)]
+        symbols = frame["symbol"].astype(str)
+        list_date = symbols.map(listed)
+        delist_date = symbols.map(delisted)
+        dates = pd.to_datetime(frame["date"])
+        before_list = list_date.notna() & (dates < list_date)
+        after_delist = delist_date.notna() & (dates > delist_date)
+        return frame[~(before_list | after_delist)]
     except Exception:  # noqa: BLE001
         return frame
 
@@ -209,12 +215,15 @@ def _attach_extras(frame: pd.DataFrame, codes: list[str], start: str, end: str,
         parts: list[pd.DataFrame] = []
         for offset in range(0, len(codes), _CHUNK):
             chunk = codes[offset : offset + _CHUNK]
+            _t0 = time.time()
             part = _query(
                 f"select ts, code, {fields} from {dataset} "
                 f"where code in ({_literal(chunk)}) "
                 f"and ts between '{start_ts}' and '{end}'",
                 timeout=600,
             )
+            logger.info("extra %s chunk %d rows=%d %.1fs", dataset, offset // _CHUNK + 1,
+                        len(part), time.time() - _t0)
             if not part.empty:
                 parts.append(part)
         if not parts:
@@ -253,13 +262,18 @@ def _attach_benchmark(frame, start: str, end: str):
         return frame
 
 
-def load_panel(spec: EvalSpec) -> PanelData:
+def load_panel(spec: PanelSpec) -> PanelData:
     """按统一口径取一次数，供所有因子共用（保证同池、同期、同列）。"""
     end = spec.end or _today()
     codes, membership, label = _resolve_universe(spec)
+    logger.info("panel start universe=%s codes=%d", spec.universe, len(codes))
+    _t0 = time.time()
     frame = _load_ohlcv(codes, spec.start, end, spec.warmup_days)
+    logger.info("ohlcv loaded rows=%d %.1fs", len(frame), time.time() - _t0)
     if spec.extras:
+        _t0 = time.time()
         frame = _attach_extras(frame, codes, spec.start, end, spec.extras)
+        logger.info("extras merged rows=%d %.1fs", len(frame), time.time() - _t0)
 
     # 后复权：以区间末的复权因子为 1（价格水平对齐当前，收益率不受影响）
     factor = frame["adj_factor"].fillna(1.0)

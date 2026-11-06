@@ -543,6 +543,8 @@ class FactorReport:
     rolling_ic: pd.Series | None = None
     ic_by_year: pd.Series | None = None
     ic_by_year_ci: pd.DataFrame | None = None
+    ic_by_month: pd.Series | None = None
+    ic_by_month_ci: pd.DataFrame | None = None
     ic_by_regime: pd.Series | None = None
     regime_stats: pd.DataFrame | None = None
     regime_stats_alt: pd.DataFrame | None = None
@@ -607,6 +609,7 @@ class FactorReport:
     factor_stats: dict = field(default_factory=dict)
     pool: dict = field(default_factory=dict)
     pool_robustness: pd.DataFrame | None = None
+    sensitivity: list[dict] = field(default_factory=list)
     freshness: dict = field(default_factory=dict)
     raw_direction: int = 1
     flipped: bool = False
@@ -982,7 +985,12 @@ def build_report(
     exclude_limit_up: bool = False,
     direction_source: str = "registry",
     full: bool = True,
+    sections: tuple[str, ...] | None = None,
 ) -> FactorReport:
+    sections = tuple(sections or ("definition", "timing", "cross_section", "rating", "appendix"))
+    need_cross_extra = "cross_section" in sections
+    need_rating = "rating" in sections
+    need_cross_core = need_cross_extra or need_rating
     factor = factor.sort_index()
     # 因子面板可能比行情短（预热期被裁掉）。统一裁到因子日期，避免
     # 可成交分母、成本、容量把预热期算进去，也避免 fwd 跨到评估起点之前。
@@ -1096,6 +1104,7 @@ def build_report(
         window = max(20, min(60, len(primary) // 6 or 20))
         report.rolling_ic = primary.rolling(window, min_periods=max(5, window // 3)).mean()
         report.ic_by_year = primary.groupby(primary.index.year).mean()
+        report.ic_by_month = primary.groupby(primary.index.month).mean()
         half = len(primary) // 2
         if half >= 20:
             first, second = primary.iloc[:half], primary.iloc[half:]
@@ -1147,6 +1156,17 @@ def build_report(
             }
         report.ic_by_year_ci = pd.DataFrame(year_rows).T
 
+        month_rows = {}
+        for month, group in primary.groupby(primary.index.month):
+            lo, hi = block_bootstrap_ci(group, block=5)
+            month_rows[int(month)] = {
+                "mean": float(group.mean()),
+                "n": int(len(group)),
+                "ci_lo": lo,
+                "ci_hi": hi,
+            }
+        report.ic_by_month_ci = pd.DataFrame(month_rows).T
+
     nav, turnover_df, period_returns, period_gross, daily, ls_cost, turnover_mean = _quantile_nav(
         analysis_factor, close, open_, groups=groups, horizon=primary_horizon, cost_bps=cost_bps,
         tradeable=mask if exclude_limit_up else None,
@@ -1162,29 +1182,6 @@ def build_report(
         report.cross_section_std = float(_stds.mean()) if _stds.size else float("nan")
     except Exception:  # noqa: BLE001
         report.cross_section_std = float("nan")
-    # 复现自检：用完全相同的因子对象与参数再跑一次，比较结果是否逐点一致。
-    # 必须在内部完成——外部重新推导输入会因中性化/裁剪等变换而失真。
-    try:
-        _again = _quantile_nav(
-            analysis_factor, close, open_, groups=groups, horizon=primary_horizon,
-            cost_bps=cost_bps, tradeable=mask if exclude_limit_up else None,
-        )
-        _pr2, _pg2 = _again[2], _again[3]
-        _left = {
-            "q5_net": float(period_returns["Q5"].mean()),
-            "q1_net": float(period_returns["Q1"].mean()),
-            "mono": diag.group_monotonicity(period_gross.mean())[0],
-        }
-        _right = {
-            "q5_net": float(_pr2["Q5"].mean()),
-            "q1_net": float(_pr2["Q1"].mean()),
-            "mono": diag.group_monotonicity(_pg2.mean())[0],
-        }
-        _check = diag.reproduction_check(_left, _right, list(_left))
-        report.reproduction = _check.as_dict()
-        report._repro_check = _check
-    except Exception as exc:  # noqa: BLE001
-        report.reproduction = {"status": "unavailable", "detail": str(exc)[:120]}
     # 分层 IC：流动性 / 市值 / 行业，全部在已加载宽表上切片
     try:
         _strata: dict[str, pd.DataFrame] = {}
@@ -1316,8 +1313,10 @@ def build_report(
         except Exception as exc:  # noqa: BLE001
             logger.warning("10 日中性化对比失败: %s", exc)
 
-        report.horizon_spreads = pd.DataFrame(_hs_rows)
-        report.filter_test = _filter_test(period_returns, primary_horizon)
+        if need_cross_extra:
+            report.horizon_spreads = pd.DataFrame(_hs_rows)
+        if need_cross_core:
+            report.filter_test = _filter_test(period_returns, primary_horizon)
         if len(net_spread) > 10:
             ls_nav = (1 + net_spread).cumprod()
             report.ls_nav = ls_nav
@@ -1325,7 +1324,8 @@ def build_report(
             report.drawdown = ls_nav / ls_nav.cummax() - 1
             report.perf = _period_performance(net_spread, primary_horizon)
             report.annual_returns = _annual_returns(ls_nav)
-            report.annual_ic_return = _annual_ic_return(report.ic_by_year, report.annual_returns)
+            if need_cross_extra:
+                report.annual_ic_return = _annual_ic_return(report.ic_by_year, report.annual_returns)
             report.long_short = {
                 "total": report.perf.get("total", np.nan),
                 "ann": report.perf.get("ann", np.nan),
@@ -1355,7 +1355,7 @@ def build_report(
         if not bench.empty:
             report.benchmark_nav = bench / bench.iloc[0]
 
-    if full and (market_cap is not None or industry is not None):
+    if need_cross_extra and (market_cap is not None or industry is not None):
         report.ic_neutral = neutralized_ic(
             analysis_factor, fwd[primary_horizon], market_cap, industry
         )
@@ -1363,7 +1363,7 @@ def build_report(
             ind = report.ic_neutral.loc["行业中性", "mean"] if "行业中性" in report.ic_neutral.index else np.nan
             report.industry_neutral_ic = float(ind)
 
-    if market_cap is not None:
+    if need_cross_extra and market_cap is not None:
         ic_by_size = {}
         caps = market_cap.reindex(index=factor.index, columns=factor.columns)
         for label, lo, hi in (("小市值", 0.0, 1 / 3), ("中市值", 1 / 3, 2 / 3), ("大市值", 2 / 3, 1.0)):
@@ -1374,7 +1374,7 @@ def build_report(
                 ic_by_size[label] = float(series.mean())
         report.ic_by_size = pd.Series(ic_by_size) if ic_by_size else None
 
-    if industry is not None:
+    if need_cross_extra and industry is not None:
         industry = industry.reindex(index=factor.index, columns=factor.columns)
         ic_by_ind = {}
         for name in pd.unique(industry.iloc[-1].dropna()):
@@ -1388,17 +1388,9 @@ def build_report(
         if ic_by_ind:
             report.ic_by_industry = pd.Series(ic_by_ind).sort_values(ascending=False)
 
-    ranks = analysis_factor.rank(axis=1, pct=True)
-    autocorrs = []
-    for k in range(1, 21):
-        a, b = ranks.iloc[k:], ranks.iloc[:-k]
-        pair = pd.concat([a.stack(), b.stack()], axis=1).dropna()
-        if len(pair) > 1000:
-            autocorrs.append(pair.iloc[:, 0].corr(pair.iloc[:, 1]))
-    report.autocorr = float(np.nanmean(autocorrs)) if autocorrs else float("nan")
-
-    report.tradeability = _tradeability(factor, close, open_, horizon=primary_horizon, is_st=is_st)
-    if full:
+    if need_cross_extra:
+        report.tradeability = _tradeability(factor, close, open_, horizon=primary_horizon, is_st=is_st)
+    if full and need_cross_extra:
         report.sell_side = _sell_side_summary(
             analysis_factor, close, open_, fwd[primary_horizon], horizon=primary_horizon, groups=groups, is_st=is_st
         )
@@ -1407,6 +1399,7 @@ def build_report(
             tradeable=mask if exclude_limit_up else None,
         )
         report.capacity = _capacity(amount, analysis_factor, primary_horizon, groups) if amount is not None else {}
+    if full and need_cross_core:
         inc, corr = _incremental(analysis_factor, fwd[primary_horizon], peers)
         report.incrementality = inc
         report.peers = corr
@@ -1601,7 +1594,7 @@ def _norm_code(c) -> str:
 
 def _index_series(panel, code):
     try:
-        from research.eval.data import _query
+        from research.data.loader import _query
 
         df = _query(f"select ts, close from ohlcv_1d where code='{code}' and type='idx' order by ts")
         if df is None or df.empty:
@@ -1614,7 +1607,7 @@ def _index_series(panel, code):
 
 def _industry_lookup(panel):
     try:
-        from research.eval.data import _query
+        from research.data.loader import _query
 
         df = _query(
             "select code, last(industry) as name from stock_basic_info "

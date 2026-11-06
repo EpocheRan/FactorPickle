@@ -17,16 +17,15 @@ import pandas as pd
 
 from data_interface.common.timeutil import market_closed_today, now_cn
 
-from .db import query as _query
 
 #: 报告样本池只保留沪深主板/创业板/科创板；北交所 30% 涨跌停与流动性结构不同
 _ALLOWED_PREFIX = ("60", "00", "30", "68")
 
 
-# 取数已迁到 B 模块（research.eval.data），此处保留同名薄封装供旧调用方使用。
-# 必须延迟导入：research.report.db → report.__init__ → runner → panel 存在环。
+# 取数已迁到数据层（research.data.loader），此处保留同名薄封装供旧调用方使用。
+# 必须延迟导入：data.db → report.__init__ → runner → panel 存在环。
 def financial_factor_panel(*args, **kwargs):
-    from research.eval.data import stored_factor_panel
+    from research.data.loader import stored_factor_panel
 
     return stored_factor_panel(*args, **kwargs)
 
@@ -157,7 +156,7 @@ def load_panel(
     universe: str | None = None,
     **kwargs,
 ):
-    """取数委托给唯一的 B 模块（``research.eval.data``）。
+    """取数委托给唯一数据入口（``research.data.loader``）。
 
     本函数不再包含任何 SQL 或选池逻辑；``pool_date/pool_size`` 仅为兼容旧调用签名，
     实际池子由 ``universe``（默认 all_a 全市场）决定。

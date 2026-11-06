@@ -122,6 +122,33 @@ def test_filter_test_positive_q1_is_not_useful():
     assert not out["useful"]
 
 
+def test_sections_skip_cross_section_extras():
+    dates, cols, close, open_, factor = _panel(n_dates=160, n_cols=80)
+    cap = pd.DataFrame(1e9, index=dates, columns=cols)
+    industry = pd.DataFrame(
+        [[f"ind{i % 8}" for i in range(len(cols))]] * len(dates), index=dates, columns=cols
+    )
+    report = metrics.build_report(
+        factor,
+        close,
+        open_,
+        factor_id="momentum.test",
+        direction=1,
+        market_cap=cap,
+        industry=industry,
+        sections=("definition", "timing", "rating"),
+    )
+    assert report.tradeability == {}
+    assert report.sell_side == {}
+    assert report.capacity == {}
+    assert report.horizon_spreads is None
+    assert report.ic_neutral is None
+    assert report.ic_by_size is None
+    assert report.ic_by_industry is None
+    # 评级需要的核心价差仍在，不能因为省略展示章节而丢掉
+    assert report.spread_net
+
+
 def test_build_report_smoke_and_direction_banner_data():
     dates, cols, close, open_, factor = _panel(n_dates=160, n_cols=80)
     cap = pd.DataFrame(1e9, index=dates, columns=cols)

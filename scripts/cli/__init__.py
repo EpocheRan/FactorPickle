@@ -1,1 +1,1 @@
-"""CLI 薄封装集合：只做参数解析与转发，业务逻辑一律在 research/ 下。"""
+"""辅助脚本入口；因子报告入口是 ``python -m research.report``。"""

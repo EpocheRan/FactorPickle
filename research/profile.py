@@ -1,10 +1,9 @@
-"""评估内容（F）：profile 的存取与解析。
+"""报告内容（F）：profile 的存取与解析。
 
-profile 只描述「评估什么」：勾选哪些评估项、每项的参数、判定阈值、参照因子。
-股票池 / 区间 / 成本 / horizon 是运行参数，不属于 profile——同一套 profile 可以
-跑 200 池、中证500、全 A 做横向对比。
+profile 只描述「报告展示哪些章节」；股票池 / 区间 / 成本 / horizon 是运行参数，
+不属于 profile。profile 以 name 为唯一键，不再有版本号。
 
-存储：QuestDB ``eval_profile``（版本化，不覆盖旧版）；DB 不可用时回落到内置默认。
+存储：QuestDB ``eval_profile``（旧表名保留兼容）；DB 不可用时回落到内置默认。
 """
 
 from __future__ import annotations
@@ -14,25 +13,28 @@ import json
 
 import pandas as pd
 
-from research.report.db import query as _query
+from research.report_sections import DEFAULT_SECTIONS, QUICK_SECTIONS, SECTIONS
 
 TABLE = "eval_profile"
+
+
+def _query(sql: str, timeout: int = 60):
+    """延迟导入，避免 profile 与数据层初始化顺序互相牵制。"""
+    from research.data.db import query
+
+    return query(sql, timeout=timeout)
 
 #: 内置 profile：DB 首次初始化时灌入，也是 DB 不可用时的兜底
 BUILTIN: dict[str, dict] = {
     "default": {
-        "description": "深评：单因子 HTML 报告的完整评估项",
-        "items": (
-            "coverage", "ic", "spread", "turnover",
-            "mono", "decay", "assertions", "reference_rho",
-            "stability_by_year", "rating",
-        ),
-        "reference": "liquidity.turnover_std_bias_42_252",
+        "description": "完整单因子报告：定义、时间、空间、评级、附录",
+        "items": DEFAULT_SECTIONS,
+        "reference": "",
     },
     "quick": {
-        "description": "快筛：批量扫描用的最小集合",
-        "items": ("coverage", "ic", "spread", "turnover", "reference_rho"),
-        "reference": "liquidity.turnover_std_bias_42_252",
+        "description": "快筛：定义、时间、评级",
+        "items": QUICK_SECTIONS,
+        "reference": "",
     },
 }
 
@@ -76,16 +78,10 @@ def _latest_rows() -> pd.DataFrame:
 
 
 def seed() -> list[str]:
-    """把内置 profile 灌进库（只灌缺失的 name）。"""
+    """用内置 profile 覆盖同名记录（name 唯一）。"""
     ensure_table()
-    try:
-        existing = {str(row["name"]) for _, row in _latest_rows().iterrows()}
-    except Exception:  # noqa: BLE001
-        existing = set()
     written: list[str] = []
     for name, payload in BUILTIN.items():
-        if name in existing:
-            continue
         save(
             name,
             items=tuple(payload["items"]),
@@ -104,17 +100,19 @@ def load(name: str = "default") -> dict:
         if not rows.empty:
             row = rows.iloc[-1]
             items = tuple(str(x) for x in json.loads(row["items"]))
-            return {
-                "name": str(row["name"]),
-                "version": int(row["version"]),
-                "items": items,
-                "item_params": json.loads(row["item_params"] or "{}"),
-                "thresholds": json.loads(row["thresholds"] or "{}"),
-                "reference": str(row["reference"] or ""),
-                "description": str(row["description"] or ""),
-                "profile_hash": str(row["profile_hash"] or ""),
-                "source": "db",
-            }
+            # 旧库里的 default/quick 还是旧评估项 id；遇到就回落到内置章节。
+            legacy_builtin = name in BUILTIN and not set(items).issubset(SECTIONS)
+            if not legacy_builtin:
+                return {
+                    "name": str(row["name"]),
+                    "items": items,
+                    "item_params": json.loads(row["item_params"] or "{}"),
+                    "thresholds": json.loads(row["thresholds"] or "{}"),
+                    "reference": str(row["reference"] or ""),
+                    "description": str(row["description"] or ""),
+                    "profile_hash": str(row["profile_hash"] or ""),
+                    "source": "db",
+                }
     except Exception:  # noqa: BLE001 - DB 不可用不阻断评估
         pass
     if name in BUILTIN:
@@ -122,7 +120,6 @@ def load(name: str = "default") -> dict:
         items = tuple(payload["items"])
         return {
             "name": name,
-            "version": 0,
             "items": items,
             "item_params": {},
             "thresholds": {},
@@ -143,16 +140,15 @@ def save(
     reference: str = "",
     description: str = "",
 ) -> dict:
-    """写入新版 profile（version = 当前最大 + 1，不覆盖旧版）。"""
+    """按 name 覆盖 profile。
+
+    ``eval_profile`` 的 ``version`` 列是历史遗留列，仅为兼容旧表保留；
+    对外 API 不再暴露版本，name 是唯一逻辑键。
+    """
     ensure_table()
     item_params = item_params or {}
     thresholds = thresholds or {}
-    try:
-        frame = _latest_rows()
-        rows = frame[frame["name"].astype(str) == str(name)]
-        version = int(rows["version"].max()) + 1 if not rows.empty else 1
-    except Exception:  # noqa: BLE001
-        version = 1
+    version = 1  # legacy column, not exposed; latest row by name wins
     digest = _hash(tuple(items), item_params, thresholds, reference)
     now = pd.Timestamp.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000000Z")
     payload = json.dumps(list(items), ensure_ascii=False).replace("'", "''")
@@ -165,7 +161,7 @@ def save(
         f"'{params}', '{limits}', '{reference}', '{digest}', true)",
         timeout=60,
     )
-    return {"name": name, "version": version, "profile_hash": digest}
+    return {"name": name, "profile_hash": digest}
 
 
 def list_profiles() -> pd.DataFrame:
@@ -176,10 +172,12 @@ def list_profiles() -> pd.DataFrame:
     if frame.empty:
         return pd.DataFrame(
             [
-                {"name": name, "version": 0, "items": len(payload["items"]), "source": "builtin"}
+                {"name": name, "items": len(payload["items"]), "source": "builtin"}
                 for name, payload in BUILTIN.items()
             ]
         )
+    if "version" in frame.columns:
+        frame = frame.drop(columns=["version"])
     return frame.assign(source="db")
 
 

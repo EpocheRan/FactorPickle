@@ -1,7 +1,7 @@
-"""报告取数适配器：把 B（``research.eval.data``）的结果转成报告要的 ``Panel``。
+"""报告取数适配器：把数据层（``research.data.loader``）的结果转成报告要的 ``Panel``。
 
 报告层不再自己写 SQL：本模块只做「PanelData → Panel」的字段映射，
-数据获取全部由唯一的 B 模块完成（分块查询，支持 all_a 全市场）。
+数据获取全部由唯一数据入口完成（分块查询，支持 all_a 全市场）。
 """
 
 from __future__ import annotations
@@ -9,8 +9,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from research.eval.data import load_panel as _load_panel_data
-from research.eval.spec import EvalSpec
+from research.data.loader import load_panel as _load_panel_data
+from research.data.spec import PanelSpec
 
 from .panel import Panel
 
@@ -63,7 +63,7 @@ def _market_cap_from_extras(extras: dict, index, columns):
 def _industry_map():
     """东财行业映射（主归属），代码 → 行业名；取数失败返回 None。"""
     try:
-        from research.eval.data import _query
+        from research.data.loader import _query
 
         rows = _query(
             "select code, last(board_name) as name from map_stock_board "
@@ -82,7 +82,7 @@ def _regime_for(dates: pd.DatetimeIndex):
     口径写死在代码里并在报告「数据口径」中标明；取数失败时返回 None（相关小节留空）。
     """
     try:
-        from research.eval.data import _query
+        from research.data.loader import _query
 
         rows = _query(
             "select ts, close from ohlcv_1d "
@@ -117,11 +117,11 @@ def load_panel(
     universe: str | None = None,
     extras: tuple[str, ...] = (),
 ) -> Panel:
-    """唯一取数入口（经 B 模块）；``pool_date/pool_size`` 仅为兼容旧签名。"""
+    """唯一取数入口（经数据层）；``pool_date/pool_size`` 仅为兼容旧签名。"""
     target = universe or DEFAULT_UNIVERSE
     if target == "pool" and pool_date and pool_size:
         target = f"pool:{pool_date}:{int(pool_size)}"
-    spec = EvalSpec(
+    spec = PanelSpec(
         universe=target,
         start=start,
         end=end,

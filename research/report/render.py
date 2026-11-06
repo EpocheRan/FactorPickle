@@ -10,6 +10,7 @@ import pandas as pd
 
 from . import charts
 from . import diagnostics as diag
+from research.report_sections import DEFAULT_SECTIONS, SECTIONS
 
 CSS = """
 :root{
@@ -54,8 +55,12 @@ p{margin:8px 0;}
 .figure .cap{font-size:12px;color:var(--muted);margin-top:8px;}
 .figure .cap b{color:var(--ink);font-weight:600;margin-right:8px;}
 .figure .note{font-size:11.5px;color:var(--faint);margin-top:2px;}
+.table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:10px 0 6px;}
+.table-wrap table{margin:0;}
 table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0 6px;
   font-variant-numeric:tabular-nums;}
+table.wide{font-size:11.5px;}
+table.wide th,table.wide td{padding:5px 5px;}
 .block{min-width:0;}
 table.kv td:nth-child(2),table.kv th:nth-child(2){text-align:left;}
 th,td{padding:7px 8px;border-bottom:1px solid var(--rule);text-align:right;}
@@ -78,11 +83,18 @@ tbody tr:last-child td{border-bottom:1.5px solid var(--ink);}
   font-size:11px;color:var(--faint);display:flex;justify-content:space-between;}
 .tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;color:var(--muted);
   border:1px solid var(--rule);padding:1px 7px;margin-right:6px;}
+@media (max-width: 760px){
+  .page{padding:28px 18px 36px;}
+  table.wide{font-size:10.5px;}
+  table.wide th,table.wide td{padding:4px 3px;}
+}
 @media print{
   body{background:#fff;font-size:11.5px}
   .page{box-shadow:none;margin:0;padding:0 0 12mm;max-width:none}
   h2{page-break-after:avoid}
   .figure,table{page-break-before:auto;page-break-inside:avoid}
+  .table-wrap{overflow:visible;}
+  table.wide{font-size:9.5px;}
 }
 """
 
@@ -193,10 +205,10 @@ def _table(headers, rows, note: str = "") -> str:
         for row in rows
     )
     note_html = f'<div class="note">{_esc(note)}</div>' if note else ""
-    cls = "kv" if len(headers) == 2 else ""
+    cls = "kv" if len(headers) == 2 else ("wide" if len(headers) >= 8 else "")
     return (
-        f'<div class="block"><table class="{cls}"><thead><tr>{head}</tr></thead>'
-        f"<tbody>{body}</tbody></table>{note_html}</div>"
+        f'<div class="block"><div class="table-wrap"><table class="{cls}"><thead><tr>{head}</tr></thead>'
+        f"<tbody>{body}</tbody></table></div>{note_html}</div>"
     )
 
 
@@ -243,7 +255,29 @@ def _direction_banner(report) -> str:
     )
 
 
-def render(report, rating: dict, meta: dict) -> str:
+_SECTION_RE = re.compile(
+    r"<!--REPORT_SECTION:([a-z_]+)-->(.*?)<!--/REPORT_SECTION:\1-->",
+    re.S,
+)
+
+
+def _filter_report_sections(html: str, keep: set[str]) -> str:
+    def replace(match: re.Match[str]) -> str:
+        return match.group(2) if match.group(1) in keep else ""
+
+    return _SECTION_RE.sub(replace, html)
+
+
+def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = None) -> str:
+    sections = tuple(sections or meta.get("sections") or DEFAULT_SECTIONS)
+    section_titles = "、".join(SECTIONS[item].title for item in sections if item in SECTIONS)
+    profile_name = str((meta.get("profile") or {}).get("name") or "default")
+    profile_block = (
+        '<div class="banner"><b>报告范围：</b>'
+        f'profile「{_esc(profile_name)}」；'
+        f'已启用 {len(sections)} 章：{_esc(section_titles)}。'
+        "股票池、区间、horizon、cost 是运行参数，不属于 profile。</div>"
+    )
     stats = report.ic_stats
     primary = 5 if 5 in stats.index else (stats.index[0] if len(stats) else 5)
     row = stats.loc[primary] if primary in stats.index else None
@@ -355,7 +389,35 @@ def render(report, rating: dict, meta: dict) -> str:
                              "显著年份少于 3 年、或显著年份方向不一致时，触发「证据不足」否决；"
                              "不再按同号率降档。")
 
-    # ---------------- 图 2-3：IC 衰减（图注由数据生成）
+    # ---------------- 图 2-3：分月份 IC（1–12 月，跨年合并）
+    monthly_fig = ""
+    if report.ic_by_month is not None and len(report.ic_by_month) > 1:
+        months = [int(m) for m in sorted(report.ic_by_month.index) if 1 <= int(m) <= 12]
+        labels = [f"{m}月" for m in months]
+        values = [float(report.ic_by_month.loc[m]) for m in months]
+        errors = []
+        for month in months:
+            if report.ic_by_month_ci is not None and month in report.ic_by_month_ci.index:
+                rec = report.ic_by_month_ci.loc[month]
+                errors.append((rec["ci_hi"] - rec["ci_lo"]) / 2 if np.isfinite(rec["ci_hi"]) else 0.0)
+            else:
+                errors.append(0.0)
+        svg = charts.bar_chart(
+            labels, values,
+            width=980, height=250,
+            formatter=lambda v: f"{v:+.3f}",
+            errors=errors,
+            caption="",
+        )
+        monthly_fig = _figure(
+            "2-3",
+            "分月份 IC（1–12 月，误差棒为 95% 块自助置信区间）",
+            svg,
+            "注：同一自然月跨年合并，不是月度时间序列；月份差异可能被年份、市场状态和样本结构混杂，"
+            "不能仅凭柱体高低判定季节性。误差棒跨 0 表示该月 IC 与 0 无法区分。",
+        )
+
+    # ---------------- 图 2-4：IC 衰减（图注由数据生成）
     decay_fig = ""
     if report.decay is not None and len(report.decay) > 1:
         points = [(float(h), float(v)) for h, v in report.decay.items()]
@@ -366,7 +428,7 @@ def render(report, rating: dict, meta: dict) -> str:
             x_labels=[f"h={int(h)}" for h in report.decay.index],
             caption="",
         )
-        decay_fig = _figure("2-3", "IC 衰减曲线", svg, f"注：{_esc(report.decay_note)}")
+        decay_fig = _figure("2-4", "IC 衰减曲线", svg, f"注：{_esc(report.decay_note)}")
 
     # ---------------- 图 3-1：分组平均收益（带 95% CI 与 y 轴）
     nav_fig = ""
@@ -1071,6 +1133,37 @@ def render(report, rating: dict, meta: dict) -> str:
     else:
         cost_block = ""
 
+    sens_block = ""
+    if report.sensitivity:
+        sens_rows = [
+            [
+                rec["universe"],
+                f"{int(rec['symbols'])}",
+                f"{rec['avg_names']:.0f}",
+                f"{rec['zero_share']:.1%}",
+                f"{rec['ic']:+.4f}",
+                f"{rec['ic_t']:.1f}" if np.isfinite(rec["ic_t"]) else "—",
+                _pct(rec["g1"], 2),
+                _pct(rec["g5"], 2),
+                _pct(rec["spread_gross"], 2),
+                _pct(rec["spread_net"], 2),
+                f"{rec['turnover']:.1%}" if np.isfinite(rec["turnover"]) else "—",
+            ]
+            for rec in report.sensitivity
+        ]
+        sens_block = (
+            "<h3>因子对不同样本的敏感性</h3>"
+            + _table(
+                ["版本", "股票数", "日均有效", "VAR8=0", "Rank IC", "NW t",
+                 "G1/期", "G5/期", "G5−G1 毛", "G5−G1 净", "换手/期"],
+                sens_rows,
+                "注：ALL=当前报告样本；EX_BSE=排除 BSE；INVESTABLE=排除 BSE/当前 ST、"
+                "上市满 365 天、20 日成交额中位数≥2000 万、价格≥2 元；"
+                "HIGH_LIQ=在 INVESTABLE 内按 20 日成交额每日取前 200。"
+                "ST 使用当前 is_st，不是 PIT，存在前视；四版本使用同一区间、同一持有期、同一成本。",
+            )
+        )
+
     # ---------------- 评级卡
     score_svg = charts.score_bars(rating["items"], width=980, caption="")
     verdict_items = "".join(f"<li>{_esc(v)}</li>" for v in rating["vetoes"]) or "<li>无</li>"
@@ -1173,12 +1266,14 @@ def render(report, rating: dict, meta: dict) -> str:
 </div>
 
 <div class="abstract">{summary}</div>
+{profile_block}
 {_direction_banner(report)}
 <div class="banner"><b>局部评级（必读）：</b>本报告只在「{_esc(report.universe)}」内有效，
 评级与分数<b>禁止跨家族比较</b>；
-的等级线不能直接对比。家族内相对位置见 library 汇总。</div>
+不同家族的等级线不能直接对比。家族内相对位置见 library 汇总。</div>
 <div class="kpis">{kpis}</div>
 
+<!--REPORT_SECTION:definition-->
 <h2><span class="no">01</span>因子定义与样本</h2>
 <p>本报告先回答「因子是什么」，再评估<b>预测力</b>（时间维度）与<b>区分度</b>（空间维度），
 并对可交易性、容量与增量性做独立检验。所有收益均按「T 日收盘出信号、T+1 开盘买入」的
@@ -1195,12 +1290,15 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 {robust_block}
 {meta_table}
 
+<!--/REPORT_SECTION:definition-->
+<!--REPORT_SECTION:timing-->
 <h2><span class="no">02</span>时间维度：因子何时有效</h2>
 <div class="lead">{lead_02}</div>
 <p>时间维度回答三个问题：<b>信号是否持续存在</b>（IC 均值、置信区间与两类 t 值）、
 <b>是否跨周期稳定</b>（分年、分市场状态）、<b>衰减速度多快</b>（持有期曲线）。</p>
 {rolling_fig}
 {yearly_fig}
+{monthly_fig}
 {decay_fig}
 <h3>分市场状态 IC（含置信区间）</h3>
 {_table(["市场状态", "天数", "IC（h=%d）" % primary, "95% CI", "NW t"],
@@ -1229,6 +1327,8 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 <p class="small">{_esc(sig_note)}</p>
 {regime_alt_block}
 
+<!--/REPORT_SECTION:timing-->
+<!--REPORT_SECTION:cross_section-->
 <h2><span class="no">03</span>空间维度：因子在谁身上有效</h2>
 <div class="lead">{lead_03}</div>
 <p>空间维度检验横截面区分能力：分层是否单调、多空是否有经济意义、
@@ -1246,7 +1346,10 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 {trade_block}
 {sell_block}
 {cost_block}
+{sens_block}
 
+<!--/REPORT_SECTION:cross_section-->
+<!--REPORT_SECTION:rating-->
 <h2><span class="no">04</span>评级与定位</h2>
 <div class="verdict">
     <h3>结论：{_esc(rating['grade'])} 级 · {_esc(rating['quadrant'])}</h3>
@@ -1292,6 +1395,8 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
       否则即使 IC 显著，也不足以覆盖交易成本。</li>
 </ul>
 
+<!--/REPORT_SECTION:rating-->
+<!--REPORT_SECTION:appendix-->
 <h2><span class="no">05</span>附录：指标明细与方法</h2>
 <div class="lead"><b>本节结论：</b>持有期明细同时给 NW-t 与独立 t；所有统计逐日计算、不做全样本池化；
 已知局限见文末。</div>
@@ -1311,6 +1416,7 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 ⑥ 数据截止日之后的信息未进入报告，实盘使用前需滚动更新。
 </p>
 
+<!--/REPORT_SECTION:appendix-->
 <div class="footer">
   <div><span class="tag">RUN</span>{_esc(meta.get('run_id', ''))}
        <span class="tag">DATA</span>{_esc(meta.get('data_version', ''))}</div>
@@ -1318,6 +1424,7 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 </div>
 
 </div></body></html>"""
+    html = _filter_report_sections(html, set(sections))
     # 空因子/数据不足时，各表直接用 f-string 会留下 +nan% / nan；
     # 统一在出口清洗，保证「数据不足」报告仍然可读。
     html = html.replace("nan%", "—")

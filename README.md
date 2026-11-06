@@ -46,7 +46,7 @@ MCPserver ── 统一工具出口（http / sse / stdio）
 | `data_interface/` | 行情 / 财务 / 资金 / 情绪 / 板块读写与复权 | `data_interface.api.*` |
 | `factors/` | 因子定义、时序与横截面算子 | `from factors import F` |
 | `factor_engine/` | 因子物化、宽表、审计与对账 | `python -m factor_engine` |
-| `research/` | 统一评估：评估项目录（G）+ profile（F）+ 报告（E）；默认全市场 | `python scripts/cli/factor_report.py` / `scripts/cli/factor_eval.py` / `scripts/cli/profile.py` |
+| `research/` | 统一报告：profile 章节 + 单因子 HTML；默认全市场 | `python -m research.report` / `python -m scripts.cli profile` |
 | `screener/` | 因子筛股、基线、停牌与覆盖检查 | `python -m screener` |
 | `backtest/` | 单股 / 横截面回测、执行规则、账本 | `python -m backtest` |
 | `strategies/` | 策略基类、universe、weighting、模型 | `python -m backtest list` |
@@ -101,7 +101,11 @@ python -m acquisition run --datasets ohlcv_1d,factors,screener
 - **市场与品种**：`market` 是交易所（`SSE` / `SZSE` / `BSE`），`type` 是品种（`stock` / `etf` / `lof` / `fund` / `idx`）。
 - **时点正确**：财务按 `publish_date` 过滤，板块成分按 `as_of` 取最近整组快照。
 - **写入边界**：raw 表只由 `data_interface` 写，因子表只由 `factor_engine` 写。
-- **评估单一入口**：因子「行不行」只认 `research.eval_items` 的评估项 + `eval_profile` 里的 profile；报告层不取数（取数唯一入口是 `research/eval/data.py`）。
+- **报告单一入口**：因子报告只认 `research.report`；报告章节由 `eval_profile` 里的 profile 决定。取数唯一入口仍是 `research/eval/data.py`（底层保留，不再有 eval CLI）。
+- **因子报告唯一入口**：只用 `python -m research.report`。默认 `all_a` 全市场、`2017-01-01` 至 `2026-11-01`、`default` profile、5 日持有；股票池只用 `--universe`（`all_a` / `index:...` / `pool:date:size`），不再使用 `--pool/--pool-date`；只输出 HTML。禁止另写自定义报告脚本或临时 Panel。
+- **profile 即报告章节**：`default` 包含定义、时间、空间、评级、附录五章；`quick` 只含定义、时间、评级。`research.eval` 已移除，数据/面板参数在 `research.data`。
+- **策略回测入口**：`python -m backtest`（已存在，不要改 `backtest/reporting`）。
+- **profile 唯一键**：profile 以 `name` 唯一，不设版本号；股票池、区间、horizon、cost 都是 run parameter，不写进 profile。
 
 完整字段、分区与迁移说明见 [docs/design/](docs/design/) 与 [docs/data/coverage.md](docs/data/coverage.md)。
 

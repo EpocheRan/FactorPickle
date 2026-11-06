@@ -20,6 +20,9 @@ _RULES: tuple[tuple[str, int], ...] = (
     ("liquidity.amount_ma", -1),
     ("liquidity.sum_abs_rtn_amount", -1),
     ("liquidity.volume_alpha", +1),
+    # ZJFZ 的 VAR8 越高 = 超跌反转信号越强，与“过去涨幅越高越反转”的
+    # reversal 族先验方向相反，必须单独覆盖。
+    ("reversal.zjfz", +1),
     ("reversal.", -1),
     ("risk.vol_", -1),
     ("risk.return_std", -1),
