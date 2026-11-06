@@ -65,13 +65,29 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 | 02 | `data_interface` | 统一数据访问：行情/财务/资金流/情绪/板块/披露 + 工具封装 | [02-data-interface.md](modules/02-data-interface.md) |
 | 03 | `factors` | 纯计算层：因子定义（DAG）、算子、横截面变换、面板构建 | [03-factors.md](modules/03-factors.md) |
 | 04 | `factor_engine` | 因子物化层：注册表、批量计算、长表落库、审计 | [04-factor-engine.md](modules/04-factor-engine.md) |
-| 05 | `research` | 因子研究报告：IC/分层/评级/可视化/评分卡入库 | [05-research.md](modules/05-research.md) |
+| 05 | `research` | 因子报告：profile 章节、IC/分层/评级、样本敏感性、Panel 缓存 | [05-research.md](modules/05-research.md) |
 | 06 | `screener` | 选股：快照构建、条件筛选、覆盖率与断点 | [06-screener.md](modules/06-screener.md) |
 | 07 | `backtest` | 回测：RQAlpha 引擎 + A 股规则 + 横截面执行 | [07-backtest.md](modules/07-backtest.md) |
 | 08 | `strategies` | 策略基类：单标的/横截面、股票池、权重、上下文 | [08-strategies.md](modules/08-strategies.md) |
 | 09 | `position` | 持仓管理：组合/持仓/交易记录、成本与风控模式 | [09-position.md](modules/09-position.md) |
 | 10 | `scripts` | 运维脚本：回填、修复、报告、评分卡、方向校准 | [10-scripts.md](modules/10-scripts.md) |
 | 11 | `MCPserver` | MCP 工具服务器：注册各模块工具、传输与生命周期 | [11-mcp-server.md](modules/11-mcp-server.md) |
+
+### 当前因子报告口径
+
+```text
+唯一入口：python -m research.report
+默认：all_a / 2017-01-01 至 2026-11-01 / default profile / 5 日 / 20bp
+输出：只输出 HTML
+股票池：--universe all_a | index:... | pool:date:size
+```
+
+- profile 只描述报告章节：`default` 五章，`quick` 三章；
+- `eval_profile` 以 name 唯一，不设版本号；
+- Panel 缓存：`output/cache/research_panel/`，`--no-cache` 强制重建；
+- 空间维度含 `ALL / EX_BSE / INVESTABLE / HIGH_LIQ` 样本敏感性；
+- 时间维度含分月份 IC；
+- `research.eval` 独立 CLI 已移除，数据层在 `research.data`。
 
 ## 四、文档索引
 
@@ -109,6 +125,7 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 | [notes/20261101_backfill_results.md](notes/20261101_backfill_results.md) | 补数结果与问题复盘：六域覆盖、11 个坑 |
 | [notes/20261031_eval_architecture_v3.md](notes/20261031_eval_architecture_v3.md) | 评估体系 v3：全市场默认、评估项化、报告层零 SQL、170s |
 | [notes/20261031_eval_items_p1_p4.md](notes/20261031_eval_items_p1_p4.md) | 评估项化改造 P1–P4：item 目录、profile 存库、报告只增不减 |
+| [notes/20261106_report_profile_cache.md](notes/20261106_report_profile_cache.md) | 因子报告收敛：唯一 CLI、profile 章节、Panel 缓存、四样本敏感性、分月 IC |
 | [notes/20261030_drop_retired_tables.sql](notes/20261030_drop_retired_tables.sql) | 已删除的 5 张退役表回滚 SQL |
 
 ### 4.4 图谱

@@ -85,6 +85,12 @@ def make_service(frame=None):
     return FactorEngineService(store=store, data=data, config={}), store, data
 
 
+def test_risk_band_break_direction_is_negative():
+    from factors.direction import direction_of
+
+    assert direction_of("risk.band_break_21d") == -1
+
+
 def test_zjfz_is_registered_as_inline_builtin():
     from factors.direction import direction_of
 

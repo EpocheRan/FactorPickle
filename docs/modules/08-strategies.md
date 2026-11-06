@@ -25,7 +25,7 @@
 | `context.py` | `StrategyContext`（下单 API）、`PanelView`（因子视图）、`OrderIntent` |
 | `universe.py` | `UniverseSpec`（explicit/all_a/index）、`Rebalance` |
 | `weighting.py` | `EqualWeight` / `ScoreWeight` / `InverseVolWeight` / `CappedWeight` |
-| `models/*.py` | 示例策略：`atr_trend.py`、`rank_mom20.py` |
+| `models/*.py` | 示例策略：`atr_trend.py`、`rank_mom20.py`、`band_turnover_combo.py` 等 |
 
 ### 1.4 数据流
 
@@ -37,6 +37,33 @@ load STRATEGY
    │    single: on_bar(symbol, ctx)
    │    cross : rank() → 选股 → weights() → 调仓意图
    └─ 订单交给引擎撮合
+```
+
+### 1.5 内置策略示例
+
+| 策略 | 类型 | 说明 |
+|---|---|---|
+| `atr_trend.py` | single | 单标的 ATR 趋势 |
+| `rank_mom20.py` | cross | 20 日动量横截面 |
+| `factor_rank.py` | cross | 任意已注册因子 + 方向参数 |
+| `band_turnover_combo.py` | cross | `risk.band_break_21d` + `liquidity.turnover_std_bias_21_504`，横截面百分位合成 |
+| `small_cap_turnover_rsrs.py` | cross | 小市值 + 换手偏离 + RSRS |
+| `turnover_rsrs_combo.py` | cross | 换手偏离 + RSRS |
+
+`band_turnover_combo` 默认：
+
+```text
+2017-11-01 成交额前 200 池
+月末调仓
+top_n=20 / buffer=5
+band_weight=0.5
+```
+
+两因子方向都来自族先验：
+
+```text
+risk.band_break_21d                 -1
+liquidity.turnover_std_bias_21_504  -1
 ```
 
 ## 2. 核心类与方法
@@ -68,14 +95,11 @@ class RankMom20(CrossSectionStrategy):
         return [F.mom(20), F.vol(20)]
 
     def rank(self, panel, dt):
-        """panel: 因子面板视图；返回 (scores, selected)。"""
+        """返回 date × symbol 的横截面分数；框架负责选股与下单。"""
         scores = panel.at(dt)["mom20"].dropna()
-        selected = scores.sort_values(ascending=False).head(self.params["top_n"]).index.tolist()
-        return scores, selected
+        return scores
 
-    def weights(self, panel, scores, selected):
-        n = len(selected)
-        return {code: 1.0 / n for code in selected} if n else {}
+    # 选股/权重由 CrossSectionStrategy + Weighting 统一完成
 
 STRATEGY = RankMom20      # loader 找的就是这个变量
 ```
