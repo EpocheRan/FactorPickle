@@ -6,13 +6,18 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
 
 from research.data.loader import load_panel as _load_panel_data
 from research.data.spec import PanelSpec
 
+from . import panel_cache
 from .panel import Panel
+
+logger = logging.getLogger("Research.Report.PanelAdapter")
 
 #: 报告默认池子：全市场（可用 ``--universe`` 覆盖）
 DEFAULT_UNIVERSE = "all_a"
@@ -116,11 +121,47 @@ def load_panel(
     warmup_days: int = 800,
     universe: str | None = None,
     extras: tuple[str, ...] = (),
+    use_cache: bool = True,
 ) -> Panel:
-    """唯一取数入口（经数据层）；``pool_date/pool_size`` 仅为兼容旧签名。"""
+    """带本地缓存的唯一取数入口。"""
     target = universe or DEFAULT_UNIVERSE
     if target == "pool" and pool_date and pool_size:
         target = f"pool:{pool_date}:{int(pool_size)}"
+    version = panel_cache.data_version(extras) if use_cache else ""
+    cache_key = panel_cache.key(
+        universe=target, start=start, end=end, warmup_days=warmup_days,
+        extras=extras, min_amount=min_amount, max_amount=max_amount,
+        version=version,
+    ) if version else ""
+    cache_path = panel_cache.CACHE_DIR / f"{cache_key}.pkl" if cache_key else None
+    if cache_path is not None and cache_path.exists():
+        cached = panel_cache.read(cache_path)
+        if isinstance(cached, Panel):
+            logger.info("Panel 缓存命中: %s", cache_path)
+            return cached
+    panel = _build_panel(
+        pool_date, pool_size, start, end,
+        min_amount=min_amount, max_amount=max_amount, warmup_days=warmup_days,
+        universe=universe, extras=extras, target=target,
+    )
+    if cache_path is not None:
+        panel_cache.write(cache_path, panel)
+    return panel
+
+
+def _build_panel(
+    pool_date: str | None,
+    pool_size: int | None,
+    start: str,
+    end: str | None,
+    *,
+    min_amount: float | None,
+    max_amount: float | None,
+    warmup_days: int,
+    universe: str | None,
+    extras: tuple[str, ...],
+    target: str,
+) -> Panel:
     spec = PanelSpec(
         universe=target,
         start=start,

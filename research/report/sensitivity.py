@@ -77,6 +77,38 @@ def _one(
     }
 
 
+def baseline_from_report(report, factor: pd.DataFrame) -> dict:
+    """把主报告已经算好的 ALL 结果转成敏感性表的第一行。"""
+    stats = report.ic_stats
+    primary = 5 if 5 in stats.index else (stats.index[0] if len(stats) else None)
+    row = stats.loc[primary] if primary is not None else None
+    gross = report.quantile_returns_gross or {}
+    net = report.quantile_returns or {}
+    turnover = (
+        float(report.turnover_by_group.mean())
+        if getattr(report, "turnover_by_group", None) is not None
+        and len(report.turnover_by_group) else float(report.turnover)
+    )
+    finite = factor.notna().sum().sum()
+    zeros = (factor == 0).sum().sum()
+    q_keys = sorted(
+        gross, key=lambda k: int(k[1:]) if str(k).startswith("Q") and str(k)[1:].isdigit() else 0
+    )
+    return {
+        "universe": "ALL",
+        "symbols": int(report.n_symbols),
+        "avg_names": float(report.n_symbols * report.coverage),
+        "zero_share": float(zeros / finite) if finite else float("nan"),
+        "ic": float(row["mean"]) if row is not None else float("nan"),
+        "ic_t": float(row["t"]) if row is not None else float("nan"),
+        "g1": float(gross.get("Q1", np.nan)),
+        "g5": float(gross.get(q_keys[-1], np.nan)) if q_keys else float("nan"),
+        "spread_gross": float((report.spread_gross or {}).get("mean", np.nan)),
+        "spread_net": float((report.spread_net or {}).get("mean", np.nan)),
+        "turnover": turnover,
+    }
+
+
 def compute(
     panel,
     factor: pd.DataFrame,
@@ -87,6 +119,7 @@ def compute(
     high_liquidity_n: int = 200,
     start=None,
     end=None,
+    baseline: dict | None = None,
 ) -> list[dict]:
     """返回四个版本的 IC / 分组收益 / 价差 / 换手。"""
     dates = factor.index
@@ -105,6 +138,7 @@ def compute(
     is_st = (meta["is_st"].reindex(codes).fillna(False).astype(bool)
              if "is_st" in meta else pd.Series(False, index=codes))
     list_date = (pd.to_datetime(meta["list_date"].reindex(codes), errors="coerce")
+                 .dt.tz_localize(None)
                  if "list_date" in meta else pd.Series(pd.NaT, index=codes))
 
     bse = (markets == "BSE") | pd.Series(codes.str.startswith(("4", "8", "9")), index=codes)
@@ -130,9 +164,11 @@ def compute(
     all_cols = list(close.columns)
     b_cols = [c for c in close.columns if not bool(bse.get(c, False))]
 
-    out = [
+    out = [baseline] if baseline is not None else [
         _one("ALL", signal=signal, forward=forward, close=close, open_=open_,
              groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=None),
+    ]
+    out += [
         _one("EX_BSE", signal=signal[b_cols], forward=forward[b_cols],
              close=close[b_cols], open_=open_[b_cols],
              groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=None),

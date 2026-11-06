@@ -93,9 +93,11 @@ def _slice_to_eval(panel, factor, start: str):
 
 def _resolve_panel(factor_id: str, pool_date: str, pool_size: int, start: str,
                    end: str | None, extras: tuple[str, ...] = (),
-                   universe: str | None = None) -> tuple[Panel, pd.DataFrame]:
+                   universe: str | None = None,
+                   use_cache: bool = True) -> tuple[Panel, pd.DataFrame]:
     panel = load_panel(
-        pool_date, pool_size, start, end, extras=extras, universe=universe
+        pool_date, pool_size, start, end, extras=extras, universe=universe,
+        use_cache=use_cache,
     )
     # 同类因子必须在「未切片的全样本面板」上算：切片后的 Panel 只剩评估期的宽表，
     # 长表重建后行情字段会缺失，导致对照组全空、增量性退化成只看规模。
@@ -262,6 +264,7 @@ def generate(
     groups: int = 5,
     eval_horizon: int | None = None,
     profile: str = "default",
+    use_cache: bool = True,
 ) -> dict:
     profile_spec = profile_mod.load(profile)
     sections = validate(profile_spec["items"])
@@ -274,7 +277,7 @@ def generate(
         _extras = (("margin_detail", "moneyflow_daily") if factor_id.startswith("sentiment.") else ()) + ("fin_valuation_daily",)
         panel, factor = _resolve_panel(
             factor_id, pool_date, pool_size, start, end,
-            extras=_extras, universe=universe,
+            extras=_extras, universe=universe, use_cache=use_cache,
         )
     else:
         category = factor_id.split(".", 1)[0]
@@ -336,10 +339,11 @@ def generate(
                 cost_bps=20.0,
                 start=report.start,
                 end=report.end,
+                baseline=sensitivity.baseline_from_report(report, factor),
             )
             logger.info("generate: sensitivity done")
         except Exception as exc:  # noqa: BLE001 - 敏感性失败不阻断报告
-            logger.warning("不同样本敏感性计算失败: %s: %s", type(exc).__name__, exc)
+            logger.exception("不同样本敏感性计算失败: %s: %s", type(exc).__name__, exc)
             report.sensitivity = []
     if robustness and need_cross_extra:
         report.pool_robustness = _pool_robustness(

@@ -147,16 +147,25 @@ def block_bootstrap_ci(
     return float(np.quantile(means, alpha / 2)), float(np.quantile(means, 1 - alpha / 2))
 
 
-def _rank_ic_frame(factor: pd.DataFrame, fwd: pd.DataFrame, min_names: int = 20) -> pd.Series:
+def _rank_ic_frame(
+    factor: pd.DataFrame,
+    fwd: pd.DataFrame,
+    min_names: int = 20,
+    *,
+    factor_rank: pd.DataFrame | None = None,
+) -> pd.Series:
     """逐日 Spearman 秩相关（全向量化）。
 
-    先对整表按行求秩（pandas C 实现），再用 numpy 行内中心化算相关系数，
-    避免逐日 Python 循环——原实现 98 次调用累计 73 秒，是报告的主要瓶颈。
+    ``factor_rank`` 可由调用方缓存；同一 signal 对 1/5/10/20 日只排一次。
     """
     common = factor.columns.intersection(fwd.columns)
     if len(common) == 0:
         return pd.Series(dtype="float64")
-    a = factor[common].rank(axis=1)
+    a = (
+        factor_rank[common].reindex(index=factor.index)
+        if factor_rank is not None
+        else factor[common].rank(axis=1)
+    )
     b = fwd[common].reindex(index=factor.index).rank(axis=1)
     mask = a.notna() & b.notna()
     a = a.where(mask)
@@ -303,6 +312,26 @@ def neutralized_ic(
 
 
 # ---------------------------------------------------------------- 组合净值
+@dataclass(frozen=True)
+class QuantileResult:
+    nav: pd.DataFrame
+    turnover_df: pd.DataFrame
+    periods_net: pd.DataFrame
+    periods_gross: pd.DataFrame
+    daily: pd.DataFrame
+    ls_cost: pd.Series
+    turnover_mean: pd.Series
+
+    def __iter__(self):
+        return iter((
+            self.nav, self.turnover_df, self.periods_net, self.periods_gross,
+            self.daily, self.ls_cost, self.turnover_mean,
+        ))
+
+    def __getitem__(self, item):
+        return tuple(self)[item]
+
+
 def _quantile_nav(
     factor: pd.DataFrame,
     close: pd.DataFrame,
@@ -312,7 +341,7 @@ def _quantile_nav(
     horizon: int,
     cost_bps: float = 20.0,
     tradeable: pd.DataFrame | None = None,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+) -> QuantileResult:
     """分组等权组合：日度净值 + 每期收益（毛/净）+ 日收益 + 换手。
 
     成本口径：``cost_bps`` 为**单腿往返**费率（买+卖），按该组换手率摊在调仓日：
@@ -398,11 +427,14 @@ def _quantile_nav(
             period_dates.append(dt)
         i += horizon
     turnover_df = pd.DataFrame(turnover_rows, index=period_dates)
-    return (
-        nav.ffill(), turnover_df,
-        pd.DataFrame(periods_net, index=period_dates),
-        pd.DataFrame(periods_gross, index=period_dates),
-        daily, ls_cost, turnover_df.mean(),
+    return QuantileResult(
+        nav=nav.ffill(),
+        turnover_df=turnover_df,
+        periods_net=pd.DataFrame(periods_net, index=period_dates),
+        periods_gross=pd.DataFrame(periods_gross, index=period_dates),
+        daily=daily,
+        ls_cost=ls_cost,
+        turnover_mean=turnover_df.mean(),
     )
 
 
@@ -1043,6 +1075,7 @@ def build_report(
     report.raw_direction = int(direction)
     report.direction_source = direction_source
     report.flipped = False
+    factor_rank = analysis_factor.rank(axis=1)
 
     valid_values = factor.to_numpy(dtype="float64")
     finite = valid_values[np.isfinite(valid_values)]
@@ -1064,8 +1097,10 @@ def build_report(
     report.limit_up = {
         "applied": bool(exclude_limit_up),
         "excluded_ratio": float((~mask).to_numpy().mean()),
-        "ic_raw": float(_rank_ic_frame(analysis_factor, fwd_raw[primary_horizon]).mean()),
-        "ic_masked": float(_rank_ic_frame(analysis_factor, fwd[primary_horizon]).mean()),
+        "ic_raw": float(_rank_ic_frame(analysis_factor, fwd_raw[primary_horizon],
+                                       factor_rank=factor_rank).mean()),
+        "ic_masked": float(_rank_ic_frame(analysis_factor, fwd[primary_horizon],
+                                          factor_rank=factor_rank).mean()),
     }
 
     # 横截面收益离散度：IC 传导到 Q5−Q1 的分母（报告里不再写死 7%）
@@ -1075,7 +1110,7 @@ def build_report(
 
     rows = []
     for h in horizons:
-        series = _rank_ic_frame(analysis_factor, fwd[h])
+        series = _rank_ic_frame(analysis_factor, fwd[h], factor_rank=factor_rank)
         report.ic[h] = series
         if series.empty:
             continue
@@ -1167,10 +1202,11 @@ def build_report(
             }
         report.ic_by_month_ci = pd.DataFrame(month_rows).T
 
-    nav, turnover_df, period_returns, period_gross, daily, ls_cost, turnover_mean = _quantile_nav(
+    quantile = _quantile_nav(
         analysis_factor, close, open_, groups=groups, horizon=primary_horizon, cost_bps=cost_bps,
         tradeable=mask if exclude_limit_up else None,
     )
+    nav, turnover_df, period_returns, period_gross, daily, ls_cost, turnover_mean = quantile
     try:
         import warnings as _w
 
@@ -1396,7 +1432,7 @@ def build_report(
         )
         report.cost_table = _cost_sensitivity(
             analysis_factor, close, open_, groups=groups, horizon=primary_horizon,
-            tradeable=mask if exclude_limit_up else None,
+            tradeable=mask if exclude_limit_up else None, quantile=quantile,
         )
         report.capacity = _capacity(amount, analysis_factor, primary_horizon, groups) if amount is not None else {}
     if full and need_cross_core:
@@ -1558,18 +1594,27 @@ def _cost_sensitivity(
     groups: int,
     horizon: int,
     tradeable: pd.DataFrame | None,
+    quantile: QuantileResult | None = None,
 ) -> pd.DataFrame:
+    # 分组和毛收益与 bps 无关；一次分组即可，后续只按换手派生不同成本。
+    q = quantile or _quantile_nav(
+        factor, close, open_, groups=groups, horizon=horizon, cost_bps=0.0,
+        tradeable=tradeable,
+    )
+    turnover_df = q.turnover_df
+    periods_gross = q.periods_gross
+    q_hi = f"Q{groups}"
+    gross_spread = (
+        periods_gross.get(q_hi, pd.Series(dtype="float"))
+        - periods_gross.get("Q1", pd.Series(dtype="float"))
+    )
+    legs_turnover = (
+        turnover_df.get(q_hi, pd.Series(dtype="float"))
+        + turnover_df.get("Q1", pd.Series(dtype="float"))
+    )
     rows = {}
     for bps in (0.0, 10.0, 20.0, 30.0, 50.0):
-        _, turnover_df, _, periods_gross, _, _, _ = _quantile_nav(
-            factor, close, open_, groups=groups, horizon=horizon, cost_bps=bps, tradeable=tradeable
-        )
-        spread = (
-            periods_gross.get(f"Q{groups}", pd.Series(dtype="float"))
-            - periods_gross.get("Q1", pd.Series(dtype="float"))
-            - (turnover_df.get(f"Q{groups}", pd.Series(dtype="float"))
-               + turnover_df.get("Q1", pd.Series(dtype="float"))) * bps / 10000.0
-        ).dropna()
+        spread = (gross_spread - legs_turnover * bps / 10000.0).dropna()
         perf = _period_performance(spread, horizon)
         rows[f"{bps:.0f}bp"] = {
             "ann": perf.get("ann", np.nan),

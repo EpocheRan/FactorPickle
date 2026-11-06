@@ -34,6 +34,8 @@ python -m research.report --factor reversal.zjfz --start 2022-01-05 --end 2026-1
 - `profile` 只描述“报告展示哪些章节”，股票池、区间、horizon、cost 都是运行参数；
 - `rating` 是依赖项：选了 `rating` 仍会算时间/空间的核心指标（IC、价差、单调性、换手、增量性），但 `cross_section` 特有的中性化、容量、卖出端、多空明细等重计算会跳过；
 - 分层组合至少需要 `groups × 5` 只股票（默认 5 组 = 25 只）；不足会直接报错，不再输出空白章节；
+- 全市场报告慢时加 `--no-robustness`：跳过多池稳健性重算（主报告不受影响）；
+- Panel 默认缓存到 `output/cache/research_panel/`；数据截止日、universe、extras 或 schema 变化会自动失效；`--no-cache` 强制重建；
 - profile 以 `name` 为唯一键，**没有版本号**。
 
 ## 辅助脚本

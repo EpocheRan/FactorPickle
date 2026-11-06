@@ -122,6 +122,30 @@ def test_filter_test_positive_q1_is_not_useful():
     assert not out["useful"]
 
 
+def test_rank_ic_cached_factor_rank_matches():
+    dates, cols, close, open_, factor = _panel(n_dates=80, n_cols=40)
+    fwd = close.shift(-5) / open_.shift(-1) - 1
+    plain = metrics._rank_ic_frame(factor, fwd)
+    cached = metrics._rank_ic_frame(factor, fwd, factor_rank=factor.rank(axis=1))
+    pd.testing.assert_series_equal(plain, cached)
+
+
+def test_quantile_result_unpack_and_cost_reuse():
+    dates, cols, close, open_, factor = _panel(n_dates=100, n_cols=40)
+    q = metrics._quantile_nav(factor, close, open_, groups=5, horizon=5)
+    nav, turnover_df, net, gross, daily, ls_cost, turnover_mean = q
+    assert nav.shape[0] == len(dates)
+    assert turnover_df.shape == gross.shape == net.shape
+    assert q[2] is net
+    reused = metrics._cost_sensitivity(
+        factor, close, open_, groups=5, horizon=5, tradeable=None, quantile=q
+    )
+    recomputed = metrics._cost_sensitivity(
+        factor, close, open_, groups=5, horizon=5, tradeable=None
+    )
+    pd.testing.assert_frame_equal(reused, recomputed)
+
+
 def test_sections_skip_cross_section_extras():
     dates, cols, close, open_, factor = _panel(n_dates=160, n_cols=80)
     cap = pd.DataFrame(1e9, index=dates, columns=cols)

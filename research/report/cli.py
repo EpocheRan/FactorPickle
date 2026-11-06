@@ -43,6 +43,10 @@ def main() -> int:
     parser.add_argument("--horizon", type=int, default=5, help="持有期（交易日）")
     parser.add_argument("--groups", type=int, default=5, help="分组数")
     parser.add_argument("--neutralize", action="store_true", help="横截面市值中性化后再评估")
+    parser.add_argument("--no-robustness", action="store_true",
+                        help="跳过多池稳健性重算，报告更快")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="不使用 Panel 本地缓存，强制重新取数")
     parser.add_argument("--out", default="output/reports/factor")
     parser.add_argument("--category", default=None)
     parser.add_argument("--direction", type=int, default=None)
@@ -66,6 +70,7 @@ def main() -> int:
             universe=args.universe,
             extras=("fin_valuation_daily", "margin_detail", "moneyflow_daily") if _needs
             else ("fin_valuation_daily",),
+            use_cache=not args.no_cache,
         )
         print(
             f"共享面板就绪：{len(shared_panel.symbols)} 只 / {len(shared_panel.close)} 天"
@@ -86,6 +91,8 @@ def main() -> int:
             groups=args.groups,
             panel=shared_panel,
             profile=args.profile,
+            robustness=not args.no_robustness,
+            use_cache=not args.no_cache,
         )
         rating = result["rating"]
         print(
