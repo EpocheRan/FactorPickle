@@ -185,6 +185,7 @@ class ReportDataBuilder:
             self.result.selections,
             int(self.result.spec.top_n or 0),
             valuation,
+            int(self.result.spec.params.get("max_positions") or 0),
         )
         warnings = self._warnings(equity, monthly_summary, alpha_beta, result.spec)
         yearly = yearly_returns(equity)
@@ -595,6 +596,7 @@ class ReportDataBuilder:
         selections: pd.DataFrame | None = None,
         top_n: int = 0,
         valuation: dict[str, Any] | None = None,
+        max_positions: int = 0,
     ) -> list[dict[str, str]]:
         checks: list[dict[str, str]] = []
 
@@ -707,9 +709,40 @@ class ReportDataBuilder:
                         f"差异 {valuation.get('gap'):,.0f}（{gap_pct:.2f}% 权益）",
                     )
 
+        if (selections is None or selections.empty) and exposure:
+            exp = pd.DataFrame(exposure)
+            exp["date"] = pd.to_datetime(exp["date"], errors="coerce")
+            exp = exp.dropna(subset=["date"]).sort_values("date").set_index("date")
+            under = float((pd.to_numeric(exp["gross_pct"], errors="coerce") < 96.0).mean() * 100.0)
+            add(
+                "仓位低于96%占比",
+                "pass" if under <= 5.0 else "warn" if under <= 20.0 else "fail",
+                f"{under:.1f}% 的交易日",
+            )
+            target_pos = int(max_positions or top_n or 1)
+            low_pos = float((pd.to_numeric(exp["positions"], errors="coerce") < target_pos).mean() * 100.0)
+            add(
+                "持仓低于目标占比",
+                "pass" if low_pos <= 5.0 else "warn",
+                f"{low_pos:.1f}% 的交易日 / 目标 {target_pos} 只",
+            )
+            month_end = exp["gross_pct"].resample("ME").last().dropna()
+            me_under = float((month_end < 90.0).mean() * 100.0) if len(month_end) else 0.0
+            add(
+                "月末仓位低于90%占比",
+                "pass" if me_under <= 5.0 else "warn" if me_under <= 20.0 else "fail",
+                f"{me_under:.1f}% 的月份",
+            )
+            if valuation:
+                gap_pct = abs(float(valuation.get("gap_pct") or 0.0))
+                add(
+                    "持仓市值对账",
+                    "pass" if gap_pct <= 0.1 else "fail",
+                    f"差异 {valuation.get('gap'):,.0f}（{gap_pct:.2f}% 权益）",
+                )
+
         if trades is not None and not trades.empty and orders is not None and not orders.empty:
-            sell_shares = float(
-                pd.to_numeric(
+            sell_shares = float(                pd.to_numeric(
                     orders.loc[orders["type"].astype(str).str.lower() == "sell", "shares"],
                     errors="coerce",
                 ).fillna(0.0).abs().sum()
