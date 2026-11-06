@@ -26,6 +26,7 @@ _RULES: tuple[tuple[str, int], ...] = (
     ("reversal.", -1),
     ("risk.vol_", -1),
     ("risk.return_std", -1),
+    ("risk.band_break", -1),
     ("risk.high_low", -1),
     ("risk.beta", -1),
     ("risk.ivol", -1),
