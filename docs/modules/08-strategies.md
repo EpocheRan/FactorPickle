@@ -27,6 +27,7 @@
 | `weighting.py` | `EqualWeight` / `ScoreWeight` / `InverseVolWeight` / `CappedWeight` |
 | `models/*.py` | 示例策略：`atr_trend.py`、`rank_mom20.py` 等 |
 
+
 ### 1.4 数据流
 
 ```
@@ -48,6 +49,7 @@ load STRATEGY
 | `factor_rank.py` | cross | 任意已注册因子 + 方向参数 |
 | `small_cap_turnover_rsrs.py` | cross | 小市值 + 换手偏离 + RSRS |
 | `turnover_rsrs_combo.py` | cross | 换手偏离 + RSRS |
+
 
 ## 2. 核心类与方法
 
