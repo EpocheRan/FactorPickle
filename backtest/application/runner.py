@@ -198,6 +198,8 @@ class BacktestRunner:
             return self._run_single(loaded, strategy, **common)
         if strategy.mode == "cross":
             return self._run_cross(loaded, strategy, **common)
+        if strategy.mode == "event":
+            return self._run_event(loaded, strategy, **common)
         raise BacktestError(f"未知策略模式: {strategy.mode!r}")
 
     # ------------------------------------------------------------------ 单股
@@ -245,6 +247,60 @@ class BacktestRunner:
         _validate_supported(spec, factors, self.settings)
         data, panel, run_id, benchmark, corporate_actions = self._prepare(
             loaded, spec, factors, start, end, freq
+        )
+        request = self._engine_request(
+            data=data,
+            panel=panel,
+            strategy=strategy,
+            spec=spec,
+            benchmark=benchmark,
+            corporate_actions=corporate_actions,
+        )
+        return self._run_engine(request, run_id, spec)
+
+    # ------------------------------------------------------------------ 事件驱动
+    def _run_event(
+        self,
+        loaded: LoadedStrategy,
+        strategy: BaseStrategy,
+        *,
+        start: date,
+        end: date,
+        freq: str,
+        initial_cash: float | None,
+        seed: int | None,
+    ) -> BacktestResult:
+        schedule = self._universe_schedule(strategy, start, end)
+        codes = schedule.codes
+        factors = list(strategy.factors())
+        spec = RunSpec(
+            strategy_name=strategy.name,
+            strategy_path=str(loaded.path),
+            mode="event",
+            symbols=codes,
+            start=start,
+            end=end,
+            freq=freq,
+            initial_cash=self._initial_cash(initial_cash),
+            params=dict(strategy.params),
+            factor_source=self.settings.factor_source,
+            fill=self.settings.fill,
+            benchmark=self.settings.benchmark,
+            rebalance="daily",
+            max_gross_exposure=self.settings.max_gross_exposure,
+            allow_short=self.settings.allow_short,
+            risk_free_rate=self.settings.risk_free_rate,
+            corporate_actions=self.settings.corporate_actions,
+            metrics_source="engine",
+            outputs=self.settings.outputs,
+            data_source=self.settings.data,
+            seed=self._seed(seed),
+            rules=self.settings.rules,
+            universe="explicit",
+        )
+        _validate_supported(spec, factors, self.settings)
+        data, panel, run_id, benchmark, corporate_actions = self._prepare(
+            loaded, spec, factors, start, end, freq, schedule=schedule
         )
         request = self._engine_request(
             data=data,

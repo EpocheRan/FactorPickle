@@ -117,6 +117,7 @@ class RQAlphaEngine:
             start=request.spec.start,
             end=request.spec.end,
             max_gross_exposure=float(request.spec.max_gross_exposure),
+            event=str(request.spec.mode) == "event",
         )
         adapter = StrategyAdapter()
         set_runtime(runtime)
@@ -167,7 +168,7 @@ class RQAlphaEngine:
                 "sys_accounts": {
                     "enabled": True,
                     # 分钟模式由适配器执行 T+1，规避 RQAlpha 1m 结算的 sellable 问题。
-                    "stock_t1": bool(request.rules.t_plus_1) and not minute,
+                    "stock_t1": bool(request.rules.t_plus_1) and not minute and not runtime.event,
                 },
                 "sys_risk": {"enabled": True},
                 "sys_simulation": {

@@ -34,8 +34,8 @@ class BaseStrategy(ABC):
     def validate(self) -> None:
         if not self.name:
             raise ValueError(f"{type(self).__name__} 缺少 name")
-        if self.mode not in ("single", "cross"):
-            raise ValueError(f"{type(self).__name__} 的 mode 必须是 single/cross")
+        if self.mode not in ("single", "cross", "event"):
+            raise ValueError(f"{type(self).__name__} 的 mode 必须是 single/cross/event")
 
 
 class SingleSymbolStrategy(BaseStrategy):
@@ -50,6 +50,26 @@ class SingleSymbolStrategy(BaseStrategy):
     def on_bar(self, ctx: StrategyContext) -> None:
         """默认不交易。"""
         return None
+
+
+class EventStrategy(BaseStrategy):
+    """日线事件驱动组合策略：每个交易日收盘调用一次 ``on_universe``。
+
+    与横截面策略的区别：不做统一排名目标，而是逐票判断入场/退出；
+    订单仍在下一交易日开盘执行，T+1 由引擎强制。
+    """
+
+    mode = "event"
+    universe: ClassVar[UniverseSpec] = UniverseSpec()
+    max_positions: ClassVar[int] = 8
+
+    def validate(self) -> None:
+        super().validate()
+        if self.universe.kind == "explicit" and not self.universe.codes:
+            raise ValueError("event universe 不能为空")
+
+    @abstractmethod
+    def on_universe(self, contexts: Mapping[str, StrategyContext]) -> None: ...
 
 
 class CrossSectionStrategy(BaseStrategy):

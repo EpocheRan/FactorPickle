@@ -14,7 +14,7 @@ import pandas as pd
 
 from .errors import ConfigError
 
-Mode = Literal["single", "cross"]
+Mode = Literal["single", "cross", "event"]
 FillMode = Literal["next_open", "close"]
 MetricsSource = Literal["ledger", "engine"]
 CorporateActionMode = Literal["off", "approx"]

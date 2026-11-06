@@ -44,7 +44,9 @@ class StrategyAdapter:
         runtime = get_runtime()
         self._bar_index += 1
         self._manage_stops(context, bar_dict)
-        if runtime.cross_plan is None:
+        if runtime.event:
+            self._on_event(context, bar_dict)
+        elif runtime.cross_plan is None:
             self._on_single(context, bar_dict)
         else:
             self._on_cross(context, bar_dict)
@@ -117,6 +119,53 @@ class StrategyAdapter:
         )
         runtime.strategy.on_bar(ctx)
         self._apply_intent(ctx, oid, code, float(bar.close), position)
+
+    # ------------------------------------------------------------------ event
+    def _on_event(self, context, bar_dict) -> None:
+        runtime = get_runtime()
+        now = pd.Timestamp(Environment.get_instance().trading_dt)
+        dt = now if runtime.source.is_minute else now.normalize()
+        equity = float(context.portfolio.total_value)
+        contexts = {}
+        for code in runtime.symbols:
+            oid = to_order_book_id(code)
+            bar = _bar(bar_dict, oid)
+            if bar is None:
+                continue
+            position = self._position(context, oid)
+            quantity = float(getattr(position, "quantity", 0.0) or 0.0)
+            contexts[code] = StrategyContext(
+                symbol=code,
+                dt=dt,
+                open=float(bar.open),
+                high=float(bar.high),
+                low=float(bar.low),
+                close=float(bar.close),
+                hfq_close=runtime.source.hfq_close(oid, dt),
+                pos=quantity,
+                cash=float(context.portfolio.cash),
+                equity=equity,
+                weight=(
+                    float(getattr(position, "market_value", 0.0) or 0.0) / equity
+                    if equity > 0
+                    else 0.0
+                ),
+                bars_held=int(runtime.bars_held.get(code, 0)),
+                panel=runtime.panel,
+                avg_price=float(getattr(position, "avg_price", 0.0) or 0.0),
+            )
+        runtime.strategy.on_universe(contexts)
+        for code, ctx in contexts.items():
+            if not ctx.intent.has_order:
+                continue
+            oid = to_order_book_id(code)
+            self._apply_intent(
+                ctx,
+                oid,
+                code,
+                float(ctx.close),
+                self._position(context, oid),
+            )
 
     # ------------------------------------------------------------------ cross
     def _on_cross(self, context, bar_dict) -> None:
@@ -230,10 +279,10 @@ class StrategyAdapter:
         return pd.Timestamp(Environment.get_instance().trading_dt).date()
 
     def _sellable(self, position, code: str) -> float:
-        """日线用 RQAlpha 的 sellable；分钟模式由适配器执行 T+1。"""
+        """日线用 RQAlpha 的 sellable；分钟/事件模式由适配器执行 T+1。"""
         runtime = get_runtime()
         quantity = float(getattr(position, "quantity", 0.0) or 0.0)
-        if not runtime.source.is_minute:
+        if not runtime.source.is_minute and not runtime.event:
             return float(getattr(position, "sellable", 0.0) or 0.0)
         entry = runtime.entry_dates.get(code)
         return quantity if entry is not None and entry < self._today() else 0.0
@@ -241,7 +290,8 @@ class StrategyAdapter:
     def _queue_buy(self, code: str, shares: int, reason: str) -> None:
         if shares > 0:
             runtime = get_runtime()
-            runtime.entry_dates[code] = self._today()
+            if not runtime.event:
+                runtime.entry_dates[code] = self._today()
             self._queue(code, int(shares), reason)
 
     def _queue_sell(self, code: str, shares: float, reason: str) -> None:
@@ -277,6 +327,8 @@ class StrategyAdapter:
         }
         if new_day:
             for code in held:
+                if runtime.event and code not in runtime.entry_dates:
+                    runtime.entry_dates[code] = current
                 runtime.bars_held[code] = runtime.bars_held.get(code, 0) + 1
         for code in list(runtime.bars_held):
             if code not in held:

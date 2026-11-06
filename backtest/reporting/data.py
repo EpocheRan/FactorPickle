@@ -389,7 +389,11 @@ class ReportDataBuilder:
             "factors": sorted(str(key) for key in (result.factor_meta or {})),
             "corporate_actions": spec.corporate_actions,
             "data_source": spec.data_source,
-            "score_note": "score 为策略 rank() 原始输出，越大越优先；低换手策略 score=-turnover_ma_20d。",
+            "score_note": (
+                "score 为策略 rank() 原始输出，越大越优先；低换手策略 score=-turnover_ma_20d。"
+                if "low_turnover" in str(spec.strategy_name)
+                else "score 为策略打分，越大越优先；具体因子与阈值见策略文件。"
+            ),
             "cost_model": _safe(asdict(spec.rules)),
             "cost_model_text": (
                 f"佣金 {spec.rules.commission_rate*100:.3f}%（最低 {spec.rules.min_commission:.0f}）/ "

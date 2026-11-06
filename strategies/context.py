@@ -64,6 +64,7 @@ class StrategyContext:
     weight: float
     bars_held: int
     panel: PanelView
+    avg_price: float = 0.0
     rank: float | None = None
     selected: bool = False
     universe_size: int = 0
