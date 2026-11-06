@@ -154,6 +154,16 @@ class ReportDataBuilder:
         risk_payload = {key: _num(value) for key, value in risk.items()}
         if risk.get("annualization_note"):
             risk_payload["annualization_note"] = risk["annualization_note"]
+        avg_gross = (
+            float(pd.Series([float(item.get("gross_pct") or 0.0) for item in exposure]).mean())
+            if exposure
+            else 0.0
+        )
+        annualized = float(risk.get("annualized_return_pct") or 0.0)
+        risk_payload["avg_gross_pct"] = _num(avg_gross)
+        risk_payload["cash_drag_pct"] = (
+            _num(annualized / (avg_gross / 100.0) - annualized) if avg_gross > 0 else None
+        )
         concentration = concentration_table(result.positions, equity)
         if self.industry_map is None:
             self.industry_map = load_industry_map() if result.positions is not None else {}
@@ -163,6 +173,7 @@ class ReportDataBuilder:
         summary = self._trade_summary(trades, orders, equity)
         cost_sensitivity = self._cost_sensitivity(summary)
         bridge = self._pnl_bridge(equity, orders, trades)
+        valuation = self._valuation(result.positions, equity)
         checks = self._checks(
             trades,
             summary,
@@ -173,8 +184,42 @@ class ReportDataBuilder:
             self.result.spec.max_gross_exposure,
             self.result.selections,
             int(self.result.spec.top_n or 0),
+            valuation,
         )
         warnings = self._warnings(equity, monthly_summary, alpha_beta, result.spec)
+        yearly = yearly_returns(equity)
+        rolling = rolling_stats(equity, result.benchmark, self.risk_free_rate)
+        selections_rows = self._selection_rows(result.selections)
+        board_rows, bse_months = self._board_exposure(result.selections)
+        regime = self._regime(equity, yearly, monthly_excess, rolling)
+        if valuation and abs(float(valuation.get("gap_pct") or 0.0)) > 0.1:
+            warnings.append(
+                {
+                    "level": "warn",
+                    "text": (
+                        f"持仓市值与权益市值差 {valuation.get('gap'):,.0f} "
+                        f"（{valuation.get('gap_pct'):.2f}% 权益），行业暴露/净值口径不一致。"
+                    ),
+                }
+            )
+        if bse_months:
+            warnings.append(
+                {
+                    "level": "warn",
+                    "text": "选股含北交所（920 号段）：30% 涨跌幅、流动性/冲击成本未建模，历史收益不可直接外推。",
+                }
+            )
+        if (
+            regime.get("log_share_2024_pct") is not None
+            and float(regime.get("ex_2024_years") or 0.0) > 1.0
+            and abs(float(regime["log_share_2024_pct"])) > 40
+        ):
+            warnings.append(
+                {
+                    "level": "warn",
+                    "text": f"2024 年贡献了 {regime['log_share_2024_pct']:.1f}% 的对数收益，收益高度依赖单一年份。",
+                }
+            )
         return {
             "meta": meta,
             "metrics": metrics,
@@ -182,6 +227,10 @@ class ReportDataBuilder:
             "alternative_benchmarks": alternative_benchmarks,
             "risk": risk_payload,
             "warnings": warnings,
+            "valuation": valuation,
+            "regime": regime,
+            "board_exposure": board_rows,
+            "bse_months": bse_months,
             "equity": self._equity_rows(equity),
             "benchmark": benchmark_series,
             "monthly": _safe(monthly),
@@ -190,8 +239,8 @@ class ReportDataBuilder:
             "cost_sensitivity": cost_sensitivity,
             "oos": _safe(oos_stats(equity)),
             "rolling_returns": _safe(rolling_returns(equity)),
-            "yearly": _safe(yearly_returns(equity)),
-            "rolling": _safe(rolling_stats(equity, result.benchmark, self.risk_free_rate)),
+            "yearly": _safe(yearly),
+            "rolling": _safe(rolling),
             "drawdowns": _safe(drawdown_episodes(equity)),
             "exposure": _safe(exposure),
             "concentration": _safe(concentration),
@@ -202,7 +251,7 @@ class ReportDataBuilder:
             "pnl_bridge": bridge,
             "checks": checks,
             "attribution": self._attribution(trades),
-            "selections": self._selection_rows(result.selections),
+            "selections": selections_rows,
             "selection_forward": selection_forward,
         }
 
@@ -233,12 +282,16 @@ class ReportDataBuilder:
             return {}
         series = pd.Series(values, dtype="float64")
         std = float(series.std(ddof=1)) if len(series) > 1 else 0.0
+        t_stat = float(series.mean() / (std / math.sqrt(len(series)))) if std > 0 else float("nan")
+        p_value = float(math.erfc(abs(t_stat) / math.sqrt(2.0))) if math.isfinite(t_stat) else None
         return {
             "months": len(values),
             "win_rate_pct": _num(float((series > 0).mean() * 100.0)),
             "mean_pct": _num(float(series.mean())),
             "std_pct": _num(std),
             "ir": _num(float(series.mean() / std * math.sqrt(12.0))) if std > 0 else None,
+            "t_stat": _num(t_stat),
+            "p_value": _num(p_value, 3),
         }
 
     @staticmethod
@@ -537,6 +590,7 @@ class ReportDataBuilder:
         max_gross_exposure: float = 0.98,
         selections: pd.DataFrame | None = None,
         top_n: int = 0,
+        valuation: dict[str, Any] | None = None,
     ) -> list[dict[str, str]]:
         checks: list[dict[str, str]] = []
 
@@ -631,6 +685,23 @@ class ReportDataBuilder:
                             status,
                             f"目标 {target_pct:.0f}% / 月末中位 {median_me:.1f}%",
                         )
+                    if len(exp):
+                        under = float((pd.to_numeric(exp["gross_pct"], errors="coerce") < 96.0).mean() * 100.0)
+                        under_status = "pass" if under <= 5.0 else "warn" if under <= 20.0 else "fail"
+                        add("仓位低于96%占比", under_status, f"{under:.1f}% 的交易日")
+                        low_pos = float((pd.to_numeric(exp["positions"], errors="coerce") < top_n).mean() * 100.0)
+                        low_status = "pass" if low_pos <= 5.0 else "warn"
+                        add("持仓低于目标占比", low_status, f"{low_pos:.1f}% 的交易日 / 目标 {top_n} 只")
+                    me_under = float((month_end < 90.0).mean() * 100.0) if len(month_end) else 0.0
+                    me_status = "pass" if me_under <= 5.0 else "warn" if me_under <= 20.0 else "fail"
+                    add("月末仓位低于90%占比", me_status, f"{me_under:.1f}% 的月份")
+                if valuation:
+                    gap_pct = abs(float(valuation.get("gap_pct") or 0.0))
+                    add(
+                        "持仓市值对账",
+                        "pass" if gap_pct <= 0.1 else "fail",
+                        f"差异 {valuation.get('gap'):,.0f}（{gap_pct:.2f}% 权益）",
+                    )
 
         if trades is not None and not trades.empty and orders is not None and not orders.empty:
             sell_shares = float(
@@ -735,10 +806,14 @@ class ReportDataBuilder:
         else:
             top_rows = rows[:15]
             bottom_rows = rows[-15:]
+        top_total = float(sum(float(row["pnl"] or 0.0) for row in top_rows))
+        total = float(pnl.sum())
         return {
             "by_symbol": top_rows,
             "bottom": bottom_rows,
-            "total_pnl": _num(float(pnl.sum()), 2),
+            "total_pnl": _num(total, 2),
+            "top_total": _num(top_total, 2),
+            "top_share_pct": _num(top_total / total * 100.0) if abs(total) > 1e-9 else None,
             "symbols": len(rows),
         }
 
@@ -785,10 +860,122 @@ class ReportDataBuilder:
         return {
             "periods": len(sel_dates) - 1,
             "observations": len(series),
+            "selected_total": int(len(sel)),
+            "coverage_pct": _num(len(series) / len(sel) * 100.0) if len(sel) else None,
             "mean_ret_pct": _num(float(series.mean() * 100.0)),
             "win_rate_pct": _num(float((series > 0).mean() * 100.0)),
             "median_ret_pct": _num(float(series.median() * 100.0)),
         }
+
+    @staticmethod
+    def _valuation(positions: pd.DataFrame | None, equity: pd.DataFrame) -> dict[str, Any]:
+        if positions is None or positions.empty or "date" not in positions.columns:
+            return {}
+        pos = positions.copy()
+        pos["date"] = pd.to_datetime(pos["date"], errors="coerce").dt.normalize()
+        last_date = pos["date"].max()
+        latest = pos[pos["date"] == last_date]
+        value_col = "market_value" if "market_value" in latest.columns else "close"
+        positions_mv = float(pd.to_numeric(latest[value_col], errors="coerce").fillna(0.0).sum())
+        eq = equity.copy()
+        eq["date"] = pd.to_datetime(eq["date"], errors="coerce").dt.normalize()
+        row = eq[eq["date"] == last_date]
+        equity_mv = float(row["market_value"].sum()) if not row.empty else 0.0
+        equity_total = float(row["equity"].sum()) if not row.empty else 0.0
+        gap = positions_mv - equity_mv
+        return {
+            "date": str(last_date.date()) if pd.notna(last_date) else None,
+            "positions_mv": _num(positions_mv, 2),
+            "equity_mv": _num(equity_mv, 2),
+            "gap": _num(gap, 2),
+            "gap_pct": _num(gap / equity_total * 100.0) if equity_total else None,
+        }
+
+    @staticmethod
+    def _board(symbol: str) -> str:
+        text = str(symbol)
+        if text.startswith("920") or text.startswith("8"):
+            return "北交所"
+        if text.startswith(("300", "301")):
+            return "创业板"
+        if text.startswith("688"):
+            return "科创板"
+        return "主板"
+
+    def _regime(
+        self,
+        equity: pd.DataFrame,
+        yearly: list[dict],
+        monthly_excess: list[dict],
+        rolling: list[dict],
+    ) -> dict[str, Any]:
+        if equity is None or equity.empty:
+            return {}
+        frame = equity.copy()
+        frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+        frame = frame.dropna(subset=["date"]).sort_values("date")
+        values = pd.to_numeric(frame["equity"], errors="coerce")
+        total = float(values.iloc[-1] / values.iloc[0] - 1.0) if len(values) > 1 else 0.0
+        year_2024 = next((item["ret"] for item in yearly if int(item.get("year") == 2024)), None)
+        log_share = None
+        if year_2024 is not None and total > -1 and year_2024 > -100:
+            denominator = math.log1p(total)
+            if abs(denominator) > 1e-12:
+                log_share = math.log1p(year_2024 / 100.0) / denominator * 100.0
+        ex_2024 = None
+        if year_2024 is not None:
+            ex_2024 = ((1.0 + total) / (1.0 + year_2024 / 100.0) - 1.0) * 100.0
+        excess_total = sum(float(item.get("excess") or 0.0) for item in monthly_excess)
+        nov_2023 = next(
+            (
+                float(item.get("excess") or 0.0)
+                for item in monthly_excess
+                if int(item.get("year")) == 2023 and int(item.get("month")) == 11
+            ),
+            None,
+        )
+        beta_values = [float(item["beta"]) for item in rolling if int(item.get("window")) == 60 and item.get("beta") is not None]
+        alpha_values = [float(item["alpha_pct"]) for item in rolling if int(item.get("window")) == 60 and item.get("alpha_pct") is not None]
+        returns = values.pct_change().dropna()
+        return {
+            "return_2024_pct": _num(year_2024),
+            "log_share_2024_pct": _num(log_share),
+            "ex_2024_return_pct": _num(ex_2024),
+            "ex_2024_years": _num(max((len(values) / 252.0) - 1.0, 0.0)),
+            "excess_total_pct": _num(excess_total),
+            "nov_2023_excess_pct": _num(nov_2023),
+            "nov_2023_excess_share_pct": _num(nov_2023 / excess_total * 100.0)
+            if nov_2023 is not None and abs(excess_total) > 1e-9
+            else None,
+            "rolling_beta_min": _num(min(beta_values)) if beta_values else None,
+            "rolling_beta_max": _num(max(beta_values)) if beta_values else None,
+            "rolling_alpha_min_pct": _num(min(alpha_values)) if alpha_values else None,
+            "rolling_alpha_max_pct": _num(max(alpha_values)) if alpha_values else None,
+            "days_abs_gt_7pct": int((returns.abs() > 0.07).sum()),
+        }
+
+    @staticmethod
+    def _board_exposure(selections: pd.DataFrame | None) -> tuple[list[dict], list[dict]]:
+        if selections is None or selections.empty or "date" not in selections.columns:
+            return [], []
+        frame = selections.copy()
+        frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+        frame = frame.dropna(subset=["date"])
+        frame["board"] = frame["symbol"].astype(str).map(ReportDataBuilder._board)
+        latest = frame["date"].max()
+        latest_rows = frame[frame["date"] == latest]
+        total = len(latest_rows)
+        exposure = [
+            {"board": str(name), "count": int(count), "weight_pct": _num(count / total * 100.0)}
+            for name, count in latest_rows["board"].value_counts().items()
+        ]
+        bse = frame[frame["board"] == "北交所"].groupby(frame["date"].dt.to_period("M")).size()
+        months = [
+            {"month": str(month), "count": int(count)}
+            for month, count in bse.items()
+            if count > 0
+        ]
+        return exposure, months
 
     @staticmethod
     def _selection_rows(selections: pd.DataFrame | None) -> list[dict]:
@@ -801,5 +988,6 @@ class ReportDataBuilder:
         rows = []
         for row in frame.head(2000).itertuples(index=False):
             data = row._asdict()
+            data["board"] = ReportDataBuilder._board(str(getattr(row, "symbol", "")))
             rows.append({str(k): _safe(v) for k, v in data.items()})
         return rows

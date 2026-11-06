@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 
@@ -121,10 +123,17 @@ def capm_stats(
         return float(coef[0] / se) if se > 0 else float("nan")
 
     hac_t = _hac_alpha_t(y, x)
+    alpha_t_ols = alpha_daily / se_alpha if se_alpha and np.isfinite(se_alpha) else float("nan")
+
+    def _p_value(t_stat: float) -> float:
+        if not np.isfinite(t_stat):
+            return float("nan")
+        return float(math.erfc(abs(t_stat) / math.sqrt(2.0)))
 
     return {
         "alpha_annualized_pct": alpha_daily * PERIODS_PER_YEAR * 100.0,
         "excess_arithmetic_pct": float((aligned["p"].mean() - aligned["b"].mean()) * PERIODS_PER_YEAR * 100.0),
+        "benchmark_mean_annual_pct": float(aligned["b"].mean() * PERIODS_PER_YEAR * 100.0),
         "beta_component_pct": float((1.0 - beta) * aligned["b"].mean() * PERIODS_PER_YEAR * 100.0),
         "decomposition_residual_pct": float(
             alpha_daily * PERIODS_PER_YEAR * 100.0
@@ -132,8 +141,10 @@ def capm_stats(
             - (1.0 - beta) * aligned["b"].mean() * PERIODS_PER_YEAR * 100.0
         ),
         "alpha_daily": alpha_daily,
-        "alpha_t": alpha_daily / se_alpha if se_alpha and np.isfinite(se_alpha) else float("nan"),
+        "alpha_t": alpha_t_ols,
+        "alpha_p": _p_value(alpha_t_ols),
         "alpha_t_hac": hac_t,
+        "alpha_p_hac": _p_value(hac_t),
         "beta": beta,
         "beta_se": se_beta,
         "r2": r2,

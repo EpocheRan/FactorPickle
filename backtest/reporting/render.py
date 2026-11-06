@@ -136,6 +136,8 @@ __KPIS__
     <tbody>__OOS_ROWS__</tbody></table></div>
   <div class="card"><div class="card-head"><h3>滚动收益（12M / 36M）</h3></div>
     <div class="chart"><svg id="rollingReturnChart"></svg><div class="tip" id="rollingReturnTip"></div></div></div>
+  <div class="card"><div class="card-head"><h3>Regime / 尾部依赖</h3></div>
+    <table><thead><tr><th>指标</th><th>值</th></tr></thead><tbody>__REGIME_ROWS__</tbody></table></div>
   <div class="grid2">
     <div class="card"><div class="card-head"><h3>滚动 Alpha / Beta</h3>
       <div class="controls"><button class="btn" data-window="60">60D</button><button class="btn" data-window="120">120D</button>
@@ -183,7 +185,7 @@ __KPIS__
   <div class="card"><div class="card-head"><h3>基准对比</h3><span class="muted">Alpha / Beta / IR / R²</span></div>
     <table><thead><tr><th>基准</th><th>Alpha(年化)</th><th>Beta</th><th>IR</th><th>R²</th></tr></thead>
     <tbody>__ALT_ROWS__</tbody></table></div>
-  <div class="grid2"><div class="card"><div class="card-head"><h3>个股贡献 Top</h3><span class="muted">合计 __ATTR_TOTAL__</span></div>
+  <div class="grid2"><div class="card"><div class="card-head"><h3>个股贡献 Top</h3><span class="muted">全样本合计 __ATTR_TOTAL__ · Top __ATTR_TOP__ (__ATTR_SHARE__%)</span></div>
     <table><thead><tr><th>代码</th><th>净盈亏</th><th>回合数</th></tr></thead><tbody>__ATTR_ROWS__</tbody></table></div>
   <div class="card"><div class="card-head"><h3>个股贡献 Bottom</h3></div>
     <table><thead><tr><th>代码</th><th>净盈亏</th><th>回合数</th></tr></thead><tbody>__ATTR_BOTTOM_ROWS__</tbody></table></div></div>
@@ -194,6 +196,13 @@ __KPIS__
     <table><thead><tr><th>行业</th><th>占权益</th><th>市值</th></tr></thead><tbody>__IND_ROWS__</tbody></table></div>
   <div class="card"><div class="card-head"><h3>行业贡献</h3></div>
     <table><thead><tr><th>行业</th><th>净盈亏</th><th>回合数</th></tr></thead><tbody>__IND_PNL_ROWS__</tbody></table></div></div>
+  <p class="note">行业暴露为期末时点、行业分类来自当前映射；行业贡献为全样本。</p>
+  __IND_WARN__
+  <div class="grid2"><div class="card"><div class="card-head"><h3>板块暴露（最新选股）</h3></div>
+    <table><thead><tr><th>板块</th><th>只数</th><th>占比</th></tr></thead><tbody>__BOARD_ROWS__</tbody></table>
+    <p class="note">__BSE_NOTE__</p></div>
+  <div class="card"><div class="card-head"><h3>市值对账</h3></div>
+    <table class="meta"><tbody>__VAL_ROWS__</tbody></table></div></div>
 </section>
 <section class="pane" id="tab-details">
   <div class="card"><div class="card-head"><h3>运行信息</h3><button class="btn" id="jsonCsv">下载 report_data.json</button></div>
@@ -600,11 +609,12 @@ def _kpis(data: dict[str, Any]) -> str:
         ("年化", _num(metrics.get("annualized_return_pct"), 2, "%"), ""),
         ("最大回撤", _num(metrics.get("max_drawdown_pct"), 2, "%"), ""),
         ("Sharpe", _plain(metrics.get("sharpe"), 2), ""),
-        ("Alpha(年化)", _num(alpha.get("alpha_annualized_pct"), 2, "%"), f"t={_plain(alpha.get('alpha_t'), 2)}"),
+        ("Alpha(年化)", _num(alpha.get("alpha_annualized_pct"), 2, "%"), f"t={_plain(alpha.get('alpha_t'), 2)} (HAC {_plain(alpha.get('alpha_t_hac'), 2)})"),
         ("Beta", _plain(alpha.get("beta"), 2), f"R²={_plain(alpha.get('r2'), 2)}"),
         ("信息比率", _plain(alpha.get("information_ratio"), 2), f"TE={_num(alpha.get('tracking_error_pct'), 2, '%')}"),
         ("胜率", _plain(summary.get("win_rate_pct"), 1, "%"), f"{summary.get('count', 0)} 笔"),
     ]
+    cards = [(label.replace("胜率", "回合胜率"), value, sub) for label, value, sub in cards]
     return "<div class='kpis'>" + "".join(
         f"<div class='kpi'><div class='v {cls_name(value)}'>{value}</div>"
         f"<div class='k'>{label}</div><div class='s'>{sub}</div></div>"
@@ -698,10 +708,12 @@ def render_report(data: dict[str, Any]) -> str:
         [
             ("Alpha（年化）", _num(alpha.get("alpha_annualized_pct"), 2, "%")),
             ("算术超额", _num(alpha.get("excess_arithmetic_pct"), 2, "%")),
+            ("基准算术年化", _num(alpha.get("benchmark_mean_annual_pct"), 2, "%")),
             ("(1−β)×基准", _num(alpha.get("beta_component_pct"), 2, "%")),
             ("分解残差", _num(alpha.get("decomposition_residual_pct"), 2, "%")),
-            ("Alpha t 值", _plain(alpha.get("alpha_t"), 2)),
-            ("Alpha t（HAC）", _plain(alpha.get("alpha_t_hac"), 2)),
+            ("Alpha t（OLS）", f"{_plain(alpha.get('alpha_t'), 2)} / p={_plain(alpha.get('alpha_p'), 3)}"),
+            ("Alpha t（HAC）", f"{_plain(alpha.get('alpha_t_hac'), 2)} / p={_plain(alpha.get('alpha_p_hac'), 3)}"),
+            ("月度 t / p", f"{_plain((data.get('monthly_summary') or {}).get('t_stat'), 2)} / p={_plain((data.get('monthly_summary') or {}).get('p_value'), 3)}"),
             ("Beta", _plain(alpha.get("beta"), 2)),
             ("仓位中性 β/α", f"{_plain(alpha.get('beta_neutral'), 2)} / {_num(alpha.get('alpha_neutral_pct'), 2, '%')}"),
             ("平均仓位", _plain(alpha.get("avg_gross_pct"), 1, "%")),
@@ -727,10 +739,12 @@ def render_report(data: dict[str, Any]) -> str:
             ("Sharpe（算术）", _plain(risk.get("sharpe_arithmetic"), 2)),
             ("Sortino（算术）", _plain(risk.get("sortino"), 2)),
             ("Calmar（几何）", _plain(risk.get("calmar"), 2)),
+            ("平均仓位", _plain(risk.get("avg_gross_pct"), 1, "%")),
+            ("现金拖累（年化）", _num(risk.get("cash_drag_pct"), 2, "%")),
             ("VaR95（日）", _num(risk.get("var95_pct"), 2, "%")),
             ("CVaR95（日）", _num(risk.get("cvar95_pct"), 2, "%")),
             ("偏度 / 峰度", f"{_plain(risk.get('skew'), 2)} / {_plain(risk.get('kurtosis'), 2)}"),
-            ("月度胜率", _plain(risk.get("monthly_win_rate_pct"), 1, "%")),
+            ("月度正收益胜率", _plain(risk.get("monthly_win_rate_pct"), 1, "%")),
             ("样本数", _plain(risk.get("observations"), 0)),
         ]
     )
@@ -753,7 +767,7 @@ def render_report(data: dict[str, Any]) -> str:
         f"<div class='kpi'><div class='v'>{value}</div><div class='k'>{label}</div></div>"
         for label, value in [
             ("回合数", _plain(summary.get("count"), 0)),
-            ("胜率", _plain(summary.get("win_rate_pct"), 1, "%")),
+            ("回合胜率", _plain(summary.get("win_rate_pct"), 1, "%")),
             ("Profit Factor", _plain(summary.get("profit_factor"), 2)),
             ("平均盈亏比", _plain(summary.get("payoff"), 2)),
             ("平均盈利", _num(summary.get("avg_win_pct"), 2, "%")),
@@ -775,6 +789,8 @@ def render_report(data: dict[str, Any]) -> str:
         for item in ((data.get("attribution") or {}).get("bottom") or [])
     )
     attr_total = _num((data.get("attribution") or {}).get("total_pnl"), 2)
+    attr_top = _num((data.get("attribution") or {}).get("top_total"), 2)
+    attr_share = _plain((data.get("attribution") or {}).get("top_share_pct"), 1)
     sel_rows = "".join(
         f"<tr><td>{_esc(item.get('date'))}</td><td>{_esc(item.get('symbol'))}</td>"
         f"<td>{_plain(item.get('score'), 3)}</td>"
@@ -786,7 +802,9 @@ def render_report(data: dict[str, Any]) -> str:
     sel_fwd_text = (
         f"前瞻收益：{_num(sel_fwd.get('mean_ret_pct'), 2)}%（中位 "
         f"{_num(sel_fwd.get('median_ret_pct'), 2)}%），胜率 "
-        f"{_plain(sel_fwd.get('win_rate_pct'), 1)}%，{_plain(sel_fwd.get('observations'), 0)} 个样本"
+        f"{_plain(sel_fwd.get('win_rate_pct'), 1)}%；覆盖 "
+        f"{_plain(sel_fwd.get('observations'), 0)}/{_plain(sel_fwd.get('selected_total'), 0)}"
+        f"（{_plain(sel_fwd.get('coverage_pct'), 1)}%），优势在尾部而非命中率。"
         if sel_fwd
         else "选股前瞻收益：持仓行情不足，暂未计算"
     )
@@ -811,7 +829,7 @@ def render_report(data: dict[str, Any]) -> str:
         for item in monthly_excess
     )
     monthly_text = (
-        f"均值 {_num(monthly_summary.get('mean_pct'), 2)}% · 胜率 "
+        f"均值 {_num(monthly_summary.get('mean_pct'), 2)}% · 月度超额胜率 "
         f"{_plain(monthly_summary.get('win_rate_pct'), 1)}% · 月度 IR "
         f"{_plain(monthly_summary.get('ir'), 2)} · {_plain(monthly_summary.get('months'), 0)} 个月"
         if monthly_summary
@@ -859,6 +877,47 @@ def render_report(data: dict[str, Any]) -> str:
             ("总仓位", _plain(last_conc.get("gross_pct"), 1, "%")),
         ]
     )
+    valuation = data.get("valuation") or {}
+    val_rows = _rows(
+        [
+            ("日期", _esc(valuation.get("date"))),
+            ("持仓市值", _plain(valuation.get("positions_mv"), 0)),
+            ("权益市值", _plain(valuation.get("equity_mv"), 0)),
+            ("差异", f"{_plain(valuation.get('gap'), 0)}（{_plain(valuation.get('gap_pct'), 2)}%）"),
+        ]
+    )
+    board_rows = "".join(
+        f"<tr><td>{_esc(item.get('board'))}</td><td>{_plain(item.get('count'), 0)}</td>"
+        f"<td>{_plain(item.get('weight_pct'), 1, '%')}</td></tr>"
+        for item in (data.get("board_exposure") or [])
+    )
+    bse_months = data.get("bse_months") or []
+    industry = data.get("industry_exposure") or []
+    max_ind = max((float(item.get("weight_pct") or 0.0) for item in industry), default=0.0)
+    ind_warn = (
+        f"<p class='warnbox'>行业集中度：单一行业最高 {max_ind:.1f}% 权益，注意结构性暴露。</p>"
+        if max_ind > 30
+        else ""
+    )
+    bse_note = (
+        "920 号段为数据源的当前统一编码；北交所 30% 涨跌停，冲击成本未建模。出现月份："
+        + "、".join(f"{item['month']}({item['count']})" for item in bse_months[:8])
+        if bse_months
+        else "最新选股无北交所标的。"
+    )
+    regime = data.get("regime") or {}
+    regime_rows = _rows(
+        [
+            ("2024 收益", _num(regime.get("return_2024_pct"), 2, "%")),
+            ("2024 对数收益占比", _num(regime.get("log_share_2024_pct"), 1, "%")),
+            ("剔除 2024 后累计", _num(regime.get("ex_2024_return_pct"), 2, "%")),
+            ("2023-11 超额", _num(regime.get("nov_2023_excess_pct"), 2, "%")),
+            ("2023-11 超额占比", _num(regime.get("nov_2023_excess_share_pct"), 1, "%")),
+            ("60D β 区间", f"{_plain(regime.get('rolling_beta_min'), 2)} ~ {_plain(regime.get('rolling_beta_max'), 2)}"),
+            ("60D α 区间", f"{_num(regime.get('rolling_alpha_min_pct'), 1, '%')} ~ {_num(regime.get('rolling_alpha_max_pct'), 1, '%')}"),
+            ("|日收益|>7% 天数", _plain(regime.get("days_abs_gt_7pct"), 0)),
+        ]
+    )
     meta_rows = _rows(
         [
             ("run_id", _esc(meta.get("run_id"))),
@@ -901,6 +960,10 @@ def render_report(data: dict[str, Any]) -> str:
         .replace("__BRIDGE_ROWS__", _bridge_rows(data))
         .replace("__CHECKS__", _checks_html(data))
         .replace("__CONC_ROWS__", conc_rows)
+        .replace("__VAL_ROWS__", val_rows)
+        .replace("__BOARD_ROWS__", board_rows or "<tr><td colspan='3' class='muted'>无选股数据</td></tr>")
+        .replace("__BSE_NOTE__", _esc(bse_note))
+        .replace("__REGIME_ROWS__", regime_rows)
         .replace("__RISK_ROWS__", risk_rows)
         .replace("__RISK_NOTE__", risk_note)
         .replace("__DD_ROWS__", dd_rows or "<tr><td colspan='5' class='muted'>无回撤</td></tr>")
@@ -908,12 +971,15 @@ def render_report(data: dict[str, Any]) -> str:
         .replace("__ATTR_ROWS__", attr_rows)
         .replace("__ATTR_BOTTOM_ROWS__", attr_bottom_rows)
         .replace("__ATTR_TOTAL__", attr_total)
+        .replace("__ATTR_TOP__", attr_top)
+        .replace("__ATTR_SHARE__", attr_share)
         .replace("__ALT_ROWS__", alt_rows)
         .replace("__SEL_ROWS__", sel_rows or "<tr><td colspan='5' class='muted'>无选股快照</td></tr>")
         .replace("__SEL_COUNT__", str(sel_count))
         .replace("__SEL_FWD__", sel_fwd_text)
         .replace("__IND_ROWS__", ind_rows or "<tr><td colspan='3' class='muted'>行业映射未接入</td></tr>")
         .replace("__IND_PNL_ROWS__", ind_pnl_rows or "<tr><td colspan='3' class='muted'>无行业映射</td></tr>")
+        .replace("__IND_WARN__", ind_warn)
         .replace("__MONTHLY_EXCESS_ROWS__", monthly_excess_rows or "<tr><td colspan='5' class='muted'>无基准月度数据</td></tr>")
         .replace("__MONTHLY_SUMMARY__", monthly_text)
         .replace("__COST_ROWS__", cost_rows or "<tr><td colspan='2' class='muted'>无换手数据</td></tr>")
