@@ -1773,9 +1773,9 @@ function buildOverview() {
     const dom = DOMAIN_BY_ID[grp.d[0]];
     gWrap.appendChild(svgEl('rect', {x, y:gy, width:gw, height:gh, rx:9, fill:'rgba(7,14,24,.6)', stroke:'rgba(148,163,184,.13)'}));
     gWrap.appendChild(svgEl('rect', {x:x + 9, y:gy + 8, width:gw - 18, height:2.5, rx:1.2, fill:dom.color, opacity:.8}));
-    gWrap.appendChild(svgEl('text', {class:'gtitle', x:x + 12, y:gy + 21}, grp.t));
+    gWrap.appendChild(svgEl('text', {class:'gtitle', x:x + 12, y:gy + 29}, grp.t));
     grp.rows.forEach((name, j) => {
-      gWrap.appendChild(svgEl('text', {class:'gtab', x:x + 12, y:gy + 44 + j * 17}, name));
+      gWrap.appendChild(svgEl('text', {class:'gtab', x:x + 12, y:gy + 52 + j * 17}, name));
     });
   });
 }
