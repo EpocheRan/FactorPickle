@@ -1654,6 +1654,26 @@ function buildWhyArt() {
     }
 
     svg.appendChild(ink);
+
+    // 经纬度框注记：让等高线看起来像一张有坐标的地形图
+    const frame = svgEl('g', {opacity: .62});
+    const tick = {stroke: st.line, 'stroke-width': .6, opacity: .55};
+    const note = {
+      fill: st.line, 'font-size': 6,
+      'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace', 'letter-spacing': .2,
+      stroke: st.bg, 'stroke-width': 1.6, 'paint-order': 'stroke'
+    };
+    [25, 125, 225, 325].forEach((x) => {
+      const lon = Math.round(110 + x / W * 10);
+      frame.appendChild(svgEl('line', {x1: x, y1: 8, x2: x, y2: 13, ...tick}));
+      frame.appendChild(svgEl('text', {x, y: 21, 'text-anchor': 'middle', ...note}, `${lon}°E`));
+    });
+    [100, 175, 250].forEach((y) => {
+      const lat = Math.round(40 - y / H * 10);
+      frame.appendChild(svgEl('line', {x1: 8, y1: y, x2: 13, y2: y, ...tick}));
+      frame.appendChild(svgEl('text', {x: 16, y: y + 2.2, ...note}, `${lat}°N`));
+    });
+    svg.appendChild(frame);
     host.appendChild(svg);
   });
 }
