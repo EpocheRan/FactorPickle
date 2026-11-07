@@ -24,6 +24,7 @@ from research import profile as profile_mod
 from research.report_sections import validate
 
 from . import definitions, diagnostics as diag, metrics, rating as rating_mod, render, sensitivity
+from .data_quality import CleaningStandard
 from .panel import flow_factor_panel, Panel, financial_factor_panel, load_panel, peer_panels, price_factor_panel
 
 logger = logging.getLogger("Research.Report")
@@ -224,6 +225,7 @@ def _pool_robustness(
                 factor_id=factor_id, category=factor_id.split(".", 1)[0],
                 direction=direction, regime=panel.regime,
                 market_cap=panel.market_cap, industry=_industry_frame(panel.industry, panel.close),
+                low=panel.low, cleaning=CleaningStandard(),
                 full=False,
             )
             rows.append(
@@ -302,6 +304,10 @@ def generate(
 
     logger.info("generate: panel ready, factor rows=%s", getattr(factor, "shape", None))
     definition = definitions.describe(factor_id)
+    # 清洗的“历史天数”必须跟着因子窗口走，不能所有因子都用 20 日。
+    _cleaning = CleaningStandard(
+        min_history=max(20, int(getattr(definition, "window", 0) or 20))
+    )
     if direction is None:
         direction = definition.direction
     peers = getattr(panel, "_peers", None) if with_peers and need_cross_core else None
@@ -320,7 +326,8 @@ def generate(
         universe=universe or _universe_label(panel, pool_size, pool_date),
         regime=panel.regime, regime_alt=panel.regime_alt,
         market_cap=panel.market_cap, industry=panel.industry,
-        amount=panel.amount, benchmark=panel.benchmark, peers=peers,
+        amount=panel.amount, low=panel.low, cleaning=_cleaning,
+        benchmark=panel.benchmark, peers=peers,
         definition=definition.as_dict(), pool=panel.pool, freshness=panel.freshness,
         is_st=panel.is_st,
         neutralize=neutralize,
@@ -339,7 +346,9 @@ def generate(
                 cost_bps=20.0,
                 start=report.start,
                 end=report.end,
-                baseline=sensitivity.baseline_from_report(report, factor),
+                baseline=sensitivity.baseline_from_report(report, factor, label="EX_BSE_VALID"),
+                cleaning=_cleaning,
+                direction=direction,
             )
             logger.info("generate: sensitivity done")
         except Exception as exc:  # noqa: BLE001 - 敏感性失败不阻断报告
@@ -364,7 +373,10 @@ def generate(
         # 复现检查已在 metrics.build_report 内部用同一因子对象与参数完成
         report.attribution = diag.attribute_failure(report)
     try:
-        report.extra = metrics.long_only_stats(factor, panel, direction, horizon)
+        report.extra = metrics.long_only_stats(
+            report.quantile_factor if report.quantile_factor is not None else factor,
+            panel, 1, horizon,
+        )
     except Exception:  # noqa: BLE001 - 附加层失败不影响主报告正文
         report.extra = None
     score = rating_mod.rate(report)
@@ -373,11 +385,14 @@ def generate(
     run_hash = hashlib.sha1(
         f"{factor_id}|{start}|{panel.data_cutoff.date()}|{pool_size}|{len(panel.close)}|{profile}".encode()
     ).hexdigest()[:8]
+    _generated = now_cn()
     meta = {
-        "generated_at": f"{panel.freshness.get('generated_at', now_cn().strftime('%Y-%m-%d %H:%M:%S'))}"
-                        f"（{panel.freshness.get('timezone', 'UTC+8')}）",
-        "run_id": run_id or f"{now_cn().strftime('%Y%m%dT%H%M')}_{run_hash}",
-        "data_version": f"ohlcv_1d:{panel.data_cutoff.date()}",
+        # 生成时间与 run_id 必须同源取时，否则会出现 run_id 晚于生成时间的矛盾。
+        "generated_at": f"{_generated:%Y-%m-%d %H:%M:%S}（北京时间 UTC+8）",
+        "run_id": run_id or f"{_generated:%Y%m%dT%H%M}_{run_hash}",
+        "data_version": str(panel.freshness.get("data_version")
+                            or f"ohlcv_1d:{panel.data_cutoff.date()}|symbols:{len(panel.close.columns)}"
+                               f"|days:{len(panel.close)}"),
         "profile": profile_spec,
         "sections": sections,
     }

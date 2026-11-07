@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 
 from . import diagnostics as diag
+from .data_quality import CleaningStandard, analyze as analyze_quality
 
 TRADING_DAYS = 242
 
@@ -188,6 +189,47 @@ def _winsorize(values: np.ndarray, lower: float = 0.01, upper: float = 0.99) -> 
         return values
     lo, hi = np.quantile(finite, [lower, upper])
     return np.clip(values, lo, hi)
+
+
+def _winsorize_frame(frame: pd.DataFrame, lower: float = 0.01, upper: float = 0.99) -> pd.DataFrame:
+    """逐日横截面缩尾；用于去极值敏感性对照（不改变秩 IC）。"""
+    arr = frame.to_numpy(dtype="float64")
+    out = arr.copy()
+    for i in range(arr.shape[0]):
+        row = arr[i]
+        finite = np.isfinite(row)
+        if finite.sum() < 20:
+            continue
+        lo, hi = np.quantile(row[finite], [lower, upper])
+        out[i, finite] = np.clip(row[finite], lo, hi)
+    return pd.DataFrame(out, index=frame.index, columns=frame.columns)
+
+
+def _winsor_group_returns(
+    factor: pd.DataFrame, forward: pd.DataFrame, *, groups: int = 5,
+    horizon: int = 5, lower: float = 0.01, upper: float = 0.99,
+) -> dict:
+    """组内收益缩尾后的分组均值：回答“G5 断崖是不是极端收益拉动”。"""
+    buckets: dict[int, list[float]] = {g: [] for g in range(groups)}
+    i = 0
+    while i + horizon + 1 < len(factor.index):
+        row = factor.iloc[i]
+        ret = forward.iloc[i]
+        valid = row.notna() & ret.notna()
+        if int(valid.sum()) >= groups * 5:
+            ranked = row[valid].rank(method="first")
+            q = pd.qcut(ranked, groups, labels=False, duplicates="drop")
+            for g in range(groups):
+                vals = ret[valid][q == g].dropna()
+                if len(vals) < 5:
+                    continue
+                lo, hi = np.quantile(vals, [lower, upper])
+                buckets[g].append(float(np.clip(vals, lo, hi).mean()))
+        i += horizon
+    means = {f"Q{g + 1}": float(np.mean(v)) for g, v in buckets.items() if v}
+    if "Q1" in means and f"Q{groups}" in means:
+        means["spread"] = means[f"Q{groups}"] - means["Q1"]
+    return means
 
 
 def _zscore(values: np.ndarray) -> np.ndarray:
@@ -591,6 +633,9 @@ class FactorReport:
     period_returns_gross: pd.DataFrame | None = None
     period_returns_net: pd.DataFrame | None = None
     daily_returns: pd.DataFrame | None = None
+    winsor: dict = field(default_factory=dict)
+    return_winsor: dict = field(default_factory=dict)
+    tail_specificity: dict = field(default_factory=dict)
     quantile_returns: dict[str, float] = field(default_factory=dict)
     quantile_returns_gross: dict[str, float] = field(default_factory=dict)
     quantile_ci: dict[str, tuple[float, float]] = field(default_factory=dict)
@@ -618,6 +663,7 @@ class FactorReport:
     turnover_by_group: pd.Series | None = None
 
     filter_test: dict = field(default_factory=dict)
+    filter_test_opposite: dict = field(default_factory=dict)
     strat_ic: object | None = None
     size_ranges: dict | None = None
     horizon_spreads: object | None = None
@@ -639,6 +685,7 @@ class FactorReport:
 
     definition: dict = field(default_factory=dict)
     factor_stats: dict = field(default_factory=dict)
+    data_quality: dict = field(default_factory=dict)
     pool: dict = field(default_factory=dict)
     pool_robustness: pd.DataFrame | None = None
     sensitivity: list[dict] = field(default_factory=list)
@@ -653,7 +700,7 @@ def _regime_table(ic: pd.Series, regime: pd.Series, *, block: int = 5) -> pd.Dat
     rows = {}
     aligned = regime.reindex(ic.index)
     for key, label in (("bull", "牛市"), ("neutral", "震荡"), ("bear", "熊市")):
-        sub = ic[aligned == key]
+        sub = ic[aligned == key].dropna()
         if len(sub) < 20:
             continue
         lo, hi = block_bootstrap_ci(sub, block=block)
@@ -665,8 +712,8 @@ def _regime_table(ic: pd.Series, regime: pd.Series, *, block: int = 5) -> pd.Dat
             "t": newey_west_t(sub, lag=4),
         }
     if {"牛市", "熊市"}.issubset(rows):
-        bull = ic[aligned == "bull"]
-        bear = ic[aligned == "bear"]
+        bull = ic[aligned == "bull"].dropna()
+        bear = ic[aligned == "bear"].dropna()
         diff = float(bull.mean() - bear.mean())
         rng = np.random.default_rng(11)
         boot = []
@@ -692,30 +739,29 @@ def _decay_note(decay: pd.Series) -> str:
         return "持有期样本不足，无法判断衰减形态。"
     hs = list(clean.index)
     vals = clean.to_numpy()
-    peak_h = hs[int(np.argmax(vals))]
-    peak = float(vals.max())
-    first = float(vals[0])
-    if peak_h == max(hs) and peak > first * 1.2:
-        return (
-            f"IC 随持有期上升，在 h={peak_h} 达到最高 {peak:+.3f}，"
-            "未见衰减；5 日并非最优持有期，延长持有期可提高信号强度，"
-            "但需同时评估样本重叠、容量与调仓成本。"
-        )
-    if abs(peak) < 0.005:
+    abs_vals = np.abs(vals)
+    peak_pos = int(np.argmax(abs_vals))
+    peak_h = hs[peak_pos]
+    peak = float(vals[peak_pos])
+    peak_abs = float(abs_vals[peak_pos])
+    first_abs = float(abs_vals[0])
+    if peak_abs < 0.005:
         return "各持有期 IC 均接近 0，衰减形态无经济含义。"
-    # 半衰期：IC 降到峰值一半所需的持有期（线性插值）
-    half = peak / 2
-    half_life = None
-    for a, b, va, vb in zip(hs, hs[1:], vals, vals[1:]):
-        if (va - half) * (vb - half) <= 0 and va != vb:
-            half_life = a + (b - a) * (va - half) / (va - vb)
-            break
-    if half_life is not None:
+    if peak_h == max(hs) and peak_abs > first_abs * 1.2:
         return (
-            f"IC 在 h={peak_h} 见顶（{peak:+.3f}），半衰期约 {half_life:.1f} 个交易日；"
-            "若目标持有期显著长于半衰期，应缩短换仓周期或降低单期权重。"
+            f"IC 绝对值随持有期增强，在 h={peak_h} 达到 |IC|={peak_abs:.3f}"
+            f"（IC={peak:+.3f}），未见衰减；5 日并非最优持有期，"
+            "延长持有期可提高信号强度，但需同时评估样本重叠、容量与调仓成本。"
         )
-    return f"IC 在 h={peak_h} 见顶（{peak:+.3f}），随后走弱；衰减速度见曲线。"
+    if peak_h == min(hs) and peak_abs > abs_vals[-1] * 1.2:
+        return (
+            f"IC 绝对值在 h={peak_h} 最大（|IC|={peak_abs:.3f}，IC={peak:+.3f}），"
+            "随后走弱；信号主要集中在短持有期。"
+        )
+    return (
+        f"IC 绝对值在 h={peak_h} 最大（|IC|={peak_abs:.3f}，IC={peak:+.3f}），"
+        "随后走弱；衰减速度见曲线。"
+    )
 
 
 def _capacity(amount: pd.DataFrame, factor: pd.DataFrame, horizon: int, groups: int) -> dict:
@@ -815,6 +861,76 @@ def _filter_test(period_returns: pd.DataFrame, horizon: int) -> dict:
         "tail_rest": tail_rest,
         "spread_mean": float(spread.mean()) if len(spread) else np.nan,
         "spread_se": se,
+        "useful": useful,
+    }
+
+
+def _filter_test_side(period_returns: pd.DataFrame, horizon: int, drop_group: str) -> dict:
+    """通用单侧过滤检验：剔除指定组后，组合是否改善。
+
+    与 ``_filter_test`` 的区别是组名可配置；用于同时检查 Q1 和 Q5，
+    避免只因为 direction=+1 就只测“最弱组”。
+    """
+    if period_returns is None or period_returns.empty or drop_group not in period_returns:
+        return {}
+    cols = list(period_returns.columns)
+    dropped = period_returns[drop_group].dropna()
+    rest_cols = [c for c in cols if c != drop_group]
+    rest = period_returns[rest_cols].mean(axis=1).dropna()
+    all_long = period_returns.mean(axis=1).dropna()
+    if len(dropped) < 20:
+        return {}
+
+    def _perf(series: pd.Series) -> dict:
+        nav = (1 + series).cumprod()
+        ann = float(nav.iloc[-1] ** (TRADING_DAYS / (len(series) * horizon)) - 1)
+        vol = float(series.std() * np.sqrt(TRADING_DAYS / horizon))
+        sharpe = float(series.mean() / series.std() * np.sqrt(TRADING_DAYS / horizon)) if series.std() else np.nan
+        mdd = float((nav / nav.cummax() - 1).min())
+        return {"ann": ann, "vol": vol, "sharpe": sharpe, "mdd": mdd}
+
+    d_perf, r_perf, a_perf = _perf(dropped), _perf(rest), _perf(all_long)
+    rel = ((1 + dropped).cumprod() / (1 + all_long).cumprod()).dropna()
+    rel_mdd = float((rel / rel.cummax() - 1).min()) if len(rel) else np.nan
+    tail_d = float((dropped < -0.03).mean())
+    tail_r = float((rest < -0.03).mean())
+    diff = (rest - all_long).dropna()
+    diff_se = float(diff.std(ddof=1) / np.sqrt(len(diff))) if len(diff) > 2 else np.nan
+    diff_t = float(diff.mean() / diff_se) if diff_se and np.isfinite(diff_se) else np.nan
+    diff_ci = (
+        (float(diff.mean() - 1.96 * diff_se), float(diff.mean() + 1.96 * diff_se))
+        if np.isfinite(diff_se) else (np.nan, np.nan)
+    )
+    # 四项改善里至少 3 项，避免单一阈值（例如尾部差 2.6pp）把明显改善判死。
+    improvements = [
+        bool(r_perf["sharpe"] > a_perf["sharpe"] + 0.05),
+        bool(dropped.mean() < all_long.mean() - 0.001),
+        bool(r_perf["mdd"] > a_perf["mdd"]),
+        bool(tail_d > tail_r + 0.01),
+    ]
+    useful = bool(sum(improvements) >= 3)
+    ann_factor = TRADING_DAYS / horizon
+    return {
+        "drop_group": drop_group,
+        "dropped_mean": float(dropped.mean()),
+        "rest_mean": float(rest.mean()),
+        "all_mean": float(all_long.mean()),
+        "dropped_ann": float(dropped.mean() * ann_factor),
+        "rest_ann": float(rest.mean() * ann_factor),
+        "all_ann": float(all_long.mean() * ann_factor),
+        "dropped_sharpe": d_perf["sharpe"],
+        "rest_sharpe": r_perf["sharpe"],
+        "all_sharpe": a_perf["sharpe"],
+        "dropped_mdd": d_perf["mdd"],
+        "rest_mdd": r_perf["mdd"],
+        "all_mdd": a_perf["mdd"],
+        "rel_mdd": rel_mdd,
+        "tail_dropped": tail_d,
+        "tail_rest": tail_r,
+        "excess_mean": float(diff.mean()) if len(diff) else np.nan,
+        "excess_t": diff_t,
+        "excess_ci": diff_ci,
+        "improvements": improvements,
         "useful": useful,
     }
 
@@ -998,7 +1114,7 @@ def build_report(
     category: str = "momentum",
     direction: int = 1,
     universe: str = "csi800",
-    horizons: tuple[int, ...] = (1, 5, 10, 20),
+    horizons: tuple[int, ...] = (1, 5, 10, 20, 60),
     primary_horizon: int = 5,
     groups: int = 5,
     cost_bps: float = 20.0,
@@ -1007,6 +1123,8 @@ def build_report(
     market_cap: pd.DataFrame | None = None,
     industry: pd.DataFrame | None = None,
     amount: pd.DataFrame | None = None,
+    low: pd.DataFrame | None = None,
+    cleaning: CleaningStandard | None = None,
     benchmark: pd.Series | None = None,
     peers: dict[str, pd.DataFrame] | None = None,
     definition: dict | None = None,
@@ -1060,6 +1178,20 @@ def build_report(
         raw_direction=direction,
     )
 
+    quality = None
+    if cleaning is not None:
+        quality = analyze_quality(
+            factor, close, open_, low=low, amount=amount,
+            standard=cleaning, horizon=primary_horizon,
+        )
+        report.data_quality = quality.summary
+        report.n_symbols = int(quality.summary["universe_symbols"])
+        report.coverage = float(
+            quality.summary["coverage"].get("valid_signal_ratio",
+                                            quality.summary["coverage"]["valid_signal"])
+        )
+        report.universe = f"{universe} · {cleaning.label}"
+
     # ---- 方向：唯一入口。
     # 因子值本身不取负；分析信号 = raw × direction。**不做样本内翻转**：
     # 在同一样本上按 IC 符号选方向，等价于用未来信息择向，会把随机因子的 IC
@@ -1068,6 +1200,8 @@ def build_report(
         raise ValueError(f"direction 必须是 +1/-1，收到 {direction!r}")
     industry = _as_industry_frame(industry, factor)
     analysis_factor = factor * int(direction)
+    if quality is not None:
+        analysis_factor = analysis_factor.where(quality.mask)
     if neutralize:
         analysis_factor = neutralize_factor(analysis_factor, market_cap)
         report.neutralized = True
@@ -1293,6 +1427,36 @@ def build_report(
             report.monotonicity_net, _ = diag.group_monotonicity(means_net)
 
         q_high, q_low = f"Q{groups}", "Q1"
+        # 顶档/底档特异度：给“单尾断崖”一个独立于 Spearman 的表达。
+        try:
+            _mid_labels = [f"Q{i}" for i in range(2, max(2, groups))]
+            _mid = float(means_gross.reindex(_mid_labels).median())
+            _upper = float(means_gross[q_high] - _mid)
+            _lower = float(means_gross[q_low] - _mid)
+            _denom = abs(_upper) + abs(_lower)
+            _ratio = max(abs(_upper), abs(_lower)) / _denom if _denom > 1e-12 else 0.0
+            _upper_diff = (period_gross[q_high] - period_gross[_mid_labels].mean(axis=1)).dropna()
+            _lower_diff = (period_gross[q_low] - period_gross[[c for c in period_gross.columns if c != q_low]].mean(axis=1)).dropna()
+            def _t_of(series: pd.Series) -> float:
+                if len(series) < 3 or series.std(ddof=1) == 0:
+                    return float("nan")
+                return float(series.mean() / (series.std(ddof=1) / np.sqrt(len(series))))
+            _tu, _tl = _t_of(_upper_diff), _t_of(_lower_diff)
+            _tt = max(abs(_tu), abs(_tl))
+            report.tail_specificity = {
+                "ratio": float(_ratio),
+                "upper": _upper,
+                "lower": _lower,
+                "mid": _mid,
+                "upper_t": _tu,
+                "lower_t": _tl,
+                "t": _tt if np.isfinite(_tt) else 0.0,
+                "score": float(np.clip(_ratio * np.clip(abs(_tt) / 2.0, 0, 1), 0, 1))
+                if np.isfinite(_tt) else 0.0,
+            }
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("顶档特异度计算失败: %s", exc)
+            report.tail_specificity = {}
         gross_spread = (period_gross[q_high] - period_gross[q_low]).dropna()
         cost_series = (
             (turnover_df.get(q_high, pd.Series(dtype="float"))
@@ -1305,10 +1469,48 @@ def build_report(
         report.spread_net = diag.spread_stats(net_spread)
         report.cost_mean = float(cost_series.mean()) if len(cost_series) else float("nan")
 
+        # 去极值敏感性：1%/99% 横截面缩尾，回答“G5 断崖是不是极端值造成”
+        try:
+            _wf = _winsorize_frame(analysis_factor, 0.01, 0.99)
+            _wq = _quantile_nav(
+                _wf, close, open_, groups=groups, horizon=primary_horizon,
+                cost_bps=cost_bps,
+            )
+            _, _wto, _wpnet, _wpgross, _, _, _ = _wq
+            _wg = _wpgross.mean()
+            _wn = _wpnet.mean()
+            _wcost = (
+                (_wto.get(q_high, pd.Series(dtype="float64"))
+                 + _wto.get(q_low, pd.Series(dtype="float64")))
+                * cost_bps / 10000.0
+            ).dropna()
+            _wls = (_wpgross[q_high] - _wpgross[q_low] - _wcost).dropna()
+            report.winsor = {
+                "g1": float(_wg.get(q_low, np.nan)),
+                "g5": float(_wg.get(q_high, np.nan)),
+                "spread_gross": float(_wg.get(q_high, np.nan) - _wg.get(q_low, np.nan)),
+                "spread_net": float(_wls.mean()) if len(_wls) else np.nan,
+                "spread_net_t": float(newey_west_t(_wls, lag=max(1, primary_horizon - 1)))
+                if len(_wls) > 2 else np.nan,
+                "n_periods": int(len(_wpgross)),
+            }
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("去极值敏感性计算失败: %s", exc)
+            report.winsor = {}
+
+        try:
+            report.return_winsor = _winsor_group_returns(
+                analysis_factor, fwd[primary_horizon],
+                groups=groups, horizon=primary_horizon,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("收益缩尾敏感性计算失败: %s", exc)
+            report.return_winsor = {}
+
         # 多持有期对比（5/10/20 日）＋ 10 日市值中性化版本
         _hs_rows = []
         _results = {}
-        for _h in (5, 10, 20):
+        for _h in (5, 10, 20, 60):
             try:
                 if _h == primary_horizon:
                     _g, _n = period_gross, period_returns
@@ -1353,6 +1555,9 @@ def build_report(
             report.horizon_spreads = pd.DataFrame(_hs_rows)
         if need_cross_core:
             report.filter_test = _filter_test(period_returns, primary_horizon)
+            report.filter_test_opposite = _filter_test_side(
+                period_returns, primary_horizon, f"Q{groups}"
+            )
         if len(net_spread) > 10:
             ls_nav = (1 + net_spread).cumprod()
             report.ls_nav = ls_nav
@@ -1386,6 +1591,17 @@ def build_report(
         float(turnover_mean.get(f"Q{groups}", turnover_mean.mean()))
         if not turnover_mean.empty else float("nan")
     )
+    if quality is not None:
+        report.data_quality["clean"] = {
+            "g1": float(report.quantile_returns_gross.get("Q1", np.nan)),
+            "g5": float(report.quantile_returns_gross.get(f"Q{groups}", np.nan)),
+            "spread_gross": float((report.spread_gross or {}).get("mean", np.nan)),
+            "spread_net": float((report.spread_net or {}).get("mean", np.nan)),
+            "spread_net_t": float((report.spread_net or {}).get("t", np.nan)),
+            "monotonicity": float(report.monotonicity),
+            "turnover": float(report.turnover),
+            "n_periods": int(len(report.period_returns)) if report.period_returns is not None else 0,
+        }
     if benchmark is not None and not benchmark.empty:
         bench = benchmark.reindex(close.index).ffill().dropna()
         if not bench.empty:
@@ -1425,7 +1641,9 @@ def build_report(
             report.ic_by_industry = pd.Series(ic_by_ind).sort_values(ascending=False)
 
     if need_cross_extra:
-        report.tradeability = _tradeability(factor, close, open_, horizon=primary_horizon, is_st=is_st)
+        report.tradeability = _tradeability(
+            analysis_factor, close, open_, horizon=primary_horizon, is_st=is_st
+        )
     if full and need_cross_extra:
         report.sell_side = _sell_side_summary(
             analysis_factor, close, open_, fwd[primary_horizon], horizon=primary_horizon, groups=groups, is_st=is_st
@@ -1477,6 +1695,12 @@ def build_report(
             report.warnings.append(f"自检失败[{check.check_id}]：{check.actual}")
         elif check.status == "warn":
             report.warnings.append(f"自检提示[{check.check_id}]：{check.actual}")
+    # 标题/样本区间按“第一个有有效 IC 的交易日”收口，避免 252 日因子把 2017 写成样本期。
+    _ic5 = (report.ic or {}).get(5)
+    if _ic5 is not None and len(_ic5):
+        _first_ic = _ic5.first_valid_index()
+        if _first_ic is not None:
+            report.start = max(report.start, _first_ic)
     return report
 
 
@@ -1547,15 +1771,19 @@ def _sell_side_summary(
     entry_valid = open_.shift(-1).notna() & factor.notna() & mature
     blocked_target = entry_valid & blocked0
     denom = int(entry_valid.to_numpy().sum())
-    delayed_cnt = int((delay > 0).to_numpy().sum())
+    # 卖出端必须按本因子实际可买入的信号统计，不能把全市场没有信号的单元格也算进来；
+    # 否则不同因子的延迟笔数会逐位相同（旧实现的典型串味）。
+    delay_valid = delay.where(entry_valid)
+    delayed_cnt = int((delay_valid > 0).to_numpy().sum())
     stats = {
         "denominator": denom,
         "blocked_at_target": int(blocked_target.to_numpy().sum()),
         "pct_blocked": float(blocked_target.to_numpy().sum() / denom) if denom else np.nan,
         "delayed": delayed_cnt,
+        "unresolved": max(0, int(blocked_target.to_numpy().sum()) - delayed_cnt),
         "pct_delayed": float(delayed_cnt / denom) if denom else np.nan,
-        "avg_delay": float(delay.where(delay > 0).stack().mean()) if delayed_cnt else 0.0,
-        "max_delay": float(delay.max().max()) if delayed_cnt else 0.0,
+        "avg_delay": float(delay_valid.where(delay_valid > 0).stack().mean()) if delayed_cnt else 0.0,
+        "max_delay": float(delay_valid.max().max()) if delayed_cnt else 0.0,
     }
     # 组合层面：计划卖出 vs 顺延卖出的 Q5−Q1 每期均值
     def _spread(ret: pd.DataFrame) -> float:
@@ -1683,25 +1911,26 @@ def _ls_periods(factor, panel, direction, horizon, groups):
         q = pd.qcut(s[ok].rank(method="first"), groups, labels=False)
         top = ret[ok][q == groups - 1].index
         out.append({"i": i, "top": top, "ret": ret[ok],
-                    "r_top": float(ret[top].mean()) - 2 * _LS_COST, "date": close.index[i]})
+                    "r_top": float(ret[top].mean()) - _LS_COST, "date": close.index[i]})
     return out
 
 
-def _ls_stats(r_top, r_bench):
+def _ls_stats(r_top, r_bench, *, periods_per_year: float = 12.0):
+    """多头/基准统计。频率由 ``periods_per_year`` 明确传入，避免 5 日频被当成月频。"""
     a = np.asarray(r_top, dtype="float64")
     b = np.asarray(r_bench, dtype="float64")
     ex = a - b
     eq = np.cumprod(1 + a)
-    years = len(a) / 12
     beta = np.cov(a, b)[0, 1] / np.var(b, ddof=1) if len(a) > 2 else np.nan
+    ppy = float(periods_per_year) if np.isfinite(periods_per_year) and periods_per_year > 0 else 12.0
     return {
-        "cagr": float(eq[-1] ** (1 / years) - 1),
-        "bench": float(np.cumprod(1 + b)[-1] ** (1 / years) - 1),
-        "excess": float(ex.mean() * 12),
-        "te": float(ex.std(ddof=1) * np.sqrt(12)),
-        "ir": float(ex.mean() / ex.std(ddof=1) * np.sqrt(12)) if ex.std(ddof=1) else np.nan,
+        "cagr": float(eq[-1] ** (ppy / max(1, len(a))) - 1),
+        "bench": float(np.cumprod(1 + b)[-1] ** (ppy / max(1, len(a))) - 1),
+        "excess": float(ex.mean() * ppy),
+        "te": float(ex.std(ddof=1) * np.sqrt(ppy)),
+        "ir": float(ex.mean() / ex.std(ddof=1) * np.sqrt(ppy)) if ex.std(ddof=1) else np.nan,
         "beta": float(beta),
-        "alpha": float((a.mean() - beta * b.mean()) * 12),
+        "alpha": float((a.mean() - beta * b.mean()) * ppy),
         "t": float(ex.mean() / (ex.std(ddof=1) / np.sqrt(len(ex)))) if ex.std(ddof=1) else np.nan,
         "mdd": float((eq / np.maximum.accumulate(eq) - 1).min()),
         "win": float((ex > 0).mean()),
@@ -1756,14 +1985,15 @@ def long_only_stats(factor, panel, direction, horizon=20, groups=5) -> dict:
             r_style.append(float(p["ret"].mean()))
 
     dates = [p["date"] for p in per]
+    ppy = TRADING_DAYS / max(1, int(horizon))
     res = {
         "periods": len(per),
         "holdings": int(np.median([len(p["top"]) for p in per])),
         "index_code": idx_code,
         "median_cap": med_cap,
-        "ew": _ls_stats(r_top, r_ew),
-        "index": _ls_stats(r_top, r_idx),
-        "style": _ls_stats(r_top, r_style),
+        "ew": _ls_stats(r_top, r_ew, periods_per_year=ppy),
+        "index": _ls_stats(r_top, r_idx, periods_per_year=ppy),
+        "style": _ls_stats(r_top, r_style, periods_per_year=ppy),
         "capacity": float(np.nanmedian([float(amount.iloc[p["i"]][p["top"]].median()) for p in per])) * 0.05 * int(np.median([len(p["top"]) for p in per]))
         if amount is not None else np.nan,
         "oos": [],
@@ -1774,7 +2004,7 @@ def long_only_stats(factor, panel, direction, horizon=20, groups=5) -> dict:
         if sum(mask) < 12:
             continue
         sub = lambda arr: [v for v, m in zip(arr, mask) if m]
-        s = _ls_stats(sub(r_top), sub(r_ew))
+        s = _ls_stats(sub(r_top), sub(r_ew), periods_per_year=ppy)
         s["start"] = st
         res["oos"].append(s)
 

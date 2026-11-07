@@ -124,6 +124,16 @@ def rho_spread_identity(rho: float, spread: float, groups: int = 5) -> Check:
     if not np.isfinite(rho) or not np.isfinite(spread):
         return Check("rho_spread", "ρ 与 G5−G1 恒等式", "skip", "—", "—", "样本不足")
     actual = f"ρ={rho:+.2f}，G5−G1={spread * 100:+.2f}%/期"
+    if abs(rho) < 1e-12:
+        if abs(spread) < 1e-12:
+            return Check("rho_spread", "ρ 与 G5−G1 恒等式", "pass", actual,
+                         "ρ=0 且价差≈0", "")
+        return Check(
+            "rho_spread", "ρ 与 G5−G1 恒等式", "warn", actual,
+            "ρ=0 时不能声称同号",
+            "ρ=0 表示分层没有单调方向，G5−G1 的符号不能由 ρ 推出；"
+            "需直接看分组均值，不能把 0 当正数判「同号」。",
+        )
     if rho >= 0.80 and spread <= 0:
         return Check(
             "rho_spread", "ρ 与 G5−G1 恒等式", "fail", actual, "ρ≥0.8 时 G5−G1 必须 >0",
@@ -249,6 +259,44 @@ def attribute_failure(report) -> dict:
         return {"label": "复现失败", "reason": checks["reproduction"].actual}
     if checks.get("direction") and checks["direction"].status == "fail":
         return {"label": "方向错", "reason": checks["direction"].actual}
+    dq = getattr(report, "data_quality", None) or {}
+    if dq.get("triggered"):
+        reasons = ["零值桶污染"]
+        inc = report.incrementality or {}
+        residual = float(inc.get("ic_resid", np.nan)) if inc else float("nan")
+        retention = float(inc.get("effective_ratio", inc.get("ratio", np.nan))) if inc else float("nan")
+        if inc and (
+            (np.isfinite(residual) and residual <= 0)
+            or (np.isfinite(retention) and retention <= 0.10)
+            or float(inc.get("score", 0) or 0) <= 0
+        ):
+            reasons.append("完全冗余")
+        clean = dq.get("clean", {})
+        net_t = float(clean.get("spread_net_t", np.nan)) if clean else float("nan")
+        if clean and np.isfinite(net_t) and net_t < 1.0:
+            reasons.append("扣费后无净 edge")
+        bits = []
+        if clean:
+            bits.append(
+                "清洗后 G1 {:+.2%}、G5 {:+.2%}、多空净价差 {:+.2%}（t={:.2f}）".format(
+                    float(clean.get("g1", np.nan)),
+                    float(clean.get("g5", np.nan)),
+                    float(clean.get("spread_net", np.nan)),
+                    net_t,
+                )
+            )
+        if inc:
+            bits.append(
+                f"残差 IC {residual:+.3f}、保留率 {retention:.0%}"
+                if np.isfinite(residual) and np.isfinite(retention)
+                else f"残差 IC {residual:+.3f}"
+            )
+        return {
+            "label": " + ".join(reasons),
+            "reason": "；".join(bits) if bits else "零值桶污染",
+            "reasons": reasons,
+            "quality_note": "零值桶污染：清洗前后的 G1/价差对照见「数据质量与覆盖」与敏感性表。",
+        }
     trans = checks.get("ic_transmission")
     rho = checks.get("rho_spread")
     if trans and trans.status == "warn" and "比值 -" in trans.actual:

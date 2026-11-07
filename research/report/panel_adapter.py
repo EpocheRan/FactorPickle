@@ -223,6 +223,7 @@ def _build_panel(
         "intraday_trimmed": False,
         "partial_last_day": None,
         "last_day_coverage": int(close.notna().sum(axis=1).iloc[-1]),
+        "data_version": f"ohlcv_1d:{close.index.max().date()}|symbols:{close.shape[1]}|days:{close.shape[0]}",
         "today": str(pd.Timestamp.today().date()),
     }
 

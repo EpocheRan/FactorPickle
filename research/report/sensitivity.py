@@ -14,6 +14,7 @@ import pandas as pd
 
 from research.data.db import query
 from . import metrics
+from .data_quality import CleaningStandard, analyze as analyze_quality
 
 
 def _metadata() -> pd.DataFrame:
@@ -55,12 +56,19 @@ def _one(
     counts = valid.sum(axis=1)
     ic = _rank_ic(signal, forward)
     ic_t = metrics.newey_west_t(ic, lag=max(0, horizon - 1)) if len(ic) > 2 else float("nan")
-    _, _, pg, pnet, _, _, turnover = metrics._quantile_nav(
+    _, turnover_df, pg, pnet, _, _, turnover_mean = metrics._quantile_nav(
         signal, close, open_, groups=groups, horizon=horizon,
         cost_bps=cost_bps, tradeable=tradeable,
     )
     gross = pg.mean() if not pg.empty else pd.Series(dtype="float64")
     net = pnet.mean() if not pnet.empty else pd.Series(dtype="float64")
+    q_hi, q_lo = f"Q{groups}", "Q1"
+    # 多空净价差 = 毛价差 − 两条腿成本；和“分组净差”不是同一个量。
+    leg_cost = (
+        (turnover_df.get(q_hi, pd.Series(dtype="float64"))
+         + turnover_df.get(q_lo, pd.Series(dtype="float64"))) * cost_bps / 10000.0
+    ).dropna()
+    ls_net = (pg[q_hi] - pg[q_lo] - leg_cost).dropna() if (q_hi in pg and q_lo in pg) else pd.Series(dtype="float64")
     vals = signal.stack().dropna()
     return {
         "universe": name,
@@ -71,14 +79,19 @@ def _one(
         "ic_t": float(ic_t),
         "g1": float(gross.get("Q1", np.nan)),
         "g5": float(gross.get(f"Q{groups}", np.nan)),
-        "spread_gross": float(gross.get(f"Q{groups}", np.nan) - gross.get("Q1", np.nan)),
-        "spread_net": float(net.get(f"Q{groups}", np.nan) - net.get("Q1", np.nan)),
-        "turnover": float(turnover.mean().mean()) if not turnover.empty else float("nan"),
+        "spread_gross": float(gross.get(q_hi, np.nan) - gross.get(q_lo, np.nan)),
+        "group_net_diff": float(net.get(q_hi, np.nan) - net.get(q_lo, np.nan)),
+        "spread_net": float(ls_net.mean()) if len(ls_net) else float("nan"),
+        "spread_net_t": float(metrics.newey_west_t(ls_net, lag=max(1, horizon - 1)))
+        if len(ls_net) > 2 else float("nan"),
+        "turnover": float(turnover_mean.mean()) if not turnover_mean.empty else float("nan"),
+        "turnover_top": float(turnover_df[q_hi].mean())
+        if (q_hi in turnover_df and not turnover_df.empty) else float("nan"),
     }
 
 
-def baseline_from_report(report, factor: pd.DataFrame) -> dict:
-    """把主报告已经算好的 ALL 结果转成敏感性表的第一行。"""
+def baseline_from_report(report, factor: pd.DataFrame, label: str = "ALL") -> dict:
+    """把主报告已经算好的结果转成敏感性表的基线行。"""
     stats = report.ic_stats
     primary = 5 if 5 in stats.index else (stats.index[0] if len(stats) else None)
     row = stats.loc[primary] if primary is not None else None
@@ -94,18 +107,24 @@ def baseline_from_report(report, factor: pd.DataFrame) -> dict:
     q_keys = sorted(
         gross, key=lambda k: int(k[1:]) if str(k).startswith("Q") and str(k)[1:].isdigit() else 0
     )
+    dq = getattr(report, "data_quality", None) or {}
+    avg_names = float(dq.get("coverage", {}).get("avg_names", report.n_symbols * report.coverage))
+    zero_share = float(dq.get("zero", {}).get("share", (zeros / finite) if finite else np.nan))
     return {
-        "universe": "ALL",
+        "universe": label,
         "symbols": int(report.n_symbols),
-        "avg_names": float(report.n_symbols * report.coverage),
-        "zero_share": float(zeros / finite) if finite else float("nan"),
+        "avg_names": avg_names,
+        "zero_share": zero_share,
         "ic": float(row["mean"]) if row is not None else float("nan"),
         "ic_t": float(row["t"]) if row is not None else float("nan"),
         "g1": float(gross.get("Q1", np.nan)),
         "g5": float(gross.get(q_keys[-1], np.nan)) if q_keys else float("nan"),
         "spread_gross": float((report.spread_gross or {}).get("mean", np.nan)),
+        "group_net_diff": float((net.get(q_keys[-1], np.nan) - net.get("Q1", np.nan))) if q_keys else float("nan"),
         "spread_net": float((report.spread_net or {}).get("mean", np.nan)),
-        "turnover": turnover,
+        "spread_net_t": float((report.spread_net or {}).get("t", np.nan)),
+        "turnover": float(report.turnover) if np.isfinite(report.turnover) else turnover,
+        "turnover_top": float(report.turnover) if np.isfinite(report.turnover) else turnover,
     }
 
 
@@ -120,6 +139,8 @@ def compute(
     start=None,
     end=None,
     baseline: dict | None = None,
+    cleaning: CleaningStandard | None = None,
+    direction: int = 1,
 ) -> list[dict]:
     """返回四个版本的 IC / 分组收益 / 价差 / 换手。"""
     dates = factor.index
@@ -129,7 +150,7 @@ def compute(
         dates = dates[dates <= pd.Timestamp(end)]
     close = panel.close.reindex(index=dates, columns=factor.columns)
     open_ = panel.open.reindex(index=dates, columns=factor.columns)
-    signal = factor.reindex(index=dates, columns=close.columns)
+    signal = factor.reindex(index=dates, columns=close.columns) * int(direction)
     forward = close.shift(-horizon) / open_.shift(-1) - 1
 
     meta = _metadata()
@@ -164,19 +185,56 @@ def compute(
     all_cols = list(close.columns)
     b_cols = [c for c in close.columns if not bool(bse.get(c, False))]
 
-    out = [baseline] if baseline is not None else [
-        _one("ALL", signal=signal, forward=forward, close=close, open_=open_,
-             groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=None),
-    ]
-    out += [
-        _one("EX_BSE", signal=signal[b_cols], forward=forward[b_cols],
-             close=close[b_cols], open_=open_[b_cols],
-             groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=None),
-        _one("INVESTABLE", signal=signal, forward=forward, close=close, open_=open_,
-             groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=investable),
-        _one("HIGH_LIQ", signal=signal, forward=forward, close=close, open_=open_,
-             groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=high),
-    ]
+    clean_mask = None
+    if cleaning is not None:
+        clean_mask = analyze_quality(
+            signal, close, open_,
+            low=panel.low.reindex(index=dates, columns=close.columns) if panel.low is not None else None,
+            amount=amount,
+            standard=cleaning,
+            horizon=horizon,
+        ).mask
+
+    if cleaning is not None:
+        # 所有对照版本共用同一有效观测 mask；否则“换 universe”会混入“换算法”。
+        out = [
+            _one("ALL_RAW", signal=signal, forward=forward, close=close, open_=open_,
+                 groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=None),
+            _one("ALL_VALID", signal=signal.where(clean_mask), forward=forward,
+                 close=close, open_=open_, groups=groups, horizon=horizon,
+                 cost_bps=cost_bps, tradeable=clean_mask),
+        ]
+        if baseline is not None:
+            out.append(baseline)
+        else:
+            out.append(_one("EX_BSE_VALID", signal=signal.where(clean_mask),
+                            forward=forward, close=close, open_=open_,
+                            groups=groups, horizon=horizon, cost_bps=cost_bps,
+                            tradeable=clean_mask))
+        out += [
+            _one("INVESTABLE_VALID",
+                 signal=signal.where(clean_mask), forward=forward,
+                 close=close, open_=open_, groups=groups, horizon=horizon,
+                 cost_bps=cost_bps, tradeable=clean_mask & investable),
+            _one("HIGH_LIQ_VALID",
+                 signal=signal.where(clean_mask), forward=forward,
+                 close=close, open_=open_, groups=groups, horizon=horizon,
+                 cost_bps=cost_bps, tradeable=clean_mask & high),
+        ]
+    else:
+        out = [baseline] if baseline is not None else [
+            _one("ALL", signal=signal, forward=forward, close=close, open_=open_,
+                 groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=None),
+        ]
+        out += [
+            _one("EX_BSE", signal=signal[b_cols], forward=forward[b_cols],
+                 close=close[b_cols], open_=open_[b_cols],
+                 groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=None),
+            _one("INVESTABLE", signal=signal, forward=forward, close=close, open_=open_,
+                 groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=investable),
+            _one("HIGH_LIQ", signal=signal, forward=forward, close=close, open_=open_,
+                 groups=groups, horizon=horizon, cost_bps=cost_bps, tradeable=high),
+        ]
     return out
 
 

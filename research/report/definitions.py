@@ -120,6 +120,11 @@ def describe(factor_id: str) -> Definition:
     category, _, short = key.partition(".")
     window, direction, unit, lag, as_of, reg_formula = _registry_meta(key)
     econ = DEFAULT_ECON.get(category, "见因子注册表。")
+    if category == "momentum" and short.startswith("ret_"):
+        econ = (
+            "动量/趋势延续（registry 先验）。注意：A 股短周期收益常呈均值回复，"
+            "样本内方向由 IC 检验决定；不能把 +1 先验当成事实，方向是否重设见报告的方向复核。"
+        )
     transform = "原值（未取对数 / 未除以市值）"
     notes = ""
     pit = ""

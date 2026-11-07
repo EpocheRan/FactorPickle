@@ -17,12 +17,14 @@ import argparse
 import logging
 import sys
 import time
+from pathlib import Path
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:  # noqa: BLE001
     pass
 
+from research.report import quality_audit  # noqa: E402
 from research.report.runner import generate  # noqa: E402
 
 
@@ -53,6 +55,8 @@ def main() -> int:
     parser.add_argument("--category", default=None)
     parser.add_argument("--direction", type=int, default=None)
     parser.add_argument("--profile", default="default", help="报告章节 profile")
+    parser.add_argument("--quality-audit", action="store_true",
+                        help="生成数据质量/归因审计 CSV（同目录 quality_audit.csv）")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -79,6 +83,7 @@ def main() -> int:
             f"（{time.time() - _t0:.1f}s），{len(factors)} 个因子复用"
         )
 
+    audit_rows: list[dict] = []
     for factor in factors:
         try:
             result = generate(
@@ -110,6 +115,11 @@ def main() -> int:
         )
         for veto in rating["vetoes"]:
             print(f"    否决: {veto}")
+        if args.quality_audit:
+            audit_rows.append(quality_audit.row_from_report(result["report"], rating))
+    if args.quality_audit and audit_rows:
+        path = quality_audit.write_csv(Path(args.out) / "quality_audit.csv", audit_rows)
+        print(f"数据质量审计: {path}")
     return 0
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from research.report import data_quality
 from research.report import metrics
 from research.report import diagnostics as diag
 
@@ -235,6 +236,169 @@ def test_negative_retention_has_plain_wording():
     assert "残差为负" in text
     assert "0 分" in text
     assert "-15%" not in text
+
+
+def test_data_quality_cleaning_marks_zero_no_data():
+    rng = np.random.default_rng(11)
+    dates = pd.bdate_range("2024-01-02", periods=80)
+    cols = [f"{i:06d}" for i in range(40)]
+    close = pd.DataFrame(
+        np.cumprod(1 + rng.normal(0, 0.01, size=(len(dates), len(cols))), axis=0),
+        index=dates, columns=cols,
+    )
+    factor = pd.DataFrame(
+        rng.uniform(0.01, 1.0, size=(len(dates), len(cols))), index=dates, columns=cols
+    )
+    # 前 20 只股票在前 30 天无行情，因子被填 0
+    close.iloc[:30, :20] = np.nan
+    factor.iloc[:30, :20] = 0.0
+    amount = pd.DataFrame(1e8, index=dates, columns=cols)
+    q = data_quality.analyze(
+        factor, close, close, low=close, amount=amount,
+        standard=data_quality.CleaningStandard(min_history=20), horizon=5,
+    )
+    assert q.summary["triggered"]
+    assert q.summary["zero"]["share"] > 0.15
+    assert q.summary["zero"]["no_data_share"] > 0.10
+    assert not bool(q.mask.iloc[0, 0])
+    assert bool(q.mask.iloc[-2, 0])
+
+
+def test_data_quality_positive_factor_not_triggered():
+    rng = np.random.default_rng(12)
+    dates = pd.bdate_range("2024-01-02", periods=60)
+    cols = [f"{i:06d}" for i in range(30)]
+    close = pd.DataFrame(
+        np.cumprod(1 + rng.normal(0, 0.01, size=(len(dates), len(cols))), axis=0),
+        index=dates, columns=cols,
+    )
+    factor = pd.DataFrame(
+        rng.uniform(0.01, 1.0, size=(len(dates), len(cols))), index=dates, columns=cols
+    )
+    q = data_quality.analyze(
+        factor, close, close, low=close,
+        standard=data_quality.CleaningStandard(min_history=20), horizon=5,
+    )
+    assert not q.summary["triggered"]
+
+
+def test_rating_weights_are_single_source():
+    from research.report import rating
+    assert abs(sum(rating.WEIGHTS.values()) - 100.0) < 1e-9
+    assert rating._grade(85.0) == "A"
+    assert rating._grade(70.0) == "B"
+    assert rating._grade(55.0) == "C"
+    assert rating._grade(54.9) == "D"
+
+
+def test_reverse_net_keeps_cost_positive():
+    from research.report import rating
+    # 原始毛价差 -0.30%，成本 0.16%；反向毛 +0.30%，反向净 +0.14%
+    assert np.isclose(rating._reverse_net(-0.0030, 0.0016), 0.0014)
+    assert np.isclose(rating._reverse_net(0.0014, 0.0017), -0.0031)
+
+
+def test_decay_note_uses_absolute_ic_for_negative_signal():
+    decay = pd.Series({1: -0.016, 5: -0.045, 10: -0.056, 20: -0.066})
+    text = metrics._decay_note(decay)
+    assert "增强" in text or "最大" in text
+    assert "0.066" in text
+    assert "见顶" not in text
+
+
+def test_rho_zero_is_not_treated_as_positive():
+    assert diag.rho_spread_identity(0.0, -0.003).status == "warn"
+    assert diag.rho_spread_identity(0.0, 0.003).status == "warn"
+
+
+def test_filter_test_side_can_drop_q5():
+    rng = np.random.default_rng(21)
+    base = rng.normal(0.001, 0.01, 120)
+    periods = pd.DataFrame(
+        {"Q1": base + 0.001, "Q2": base + 0.001, "Q3": base + 0.001,
+         "Q4": base + 0.001, "Q5": base - 0.003}
+    )
+    out = metrics._filter_test_side(periods, 5, "Q5")
+    assert out["drop_group"] == "Q5"
+    assert out["dropped_mean"] < out["rest_mean"]
+    assert np.isfinite(out["rest_sharpe"])
+
+
+def test_regime_diff_ci_ignores_nan_ic_days():
+    idx = pd.bdate_range("2024-01-02", periods=200)
+    rng = np.random.default_rng(7)
+    ic = pd.Series(rng.normal(-0.04, 0.05, len(idx)), index=idx)
+    ic.iloc[::7] = np.nan
+    regime = pd.Series(
+        np.where(np.arange(len(idx)) % 2 == 0, "bull", "bear"), index=idx
+    )
+    table = metrics._regime_table(ic, regime)
+    row = table.loc["牛市−熊市"]
+    assert np.isfinite(row["ci_lo"]) and np.isfinite(row["ci_hi"])
+
+
+def test_winsorize_frame_clips_cross_section_tails():
+    dates = pd.bdate_range("2024-01-02", periods=3)
+    frame = pd.DataFrame([[0.0, 1.0, 2.0, 3.0, 100.0]] * 3,
+                         index=dates, columns=list("abcde"))
+    out = metrics._winsorize_frame(frame, 0.01, 0.99)
+    assert out.iloc[0, -1] <= 100.0
+    assert out.shape == frame.shape
+
+
+def test_data_quality_symbol_funnel_is_complete():
+    rng = np.random.default_rng(31)
+    dates = pd.bdate_range("2024-01-02", periods=40)
+    cols = [f"{i:06d}" for i in range(20)]
+    close = pd.DataFrame(1.0, index=dates, columns=cols)
+    factor = pd.DataFrame(rng.uniform(0.1, 1.0, size=(len(dates), len(cols))),
+                          index=dates, columns=cols)
+    q = data_quality.analyze(
+        factor, close, close, low=close,
+        standard=data_quality.CleaningStandard(min_history=5), horizon=5,
+    )
+    steps = [r["step"] for r in q.summary["symbol_funnel"]]
+    assert steps == ["universe 解析", "剔除北证", "参与排序"]
+    assert q.summary["symbol_funnel"][-1]["count"] <= q.summary["symbol_funnel"][0]["count"]
+
+
+def test_build_report_has_tail_specificity():
+    dates, cols, close, open_, factor = _panel(n_dates=120, n_cols=60, seed=9)
+    # 只让最高分位断崖，制造单尾结构
+    factor = factor.copy()
+    factor.iloc[:, :12] = factor.iloc[:, :12] + 5.0
+    report = metrics.build_report(
+        factor, close, open_, factor_id="test.tail", category="momentum",
+        direction=1, full=False,
+    )
+    assert report.tail_specificity
+    assert 0.0 <= report.tail_specificity["ratio"] <= 1.0
+
+
+def test_quality_audit_row_is_generic():
+    from types import SimpleNamespace
+    from research.report import quality_audit
+    report = SimpleNamespace(
+        factor_id="x.test",
+        data_quality={"triggered": True, "zero": {"share": 0.2, "no_data_share": 0.15},
+                      "clean": {"g1": 0.0, "g5": 0.002, "spread_net": 0.0001,
+                                "spread_net_t": 0.5}},
+        incrementality={"max_corr": 0.6, "ic_resid": -0.01, "effective_ratio": 0.0},
+    )
+    row = quality_audit.row_from_report(report, {"grade": "D", "score": 33.0,
+                                                "attribution": {"label": "完全冗余"}})
+    assert row["factor_id"] == "x.test"
+    assert row["triggered"] is True
+    assert row["attribution"] == "完全冗余"
+
+
+def test_ls_stats_uses_period_frequency():
+    a = np.array([0.01, 0.02, 0.03, 0.04])
+    b = np.array([0.005, 0.01, 0.0, 0.02])
+    m = metrics._ls_stats(a, b, periods_per_year=48.0)
+    y = metrics._ls_stats(a, b, periods_per_year=12.0)
+    assert np.isclose(m["excess"], y["excess"] * 4.0)
+    assert np.isclose(m["te"], y["te"] * 2.0)
 
 
 def test_direction_error_gets_attribution():

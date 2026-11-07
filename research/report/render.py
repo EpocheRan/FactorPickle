@@ -108,7 +108,10 @@ def _formula_text(d: dict) -> str:
     m = _re.search(r"turnover_std_bias_(\d+)_(\d+)", fid)
     if m:
         short, long_ = m.group(1), m.group(2)
-        return f"换手率波动偏离 = MA{short}(换手率) / MA{long_}(换手率)（短窗 {short} 日 / 长窗 {long_} 日）"
+        return (
+            f"换手率波动偏离 = STD{short}(换手率) / STD{long_}(换手率) − 1"
+            f"（短窗 {short} 日 / 长窗 {long_} 日；比值减 1，所以中位数可为负）"
+        )
     mapped = {
         "momentum.rsrs": "RSRS 阻力支撑相对强度：对过去 N 日 high~low 做 OLS 回归得斜率 β，再按斜率与波动标准化",
         "risk.vol_21d": "21 日收益率标准差（年化前）",
@@ -223,7 +226,8 @@ def _fmt_factor(value: float, unit: str) -> str:
     if unit == "元":
         return f"{value / 1e8:,.2f} 亿元"
     if unit == "%":
-        return f"{value:.2f}%"
+        # 因子层统一存小数（0.05 = 5%），展示层唯一入口在这里乘 100。
+        return f"{value * 100:.2f}%"
     if abs(value) >= 1000:
         return f"{value:,.0f}"
     return f"{value:.4g}"
@@ -309,7 +313,8 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
         "两组相减不等于多空净价差；"
         f"多空组合几何年化 {_pct(ls.get('ann', float('nan')), 1)}、夏普 {_num(ls.get('sharpe', float('nan')), 2)}、"
         f"最大回撤 {_pct(ls.get('mdd', float('nan')), 1)}。"
-        f"时间维度 {rating['time_score']:.0f}/100、空间维度 {rating['space_score']:.0f}/100，"
+        f"时间稳定性（不分方向）{rating['time_score']:.0f}/100、空间维度 {rating['space_score']:.0f}/100，"
+        f"与先验同号率 {float(rating.get('prior_sign_ratio') or 0)*100:.0f}%，"
         f"定位于「<b>{rating['quadrant']}</b>」，评级 <b>{rating['grade']}</b>。"
     )
 
@@ -319,7 +324,8 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
             _kpi("ICIR", _num(ic_ir, 2), f"NW t={_num(ic_t, 1)} · 独立 t={_num(t_indep, 1)}"),
             _kpi("多空夏普", _num(ls.get("sharpe", float("nan")), 2),
                  f"年化 {_pct(ls.get('ann', float('nan')), 1)} · MDD {_pct(ls.get('mdd', float('nan')), 1)}"),
-            _kpi("覆盖率", f"{report.coverage:.1%}", f"{report.n_symbols} 只 · {report.n_dates} 日"),
+            _kpi("覆盖率（有效观测内）", f"{report.coverage:.1%}",
+                 f"{report.n_symbols} 只 · {report.n_dates} 日"),
         ]
     )
 
@@ -367,12 +373,17 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
 
     # ---------------- 图 2-2：分年 IC（带 95% CI）
     yearly_fig = ""
-    if report.ic_by_year is not None and len(report.ic_by_year) > 1:
-        years = [str(y) for y in report.ic_by_year.index]
-        values = list(report.ic_by_year.to_numpy())
+    _yearly = (
+        report.ic_by_year.dropna()
+        if report.ic_by_year is not None else pd.Series(dtype="float64")
+    )
+    _yearly = _yearly[np.isfinite(_yearly)]
+    if len(_yearly) > 1:
+        years = [str(y) for y in _yearly.index]
+        values = list(_yearly.to_numpy())
         errors = []
         if report.ic_by_year_ci is not None:
-            for year in report.ic_by_year.index:
+            for year in _yearly.index:
                 rec = report.ic_by_year_ci.loc[year]
                 errors.append((rec["ci_hi"] - rec["ci_lo"]) / 2 if np.isfinite(rec["ci_hi"]) else 0.0)
         else:
@@ -480,6 +491,32 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
                          "注：非重叠换仓，每期 5 个交易日；净收益已扣除 20bp/条腿（≈单边 10bp，多空合计 40bp）。"
                          "单调性用<b>毛收益</b>，避免各组换手差异把方向带偏；净收益与成本单列。")
 
+    winsor_block = ""
+    _wins = report.winsor or {}
+    if _wins:
+        _rw = report.return_winsor or {}
+        winsor_block = (
+            "<h3>去极值敏感性：因子值 vs 收益</h3>"
+            + _table(
+                ["指标", "原始", "因子值缩尾 1%/99%", "组内收益缩尾 1%/99%"],
+                [
+                    ["G1/期", _pct(report.quantile_returns_gross.get("Q1", np.nan), 2),
+                     _pct(_wins.get("g1", np.nan), 2), _pct(_rw.get("Q1", np.nan), 2)],
+                    ["G5/期", _pct(report.quantile_returns_gross.get("Q5", np.nan), 2),
+                     _pct(_wins.get("g5", np.nan), 2), _pct(_rw.get("Q5", np.nan), 2)],
+                    ["G5−G1 毛", _pct((report.spread_gross or {}).get("mean", np.nan), 2),
+                     _pct(_wins.get("spread_gross", np.nan), 2), _pct(_rw.get("spread", np.nan), 2)],
+                    ["多空净价差", _pct((report.spread_net or {}).get("mean", np.nan), 2),
+                     _pct(_wins.get("spread_net", np.nan), 2), "—"],
+                    ["净价差 t", f"{float((report.spread_net or {}).get('t', np.nan)):.1f}",
+                     f"{float(_wins.get('spread_net_t', np.nan)):.1f}", "—"],
+                ],
+                "注：因子值缩尾只改分组边界，若边界未动则 G1/G5 不变；"
+                "组内收益缩尾按当期组内 1%/99% 裁剪未来收益，用来回答“G5 断崖是否由极端收益拉动”。"
+                "因子值缩尾会制造边界并列，秩 IC 可能轻微变化；本表未报 IC。",
+            )
+        )
+
     # ---------------- 图 3-2：多空净值 + 回撤
     perf_fig = ""
     if report.ls_nav is not None and len(report.ls_nav) > 20:
@@ -512,21 +549,27 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
         report.quantile_returns.get("Q5", np.nan) - report.quantile_returns.get("Q1", np.nan),
     ))
     arith_ann = spread_per * 242 / 5
-    vol_ = report.perf.get("vol", float("nan"))
-    drag = 0.5 * vol_ ** 2 if np.isfinite(vol_) else float("nan")
     table_spread = float((report.spread_net or {}).get("mean", float("nan")))
+    geo_ann = report.perf.get("ann", float("nan"))
+    if np.isfinite(arith_ann) and arith_ann < 0:
+        _diff_note = "两者差额来自负收益的复利路径"
+    elif np.isfinite(arith_ann) and np.isfinite(geo_ann) and geo_ann < arith_ann:
+        _diff_note = "两者差额来自正收益的波动拖累/复利"
+    else:
+        _diff_note = "两者差额来自复利路径"
     perf_table = _table(["多空组合（G5−G1，5 日非重叠）", "数值"], perf_rows,
                         f"注：表内 G5−G1 净价差 {table_spread*100:.2f}%/期；多空两条腿各付一次往返 20bp。"
-                        f"算术年化 ≈ {arith_ann*100:.1f}%（{spread_per*100:.2f}%/期 × 242/5），"
-                        f"扣波动拖累 {drag*100:.1f}pp 后为 {arith_ann*100-drag*100:.1f}%，"
-                        f"几何复利 {report.perf.get('ann', float('nan'))*100:.1f}%；"
-                        "差额来自算术均值与几何复利，不是两套口径。未计融券费用与冲击成本。")
+                        f"算术年化 ≈ {arith_ann*100:.2f}%（{spread_per*100:.3f}%/期 × 242/5）；"
+                        f"几何复利 {geo_ann*100:.2f}%；{_diff_note}。"
+                        "未计融券费用与冲击成本。")
     annual_rows = []
     annual_corr = float("nan")
     if report.annual_ic_return is not None and not report.annual_ic_return.empty:
         frame = report.annual_ic_return
         annual_corr = float(frame["ic"].corr(frame["ret"]))
         for year, rec in frame.iterrows():
+            if not np.isfinite(rec["ic"]):
+                continue
             annual_rows.append([
                 str(year),
                 (f"{rec['ic']:+.3f}", _cls(rec["ic"])),
@@ -579,7 +622,8 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
         )
     industry_rows = []
     if report.ic_by_industry is not None:
-        top = report.ic_by_industry
+        top = report.ic_by_industry.dropna()
+        top = top[np.isfinite(top.to_numpy(dtype="float64"))]
         if len(top) > 12:
             top = pd.concat([top.head(6), top.tail(6)])
         for k, v in top.items():
@@ -601,7 +645,8 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
         f"剔除同类后的残差 IC {inc.get('ic_resid', float('nan')):+.3f}"
         f"（原始 {inc.get('ic_raw', float('nan')):+.3f}）；"
         f"{diag.retention_note(ratio, max_corr, float(inc.get('ic_raw', float('nan'))))}"
-        f" 原始增量性 {inc.get('score', float('nan')):.1f}/15（折算 {inc.get('score', float('nan')) * 4 / 3:.1f}/20）。"
+        f" 增量维度 {float(rating.get('incremental_score', 0.0)) * 0.10:.1f}/10"
+        f"（由 0–100 分 {float(rating.get('incremental_score', 0.0)):.1f} × 10/100 线性折算）。"
     )
     inc_table = _table(["对照因子", "横截面秩相关（均值）"], inc_rows or [["—", "—"]],
                        "注：相关性为逐日横截面 Spearman 的均值（每 15 个交易日抽样一次）；"
@@ -655,6 +700,51 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
             + "若组合已暴露于同族因子（见增量性表），本因子的净贡献应以残差 IC 为准。</p>"
         )
 
+    # ---------------- 另一侧过滤：剔除最强组
+    fo = report.filter_test_opposite or {}
+    filter_opposite_block = ""
+    if fo and (fo.get("useful") or report.monotonicity < 0.10):
+        _g = str(fo.get("drop_group", "Q5")).replace("Q", "G")
+        _rest_label = f"其余四组等权"
+        _t_excess = float(fo.get("excess_t", np.nan))
+        if fo.get("useful") and np.isfinite(_t_excess) and abs(_t_excess) >= 2.0:
+            _verdict = "剔除该侧有效"
+        elif fo.get("useful"):
+            _verdict = "剔除该侧为候选（超额 t 不足 2）"
+        else:
+            _verdict = "剔除该侧不成立"
+        _tbl = _table(
+            ["检验项", f"{_g}（拟剔除）", _rest_label, "全组等权"],
+            [
+                ["每期收益", _pct(fo.get("dropped_mean", np.nan)), _pct(fo.get("rest_mean", np.nan)), _pct(fo.get("all_mean", np.nan))],
+                ["相对全组（每期）", "—",
+                 f"{fo.get('excess_mean', float('nan'))*100:+.2f}%"
+                 f"（t={fo.get('excess_t', float('nan')):.1f}）", "—"],
+                ["相对全组 95% CI", "—",
+                 f"[{fo.get('excess_ci', (np.nan, np.nan))[0]*100:+.2f}%, "
+                 f"{fo.get('excess_ci', (np.nan, np.nan))[1]*100:+.2f}%]", "—"],
+                ["折年收益（算术）", _pct(fo.get("dropped_ann", np.nan), 1), _pct(fo.get("rest_ann", np.nan), 1), _pct(fo.get("all_ann", np.nan), 1)],
+                ["夏普", f"{fo.get('dropped_sharpe', np.nan):.2f}", f"{fo.get('rest_sharpe', np.nan):.2f}", f"{fo.get('all_sharpe', np.nan):.2f}"],
+                ["最大回撤", _pct(fo.get("dropped_mdd", np.nan), 1), _pct(fo.get("rest_mdd", np.nan), 1), _pct(fo.get("all_mdd", np.nan), 1)],
+                ["尾部亏损频率（<-3%/期）", f"{fo.get('tail_dropped', np.nan):.1%}", f"{fo.get('tail_rest', np.nan):.1%}", "—"],
+            ],
+            "注：另一侧过滤检验。direction 先验为正时主表只测剔除 G1；"
+            "若方向先验可疑，必须同时看剔除 G5 的对称结果。"
+            "相对全组 t/CI 为「其余四组 − 全组」；未计剔除 G5 后成分漂移的额外换手成本，"
+            "因此改善读作毛改善，不是可直接落地的净 alpha。",
+        )
+        filter_opposite_block = (
+            f"<h3>另一侧过滤检验：剔除 {_g} 后组合会更好吗？</h3>{_tbl}"
+            f"<p class=\"small\"><b>结论：{_verdict}。</b>"
+            f"{_g} 每期收益 {fo.get('dropped_mean', float('nan'))*100:+.2f}%，"
+            f"其余四组 {fo.get('rest_mean', float('nan'))*100:+.2f}%，全组 {fo.get('all_mean', float('nan'))*100:+.2f}%；"
+            f"剔除后夏普 {fo.get('all_sharpe', float('nan')):.2f}→{fo.get('rest_sharpe', float('nan')):.2f}。"
+            + (" 这是方向复核证据，不改变当前 +1 先验下的 D；若要采用，"
+               "需在独立窗口重设方向并写入 registry 后重跑。"
+               if fo.get("useful") else "")
+            + "</p>"
+        )
+
     # ---------------- 可交易性
     tr = report.tradeability or {}
     trade_rows = [
@@ -667,6 +757,8 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
     trade_table = _table(["指标", "数值"], trade_rows,
                          (tr.get("explain", "") +
                           "分母仅统计有因子值且有下一交易日的信号，口径与可执行交易一致。"
+                          "分母已要求下一日开盘，因此“停牌不可买”按构造为 0；"
+                          "买入端唯一的阻塞是开盘一字涨停。"
                           f"新口径只统计有因子值且有下一交易日的信号，{tr.get('pct', float('nan')):.2%} "
                           "才是可执行的不可成交比例。"))
 
@@ -675,7 +767,8 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
     sell_rows = [
         ["分母：可买入信号", f"{ss.get('denominator', 0):,}"],
         ["T+h 收盘跌停/停牌（无法按计划卖出）", f"{ss.get('blocked_at_target', 0):,}（{ss.get('pct_blocked', float('nan')):.2%}）"],
-        ["顺延卖出笔数", f"{ss.get('delayed', 0):,}（{ss.get('pct_delayed', float('nan')):.2%}）"],
+        ["其中：已顺延卖出", f"{ss.get('delayed', 0):,}（{ss.get('pct_delayed', float('nan')):.2%}）"],
+        ["其中：到期后仍无价格（未解决）", f"{ss.get('unresolved', 0):,}"],
         ["平均 / 最大顺延（交易日）", f"{ss.get('avg_delay', 0):.2f} / {ss.get('max_delay', 0):.0f}"],
         ["G5−G1 每期收益：计划卖出", _pct(ss.get("spread_planned", np.nan), 2)],
         ["G5−G1 每期收益：顺延卖出", _pct(ss.get("spread_delayed", np.nan), 2)],
@@ -683,7 +776,8 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
     ]
     sell_table = _table(["卖出端可执行性", "数值"], sell_rows,
                         "注：跌停价由前收盘×（1−板块幅度）推出；跌停收盘或停牌视为无法卖出，"
-                        "顺延到下一个可卖日（最多 10 个交易日）。")
+                        "顺延到下一个可卖日（最多 10 个交易日）。卖出端只统计 T+h 已到期信号，"
+                        "分母因此小于买入端；“未解决”是到期后仍无价格或样本末端的笔数。")
 
     # ---------------- 成本敏感性
     cost_rows = []
@@ -713,16 +807,22 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
                        "注：容量是量级估计，不是承诺；实际受冲击成本、涨跌停与融券约束影响。")
 
     # ---------------- 评级规则
+    _rw = rating.get("weights") or {
+        "time": 25.0, "space": 20.0, "realization": 30.0,
+        "increment": 10.0, "tradability": 15.0,
+    }
     rules_rows = [
-        ["时间维度", "30", "分年 CI 显著率 40% + 分状态显著率 30% + 滚动 12m 同号率 30%"],
-        ["空间维度", "20", "毛收益单调性 ρ 与 IC 正向强度合成；ρ<0 记 0"],
-        ["兑现维度", "20", "实测净价差 / (IC×2.5σ)，比值 0.8 以上记满分（折价系数）"],
-        ["增量维度", "15", "与同类因子的残差 IC 保留率；越独立分越高"],
-        ["可交易维度", "15", "覆盖率 40% + 换手便利 30% + 净价差 t 30%"],
+        ["时间稳定性（不分方向）", f"{_rw['time']:.0f}", "分年 CI 显著率 40% + 分状态显著率 30% + 滚动 12m 同号率 30%"],
+        ["空间维度", f"{_rw['space']:.0f}", "0.55×max(ρ,0)+0.25×max(0,min(1,IC/0.06))+0.20×顶档特异度×max(0,1−|ρ|)"],
+        ["兑现维度", f"{_rw['realization']:.0f}", "实测毛价差 / (|IC|×2.8σ)，比值 0.8 以上记满分（折价系数）"],
+        ["增量维度", f"{_rw['increment']:.0f}", "与同类因子的残差 IC 保留率；越独立分越高"],
+        ["可交易维度", f"{_rw['tradability']:.0f}", "覆盖率 40% + 换手便利 30% + 净价差 t 30%"],
     ]
     rules_table = _table(["分项", "满分", "评分规则"], rules_rows,
-                         "等级线：A ≥ 85，B ≥ 70，C ≥ 55，D < 55。一票否决只把 A/B 封顶到 C，不改变原始分。"
+                         "等级线：A ≥ 85，B ≥ 70，C ≥ 55，D < 55。证据不足、跨样本符号翻转、"
+                         "多头端双负直接判 D；其余一票否决只把 A/B 封顶到 C。"
                          "「不可交易」用毛价差 95% CI 与单期成本比较：上界<成本→触发，下界>成本→通过，否则边界。"
+                         "方向错时兑现按反向毛价差与 |IC| 计算，避免与方向否决重复扣分；"
                          "预测力与稳定性已合维，避免同一弱点被重复扣分；分数用于族内相对排序，不跨族比较。")
     veto_rows = []
     for item in rating.get("veto_table", []):
@@ -798,17 +898,23 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
          "不适用（全市场口径）" if pool.get("kind") == "universe" else pool.get("date", "—")],
         ["构造规则", pool.get("rule", "—")],
         ["板块范围", pool.get("boards", "—")],
-        ["基准日候选 / 最终入池", f"{pool.get('candidates', 0):,} / {pool.get('selected', 0):,}"],
+        ["基准日候选 / 主口径入池", f"{pool.get('candidates', 0):,} / {report.n_symbols:,}"],
         ["上市日晚于样本起点", f"{pool.get('listed_after_start', 0):,} 只"],
-        ["池内已退市", f"{pool.get('delisted_in_pool', 0):,} 只"],
+        ["池内已退市（当前库）", f"{pool.get('delisted_in_pool', 0):,} 只（当前库无历史行情，"
+                                   "不代表样本期无退市）"],
         ["区间末端无数据（>10 日）", f"{pool.get('stale_symbols', 0):,} 只"],
-        ["库内已退市股（基准日前上市）", f"{pool.get('delisted_universe', 0):,} 只，"
-                                          f"其中当日有行情 {pool.get('delisted_with_price', 0):,} 只，"
-                                          f"缺失 {pool.get('delisted_missing', 0):,} 只"],
+        ["库内已退市股（当前库）", f"{pool.get('delisted_universe', 0):,} 只，"
+                                   f"其中当日有行情 {pool.get('delisted_with_price', 0):,} 只，"
+                                   f"缺失 {pool.get('delisted_missing', 0):,} 只"],
     ]
     if pool.get("kind") == "financial":
         pool_rows = [r for r in pool_rows if not str(r[0]).startswith(("池内已退市", "库内已退市", "区间末端无数据", "上市日晚于"))]
-    pool_table = _table(["样本池", "取值"], pool_rows, pool.get("survivorship_note", ""))
+    _surv_note = (
+        (pool.get("survivorship_note", "") + " ").strip()
+        + "注意：「已退市 0 只」指当前库内没有退市股历史行情，不等同于样本期没有退市；"
+        "反转/小盘类因子会因缺失退市股而低估，而不是高估。"
+    )
+    pool_table = _table(["样本池", "取值"], pool_rows, _surv_note)
 
     # 样本池叙事必须按 pool config 条件渲染，不能把「成交额选池」复制到所有因子
     kind = str(pool.get("kind", "price"))
@@ -849,15 +955,23 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
             "这是<b>固定基准日池</b>，不是 point-in-time 全 A 池。"
             "对本因子不存在「用因子分子选池」的直接内生性，但结论仍只在该池内成立。"
         )
-    funnel = pool.get("funnel") or [
-        {"step": "基准日成交额排序候选", "n": int(pool.get("candidates", 0) or 0), "note": "含 2 倍缓冲"},
-        {"step": "板块过滤（沪深主板/创业板/科创板）", "n": int(pool.get("board_passed", 0) or report.n_symbols), "note": "剔除北交所"},
-        {"step": "最终入池且有行情", "n": int(report.n_symbols), "note": "报告样本"},
-    ]
+    _funnel_dq = report.data_quality or {}
+    if _funnel_dq.get("symbol_funnel"):
+        funnel = [
+            {"step": rec.get("step", "—"), "n": rec.get("count", 0), "note": rec.get("note", "")}
+            for rec in _funnel_dq["symbol_funnel"]
+        ]
+    else:
+        funnel = pool.get("funnel") or [
+            {"step": "基准日成交额排序候选", "n": int(pool.get("candidates", 0) or 0), "note": "含 2 倍缓冲"},
+            {"step": "板块过滤（沪深主板/创业板/科创板）", "n": int(pool.get("board_passed", 0) or report.n_symbols), "note": "剔除北交所"},
+            {"step": "最终入池且有行情", "n": int(report.n_symbols), "note": "报告样本"},
+        ]
     funnel_table = _table(
         ["选样漏斗", "数量", "说明"],
         [[str(step.get("step", "—")), f"{int(step.get('n', 0)):,}", str(step.get("note", ""))] for step in funnel],
-        "注：每一级都给出数量，避免「规则写 300 只、实际入池 120 只」却没有交代。",
+        "注：每一级都给出数量，避免「规则写 300 只、实际入池 120 只」却没有交代。"
+        "主口径为全 A 剔北证+有效观测；单元格级漏斗见下方「数据质量与覆盖」。",
     )
 
     robust_block = ""
@@ -894,8 +1008,8 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
     fresh = report.freshness or {}
     stale = fresh.get("stale_natural_days", 0)
     fresh_note = (
-        f"{fresh.get('cutoff', '—')} 收盘；生成 {fresh.get('generated_at', '—')}"
-        f"（{fresh.get('timezone', '北京时间 UTC+8')}）"
+        f"{fresh.get('cutoff', '—')} 收盘；生成 "
+        f"{meta.get('generated_at') or fresh.get('generated_at', '—')}"
     )
     if stale and stale > 0:
         fresh_note += f"；距生成日 {stale} 个自然日，当日行情尚未入库"
@@ -908,9 +1022,11 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
             f"（前一日 {partial.get('previous')} 只），已整日剔除"
         )
     elif fresh.get("last_day_coverage"):
-        missing = report.n_symbols - int(fresh.get("last_day_coverage", 0))
+        total_symbols = int((report.pool or {}).get("candidates") or report.n_symbols)
+        missing = total_symbols - int(fresh.get("last_day_coverage", 0))
         fresh_note += (
-            f"；末日覆盖 {fresh.get('last_day_coverage')}/{report.n_symbols} 只"
+            f"；末日覆盖 {fresh.get('last_day_coverage')}/{total_symbols} 只"
+            f"（主口径 {report.n_symbols} 只）"
             + (f"（{missing} 只停牌/无成交）" if missing > 0 else "")
         )
     fresh_note += "。"
@@ -921,13 +1037,15 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
         ["类别 / 家族", f"{report.category} / {diag.family_of(report.factor_id)}（{diag.family_label(diag.family_of(report.factor_id))}）"],
         ["方向来源", str(report.direction_source)],
         ["标的数 / 交易日", f"{report.n_symbols} / {report.n_dates}"],
-        ["覆盖率", f"{report.coverage:.1%}"],
+        ["覆盖率（有效观测内）", f"{report.coverage:.1%}"],
         ["成交口径", "T 日收盘出信号，T+1 开盘买入，T+h 收盘卖出"],
         ["成本假设", "单边 10bp / 往返 20bp（每条腿）；多空合计 40bp，按换手率扣除"],
         ["PIT / 财务口径", d.get("pit") or "行情类因子：无财务披露时点问题"],
         ["评分卡版本", str(rating.get("scorecard_version", "—"))],
-        ["本次口径变更", "；".join(rating.get("scorecard_changelog") or []) or "—"],
+        ["版本与口径", "v2.4.2：252 日有效观测；空间 0.55/0.25/0.20；"
+                       "兑现毛价差×2.8σ；跨样本/多头双负直接 D；覆盖率三口径"],
         ["生成时间", meta.get("generated_at", "")],
+        ["数据版本", meta.get("data_version", "")],
         ["数据截止 / 口径", fresh_note],
         ["run_id", meta.get("run_id", "")],
     ]
@@ -936,12 +1054,36 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
 
     _rev = rating.get("reverse_eval") or {}
     if _rev:
-        rev_note = (f"若把信号取反：IC {_rev['ic']:+.4f}、独立 t {_rev['t']:+.1f}、"
-                    f"单调性 {_rev['mono']:+.2f}、净价差 {_rev['spread_net']*100:+.2f}%/期"
-                    + ("　→ <b>方向待复核</b>（反向显著）" if _rev.get("suspect")
-                       else "　→ 反向也不成立"))
+        _gci = _rev.get("gross_ci") or (float("nan"), float("nan"))
+        _nci = _rev.get("net_ci") or (float("nan"), float("nan"))
+        _after = _rev.get("net_after_borrow")
+        rev_note = (
+            f"原信号 IC {ic_mean:+.4f}；取反后 IC {_rev['ic']:+.4f} 是符号翻转的机械结果，"
+            "不能拿它证明反向可用。"
+            f"反向毛价差 {_rev['spread_gross']*100:+.2f}%（95% CI "
+            f"[{_gci[0]*100:+.2f}%, {_gci[1]*100:+.2f}%]）；"
+            f"反向净价差 {_rev['spread_net']*100:+.2f}%/期（95% CI "
+            f"[{_nci[0]*100:+.2f}%, {_nci[1]*100:+.2f}%]）；"
+            f"按 8%/年融券费、5 日持有折算单期约 {_rev.get('borrow_cost', 0)*100:.2f}%，"
+            f"扣后 {'—' if _after is None else f'{_after*100:+.2f}%/期'}。"
+            "反向净价差 CI 跨 0 / 扣融券后无剩余，均足以否掉反向多空。"
+            + ("　→ <b>方向待复核</b>（反向显著）" if _rev.get("suspect")
+               else "　→ 反向不成立")
+        )
     else:
         rev_note = "—"
+    _dr = rating.get("direction_review") or {}
+    direction_block = ""
+    if _dr:
+        _rg = _dr.get("reverse_gross")
+        _rn = _dr.get("reverse_net")
+        direction_block = (
+            "<p class='banner'><b>方向复核候选：</b>"
+            f"反向 IC {_dr.get('reverse_ic', float('nan')):+.3f}、t≈{_dr.get('reverse_t', float('nan')):.1f}；"
+            f"反向毛价差 {'—' if _rg is None else f'{_rg*100:+.2f}%/期'}、"
+            f"反向净价差 {'—' if _rn is None else f'{_rn*100:+.2f}%/期'}。"
+            f"{_esc(_dr.get('note', ''))}</p>"
+        )
     _real = rating.get("realization_score", float("nan"))
     _advice = []
     if rating["grade"] in ("A", "B"):
@@ -950,31 +1092,62 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
     elif rating["grade"] == "C":
         _advice.append("仅作为组合的辅助成分或过滤条件，不建议单独承担仓位。")
     else:
-        _advice.append("归档，不建议使用；如要复用需重新设计信号或换样本。")
+        if rating.get("review_candidate"):
+            _advice.append("独立使用：按当前 +1 先验归档，不作为独立多头/多空信号。")
+        else:
+            _advice.append("归档，不建议使用；如要复用需重新设计信号或换样本。")
+    if rating.get("review_candidate") and _dr:
+        _rn = _dr.get("reverse_net")
+        _advice.append(
+            "方向复核候选：当前 D 是按 +1 先验的条件结论，不是“因子无信息”。"
+            f"反向 IC {_dr.get('reverse_ic', float('nan')):+.3f}、t≈{_dr.get('reverse_t', float('nan')):.1f}，"
+            f"反向净价差 {'—' if _rn is None else f'{_rn*100:+.2f}%/期'}；"
+            "若独立窗口确认反转方向，应写入 registry 后重跑。"
+        )
+        _fo = report.filter_test_opposite or {}
+        if _fo.get("useful"):
+            _advice.append(
+                f"顶档过滤候选：剔除 G5 后每期 {_fo.get('rest_mean', float('nan'))*100:+.2f}%"
+                f"（全组 {_fo.get('all_mean', float('nan'))*100:+.2f}%），"
+                f"超额 {_fo.get('excess_mean', float('nan'))*100:+.2f}%/期"
+                f"（t={_fo.get('excess_t', float('nan')):.1f}），"
+                f"夏普 {_fo.get('all_sharpe', float('nan')):.2f}→{_fo.get('rest_sharpe', float('nan')):.2f}；"
+                "需独立窗口验证并扣除额外换手成本。"
+            )
     if np.isfinite(_real):
         if _real >= 80:
             _advice.append(f"兑现率 {_real:.0f}/100：IC 能基本兑现为分组收益。")
         elif _real >= 40:
-            _advice.append(f"兑现率 {_real:.0f}/100：约 {_real:.0f}% 的 IC 兑现为价差，"
-                           "其余被成本与尾部稀释。")
+            _advice.append(
+                f"兑现得分 {_real:.0f}/100：这是按 0.8 满分折算的分数；"
+                f"传导比另见「{rating.get('transmission_note', '—')}」，"
+                "两者不是同一个百分比。"
+            )
         else:
-            _advice.append(f"兑现率 {_real:.0f}/100：大部分 IC 未兑现，实际收益远低于统计显著性暗示的水平。")
+            _advice.append(
+                f"兑现得分 {_real:.0f}/100（按 0.8 满分折算）：大部分 IC 未兑现，"
+                f"传导比见「{rating.get('transmission_note', '—')}」。"
+            )
     if np.isfinite(report.turnover):
         _advice.append(f"每期换手 {report.turnover:.0%}，"
                        + ("适合 5–10 日调仓。" if report.turnover <= 0.5 else
                           "建议 20 日以上调仓以摊薄成本。"))
+    _w = rating.get("weights") or {
+        "time": 25.0, "space": 20.0, "realization": 30.0,
+        "increment": 10.0, "tradability": 15.0,
+    }
     _dims = [
-        ("时间", rating.get("time_score", 0.0), 30.0),
-        ("空间", rating.get("space_score", 0.0), 20.0),
-        ("兑现", rating.get("realization_score", 0.0), 20.0),
-        ("增量", rating.get("incremental_score", 0.0), 15.0),
-        ("可交易", rating.get("tradability_score", 0.0), 15.0),
+        ("时间稳定", rating.get("time_score", 0.0), float(_w["time"])),
+        ("空间", rating.get("space_score", 0.0), float(_w["space"])),
+        ("兑现", rating.get("realization_score", 0.0), float(_w["realization"])),
+        ("增量", rating.get("incremental_score", 0.0), float(_w["increment"])),
+        ("可交易", rating.get("tradability_score", 0.0), float(_w["tradability"])),
     ]
     _vals_w = [float(v or 0.0) / 100.0 * w for _, v, w in _dims]
     _labels_w = [f"{name} {val:.0f}/{w:.0f}" for (name, _, w), val in zip(_dims, _vals_w)]
     _radar = charts.radar_chart(
         _labels_w, _vals_w, maxes=[w for _, _, w in _dims], show_value=False,
-        caption=f"五维评分（加权分，合计 {sum(_vals_w):.1f}/100；评级 {rating['grade']}）",
+        caption=f"五维评分（加权分，合计 {float(rating.get('score', sum(_vals_w))):.1f}/100；评级 {rating['grade']}）",
     )
     radar_block = _radar
     advice_block = (
@@ -988,6 +1161,18 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
         warn_html = '<div class="warn"><b>诊断提示</b><br>' + "<br>".join(
             _esc(w) for w in report.warnings) + "</div>"
 
+    _regime_n = 0
+    if report.regime_stats is not None and not report.regime_stats.empty:
+        _regime_n = int(
+            report.regime_stats.drop(index="牛市−熊市", errors="ignore")["n"].sum()
+        )
+    _regime_missing = max(0, int(report.n_dates) - _regime_n)
+    regime_coverage_txt = (
+        f"已分类 {_regime_n}/{int(report.n_dates)} 日"
+        + (f"，另有 {_regime_missing} 日因 200 日均线预热未分类；regime 结论只基于已分类日"
+           if _regime_missing else "，覆盖全样本")
+    )
+
     regime_extra = ""
     if report.regime_stats is not None and "牛市−熊市" in report.regime_stats.index:
         diff = report.regime_stats.loc["牛市−熊市"]
@@ -998,12 +1183,19 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
         )
         if np.isfinite(report.regime_corr):
             p_corr = report.regime_corr_p
+            significant = np.isfinite(p_corr) and p_corr <= 0.05
+            if not significant or abs(report.regime_corr) < 0.20:
+                relation = "几乎无关"
+            elif report.regime_corr > 0:
+                relation = "同向"
+            else:
+                relation = "反向"
             regime_extra += (
                 f" 分年 IC 与牛市天数占比的相关系数 r={report.regime_corr:+.2f}"
                 f"（n={len(report.ic_by_year.dropna()) if report.ic_by_year is not None else 0}，"
                 f"Fisher z 近似 p={p_corr:.2f}"
                 + ("，不显著" if np.isfinite(p_corr) and p_corr > 0.05 else "")
-                + "），说明状态差异与年份结构有关，不能把牛市 IC 直接外推到全样本。"
+                + f"），说明状态差异与年份结构{relation}，不能把牛市 IC 直接外推到全样本。"
             )
 
     regime_alt_block = ""
@@ -1067,7 +1259,7 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
                    for _, rec in _hs.iterrows()]
         _vals = [float(rec["gross"]) * 100 for _, rec in _hs.iterrows()]
         horizon_block = (
-            "<h3>多持有期对比：5 / 10 / 20 日</h3>"
+            "<h3>多持有期对比：5 / 10 / 20 / 60 日</h3>"
             + charts.bar_chart(_labels, _vals, height=220,
                                formatter=lambda v: f"{v:+.2f}%",
                                caption="毛价差/期（未扣多空两条腿成本）；「·中性」为 10 日持有期做市值中性化后的对照，"
@@ -1103,8 +1295,12 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
         ind_txt = "；".join(f"{k} {v*100:.1f}%" for k, v in ex.get("industry", [])[:6])
         size_txt = "；".join(f"{k} {v*100:.1f}%" for k, v in ex.get("size", []))
         cap = ex.get("capacity")
-        cap_txt = (f"<p class='small'>容量：持仓成交额中位 × 5% × 10 只 ≈ {cap/1e8:.2f} 亿</p>"
-                   if cap == cap else "")
+        cap_txt = (
+            f"<p class='small'>20 日多头组合容量（持仓成交额中位 × 5% × 持仓数 "
+            f"{int(ex.get('holdings', 0) or 0)} 只）≈ {cap/1e8:.2f} 亿；"
+            "与下方“成本敏感性与容量”的 5 日 Top 组口径不同，不能直接相加或对比。</p>"
+            if cap == cap else ""
+        )
         size_html = f"<p class='small'>持仓市值：{_esc(size_txt)}</p>" if size_txt else ""
         ind_html = (f"<p class='small'>持仓行业：{_esc(ind_txt)}（未映射 "
                     f"{ex.get('unmapped', 0)*100:.0f}%）</p>" if ind_txt else "")
@@ -1140,27 +1336,33 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
                 rec["universe"],
                 f"{int(rec['symbols'])}",
                 f"{rec['avg_names']:.0f}",
-                f"{rec['zero_share']:.1%}",
                 f"{rec['ic']:+.4f}",
                 f"{rec['ic_t']:.1f}" if np.isfinite(rec["ic_t"]) else "—",
                 _pct(rec["g1"], 2),
                 _pct(rec["g5"], 2),
                 _pct(rec["spread_gross"], 2),
+                _pct(rec.get("group_net_diff", np.nan), 2),
                 _pct(rec["spread_net"], 2),
-                f"{rec['turnover']:.1%}" if np.isfinite(rec["turnover"]) else "—",
+                f"{rec.get('spread_net_t', np.nan):.1f}"
+                if np.isfinite(rec.get("spread_net_t", np.nan)) else "—",
+                f"{rec.get('turnover_top', rec['turnover']):.1%}"
+                if np.isfinite(rec.get("turnover_top", rec["turnover"])) else "—",
             ]
             for rec in report.sensitivity
         ]
         sens_block = (
             "<h3>因子对不同样本的敏感性</h3>"
             + _table(
-                ["版本", "股票数", "日均有效", "VAR8=0", "Rank IC", "NW t",
-                 "G1/期", "G5/期", "G5−G1 毛", "G5−G1 净", "换手/期"],
+                ["版本", "股票数", "日均有效", "Rank IC", "NW t",
+                 "G1/期", "G5/期", "G5−G1 毛", "分组净差", "多空净价差", "净价差 t", "Top组换手"],
                 sens_rows,
-                "注：ALL=当前报告样本；EX_BSE=排除 BSE；INVESTABLE=排除 BSE/当前 ST、"
-                "上市满 365 天、20 日成交额中位数≥2000 万、价格≥2 元；"
-                "HIGH_LIQ=在 INVESTABLE 内按 20 日成交额每日取前 200。"
-                "ST 使用当前 is_st，不是 PIT，存在前视；四版本使用同一区间、同一持有期、同一成本。",
+                "注：ALL_RAW=未清洗诊断；ALL_VALID=全 A 同有效观测；"
+                "EX_BSE_VALID=报告主口径（剔北证+有效观测）；"
+                "INVESTABLE_VALID/HIGH_LIQ_VALID=在同一有效观测 mask 上再叠流动性/ST 诊断；"
+                "各版本同一区间、同一持有期、同一成本、同一有效观测 mask，差异只来自 universe。"
+                "分组净差 = Q5 净收益 − Q1 净收益（每组自扣自身成本）；"
+                "多空净价差 = 毛价差 − 两条腿成本；评级与结论用多空净价差。"
+                "ST 使用当前 is_st，不是 PIT，存在前视。",
             )
         )
 
@@ -1174,6 +1376,9 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
         caption="中线=60；x=空间区分度，y=时间稳定性",
     )
     cap_note = (
+        f"原始分 {rating['score']:.1f} 对应 {rating['raw_grade']} 级；"
+        f"触发 {len(rating['vetoes'])} 条证据不足类否决，直接判 D，不是“封顶到 D”。"
+        if rating.get("hard_d") else
         f"原始分 {rating['score']:.1f} 对应 {rating['raw_grade']} 级；"
         f"触发 {len(rating['vetoes'])} 条一票否决，封顶为 {rating['grade']} 级。"
         if rating.get("capped") else
@@ -1197,15 +1402,29 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
     # 衰减结论由数据生成，禁止写死「h=20 最强」
     decay = report.decay.dropna() if report.decay is not None else pd.Series(dtype="float")
     if len(decay):
-        peak_h = int(decay.idxmax())
-        peak_val = float(decay.max())
+        _abs_decay = decay.abs()
+        peak_h = int(_abs_decay.idxmax())
+        peak_val = float(decay.loc[peak_h])
+        peak_abs = float(_abs_decay.loc[peak_h])
         h5 = float(decay.get(5, float("nan")))
-        if peak_h == int(decay.index.max()) and peak_val > abs(h5) * 1.2:
-            decay_sentence = f"IC 在最长持有期 h={peak_h} 最高（{peak_val:+.3f}），未见衰减。"
-        elif abs(peak_val) < 0.005:
+        if peak_h == int(decay.index.max()) and peak_abs > abs(h5) * 1.2:
+            decay_sentence = (
+                f"IC 绝对值在最长持有期 h={peak_h} 最强（|IC|={peak_abs:.3f}，"
+                f"IC={peak_val:+.3f}），未见衰减。"
+            )
+        elif peak_abs < 0.005:
             decay_sentence = "各持有期 IC 均接近 0，衰减曲线无经济含义。"
         else:
-            decay_sentence = f"IC 在 h={peak_h} 见顶（{peak_val:+.3f}），h=5 为 {h5:+.3f}。"
+            decay_sentence = (
+                f"IC 绝对值在 h={peak_h} 最大（|IC|={peak_abs:.3f}，"
+                f"IC={peak_val:+.3f}），h=5 为 {h5:+.3f}。"
+            )
+        _hmax = int(decay.index.max())
+        if _hmax != int(peak_h) and _hmax >= 20:
+            _vmax = float(decay.loc[_hmax])
+            decay_sentence += f" h={_hmax} 为 {_vmax:+.3f}，弱于峰值但未见完全衰减。"
+        if int(peak_h) >= 60:
+            decay_sentence += " h=60 的独立样本较少，独立 t 见附录，不能只凭该点定性机制。"
     else:
         decay_sentence = "持有期样本不足，无法判断衰减。"
     half = report.ic_half or {}
@@ -1216,11 +1435,20 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
             + ("（同号）" if half.get("same_sign") else "（<b>变号</b>）")
             + "；"
         )
+    _prior = rating.get("prior_sign_ratio")
+    _prior_txt = (
+        f" 时间分数只衡量稳定性（不分方向）；与先验同号率 {_prior*100:.0f}%。"
+        if _prior is not None and np.isfinite(_prior) else ""
+    )
+    _n_ic_years = (
+        int(report.ic_by_year.dropna().shape[0])
+        if report.ic_by_year is not None else 0
+    )
     lead_02 = (
         f"<b>本节结论：</b>IC {ic_mean:+.3f}（95% CI {_ci(ic_lo, ic_hi, 3)}，独立 t {t_indep:.1f}）；"
-        f"{len(report.ic_by_year) if report.ic_by_year is not None else 0} 年中仅 {len(sig_years)} 年 CI 不含 0"
+        f"{_n_ic_years} 年中仅 {len(sig_years)} 年 CI 不含 0"
         + ("、且方向相反" if len({1 if v > 0 else -1 for _, v in sig_years}) > 1 else "")
-        + "；" + half_sentence + decay_sentence
+        + "；" + half_sentence + decay_sentence + _prior_txt
     )
     peer_name = ""
     if report.peers is not None and len(report.peers):
@@ -1243,6 +1471,150 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
             + "、".join(f"{y}（{v:+.3f}）" for y, v in sig_years)
             + "；" + ("两者方向相反，说明不是稳定同向，而是风格切换。" if len({1 if v > 0 else -1 for _, v in sig_years}) > 1
                      else "方向一致。")
+        )
+
+    _tail = rating.get("tail_specificity") or {}
+    mechanism_block = ""
+    if rating.get("attribution", {}).get("label") == "方向错" and abs(ic_mean) >= 0.02:
+        _ex = report.extra or {}
+        _size = "；".join(f"{k} {v*100:.1f}%" for k, v in (_ex.get("size") or [])[:3])
+        _ind = "；".join(f"{k} {v*100:.1f}%" for k, v in (_ex.get("industry") or [])[:3])
+        _fo = report.filter_test_opposite or {}
+        _tail_loss = float(_fo.get("tail_dropped", np.nan))
+        mechanism_block = (
+            "<h3>机制归因：这是动量，还是高波动小盘均值回复？</h3>"
+            f"<p class='small'>样本内 IC 为 {ic_mean:+.3f}（独立 t {t_indep:.1f}），"
+            "且分年点估计同号；若 registry 先验是“动量延续”，这与证据方向相反。"
+            f"G5 持仓：{_esc(_size) or '—'}；行业：{_esc(_ind) or '—'}；"
+            f"G5 尾部亏损频率 {_tail_loss:.1%}、Top 组换手 {report.turnover:.1%}。"
+            "这组暴露更像“高波动小盘/主题博弈的均值回复”，而不是“过去强势继续跑赢”。"
+            "因此本报告仍按 +1 先验归档，但经济含义栏的先验描述需要独立复核；"
+            "不能把 D 读成“21 日收益没有信息”。</p>"
+        )
+
+    tail_block = ""
+    if _tail:
+        tail_block = (
+            "<h3>顶档特异度（单尾结构）</h3>"
+            + _table(
+                ["指标", "取值"],
+                [
+                    ["Q5 − 中段", _pct(_tail.get("upper", np.nan), 2)],
+                    ["Q1 − 中段", _pct(_tail.get("lower", np.nan), 2)],
+                    ["顶档/底档特异度", f"{float(_tail.get('ratio', np.nan)):.2f}"],
+                    ["Q5 相对其余组 t", f"{float(_tail.get('upper_t', np.nan)):.2f}"],
+                    ["Q1 相对其余组 t", f"{float(_tail.get('lower_t', np.nan)):.2f}"],
+                    ["进入空间分的强度", f"{float(_tail.get('space_term', np.nan)):.2f} / 1"
+                     "（已乘 1−|ρ|，避免与单调性重复计分）"],
+                ],
+                "注：中段 = median(Q2..Q4)；特异度 = max(|Q5−中段|,|Q1−中段|) / "
+                "(|Q5−中段|+|Q1−中段|)。它不替代 Spearman ρ，只补足 ρ=0 时的单尾信息；"
+                "进入空间分前再乘 max(0,1−|ρ|)，避免与单调性重复计分。",
+            )
+        )
+
+    _tc = rating.get("tradability_components") or {}
+    tradability_block = ""
+    if _tc:
+        _tc_cov = _tc.get("coverage", {})
+        _tc_to = _tc.get("turnover", {})
+        _tc_t = _tc.get("spread_t", {})
+        tradability_block = (
+            f"<h3>可交易维度拆解（{float(_tc.get('total_points', np.nan)):.2f}/15 怎么来的）</h3>"
+            + _table(
+                ["子项", "原始值", "权重", "折算分/15"],
+                [
+                    ["覆盖率", f"{float(_tc_cov.get('raw', np.nan)):.1%}", "40%",
+                     f"{float(_tc_cov.get('points', np.nan)):.2f}"],
+                    ["换手便利", f"{float(_tc_to.get('raw', np.nan)):.1%}", "30%",
+                     f"{float(_tc_to.get('points', np.nan)):.2f}"],
+                    ["净价差 t", f"{float(_tc_t.get('raw', np.nan)):.2f}", "30%",
+                     f"{float(_tc_t.get('points', np.nan)):.2f}"],
+                    ["合计", "—", "100%", f"{float(_tc.get('total_points', np.nan)):.2f}"],
+                ],
+                "注：覆盖率=有效观测内信号/有效观测；换手便利=max(0,1-换手/80%)；"
+                "净价差 t 按 0–2 线性映射（t≥2 记满，t≤0 记 0）。三项各自 0–1，乘权重后×15。",
+            )
+        )
+
+    quality_block = ""
+    dq = report.data_quality or {}
+    if dq:
+        std = dq.get("standard", {})
+        cov = dq.get("coverage", {})
+        zero = dq.get("zero", {})
+        clean = dq.get("clean", {})
+
+        def _pct_or_dash(value):
+            return f"{float(value):.1%}" if np.isfinite(float(value)) else "—"
+
+        funnel = dq.get("funnel", [])
+        funnel_txt = " → ".join(
+            f"{rec.get('step', '')} {int(rec.get('count', 0)):,}" for rec in funnel
+        ) if funnel else "—"
+        q_rows = [
+            ["清洗标准", std.get("text", "—")],
+            ["股票池", f"{std.get('label', '—')}（{int(dq.get('universe_symbols', 0)):,} 只）"],
+            ["原始信号覆盖", _pct_or_dash(cov.get("raw_signal", float("nan")))],
+            ["价格覆盖", _pct_or_dash(cov.get("price", float("nan")))],
+            ["有效观测覆盖", _pct_or_dash(cov.get("valid_obs", float("nan")))],
+            ["清洗后信号覆盖", _pct_or_dash(cov.get("valid_signal", float("nan")))],
+            ["有效观测内信号覆盖", _pct_or_dash(cov.get("valid_signal_ratio", float("nan")))],
+            ["清洗后日均有效", f"{float(cov.get('avg_names', float('nan'))):,.0f} 只"
+             if np.isfinite(float(cov.get("avg_names", float("nan")))) else "—"],
+            ["样本损失漏斗", funnel_txt],
+        ]
+        _zero_share = float(zero.get("share", float("nan")))
+        if dq.get("triggered") or (np.isfinite(_zero_share) and _zero_share >= 0.05):
+            by_year = zero.get("by_year", {})
+            by_year_txt = "—"
+            if by_year:
+                items = sorted(by_year.items(), key=lambda kv: kv[0])
+                by_year_txt = f"{items[0][0]} {items[0][1]:.1f}% → {items[-1][0]} {items[-1][1]:.1f}%"
+            q_rows += [
+                ["零值占比", _pct_or_dash(zero.get("share", float("nan")))],
+                ["G1 中零值且无数据", _pct_or_dash(zero.get("g1_no_data", float("nan")))],
+                ["G1 中零值且真实未触发", _pct_or_dash(zero.get("g1_true", float("nan")))],
+                ["G1 中正值", _pct_or_dash(zero.get("g1_positive", float("nan")))],
+                ["零值占比分年", by_year_txt],
+            ]
+        _fq = dq.get("factor", {})
+        _skew = float(report.factor_stats.get("skew", _fq.get("skew", float("nan"))))
+        if np.isfinite(_skew) and abs(_skew) > 5:
+            q_rows += [
+                ["因子偏度", f"{_skew:.1f}" + ("（极端值，建议缩尾/核验）" if abs(_skew) > 20 else "")],
+                ["因子 P1 / P99",
+                 f"{_fmt_factor(report.factor_stats.get('p01', _fq.get('p1', float('nan'))), unit)} / "
+                 f"{_fmt_factor(report.factor_stats.get('p99', _fq.get('p99', float('nan'))), unit)}"],
+            ]
+        if clean:
+            q_rows += [
+                ["清洗后 G1/期", _pct(clean.get("g1", float("nan")), 2)],
+                ["清洗后 G5/期", _pct(clean.get("g5", float("nan")), 2)],
+                ["清洗后多空净价差", _pct(clean.get("spread_net", float("nan")), 2)],
+                ["清洗后净价差 t", f"{float(clean.get('spread_net_t', float('nan'))):.1f}"
+                 if np.isfinite(float(clean.get("spread_net_t", float("nan")))) else "—"],
+            ]
+        quality_table = _table(
+            ["项目", "取值"], q_rows,
+            "注：有效观测覆盖=有效观测/全单元格；清洗后信号覆盖=有效信号/全单元格；"
+            "有效观测内信号覆盖=有效信号/有效观测。评级覆盖率否决用最后一项，"
+            "前两项只作诊断。清洗只删上市前/历史不足/停牌/无下一日开盘的单元格，不删股票；"
+            "ST、低价、小市值、低流动性只要当天有效即保留。"
+            "主口径=EX_BSE+有效观测：北证制度不同，单独剔除；有效观测避免无数据单元格进入排序；"
+            "ALL_RAW 等原始口径只作诊断，不参与评级。",
+        )
+        trigger_txt = (
+            "检测到零值桶污染：零值占比 {:.1%}，其中无数据零值 {:.1%}；"
+            "清洗前后 G1/价差见敏感性表。".format(
+                float(zero.get("share", float("nan"))),
+                float(zero.get("no_data_share", float("nan"))),
+            )
+            if dq.get("triggered") else "未检测到零值桶污染。"
+        )
+        quality_block = (
+            f"<h3>数据质量与覆盖</h3>{quality_table}"
+            f"<p class='small'>{_esc(trigger_txt)}</p>"
         )
 
     html = f"""<!DOCTYPE html>
@@ -1280,13 +1652,14 @@ def render(report, rating: dict, meta: dict, sections: tuple[str, ...] | None = 
 可执行价格计算，不使用收盘价成交假设。</p>
 {def_table}
 <p class="small"><b>数据口径：</b>价格使用后复权；末日覆盖不足前一日 80% 时整日回退；
-regime 基准用日线完整的创业板指（399006）；可成交占比的分母为「有因子值且有下一交易日」
-的信号。</p>
+regime 基准用创业板指（399006）200 日均线 ±3%；可成交占比的分母为「有因子值且有下一交易日」
+的信号；主口径的清洗标准与覆盖率见下表。</p>
 <h3>样本池构造与幸存者偏差</h3>
 {pool_table}
 <p class="small">{pool_narrative}</p>
 <h3>选样漏斗</h3>
 {funnel_table}
+{quality_block}
 {robust_block}
 {meta_table}
 
@@ -1306,12 +1679,12 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
           f"{r['t']:.1f}" if np.isfinite(r['t']) else "—"]
          for k, r in (report.regime_stats.iterrows() if report.regime_stats is not None else [])]
         or [["—", "—", "—", "—", "—"]],
-        "注：牛/熊/震荡由创业板指（399006）的 20 日动量与 MA20 位置划分；CI 为 5 日块自助 95% 区间。"
+        "注：牛/熊/震荡由创业板指（399006）的 200 日均线 ±3% 划分；CI 为 5 日块自助 95% 区间。"
         "「牛市−熊市」行为两者均值差的 2000 次自助分布，p 值为双尾。")}
 <p class="small">{_esc(regime_extra)}</p>
 <p class="small"><b>口径：</b>状态差异必须用 CI 判断，p &gt; 0.05 时不应声称「因子只在牛市有效」。
 若 regime 基准在样本早期缺日，状态标签会集中在后段，把「年份效应」伪装成「状态效应」；
-本报告用日线完整的创业板指（399006）覆盖全样本。</p>
+本报告用创业板指（399006）200 日均线 ±3% 划分，{regime_coverage_txt}。</p>
 <p class="small">熊市与牛市的 IC 差异必须和分年度结果一起读：若牛市样本集中在少数年份，
 状态差异可能只是年份效应。下表把两者对齐。</p>
 {_table(["年份", "IC", "95% CI", "样本日", "牛市占比", "熊市占比"],
@@ -1321,7 +1694,8 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
           f"{int(rec['n'])}",
           f"{report.regime_share.loc[y].get('bull', 0):.0%}" if report.regime_share is not None and y in report.regime_share.index else "—",
           f"{report.regime_share.loc[y].get('bear', 0):.0%}" if report.regime_share is not None and y in report.regime_share.index else "—"]
-         for y, rec in (report.ic_by_year_ci.iterrows() if report.ic_by_year_ci is not None else [])]
+         for y, rec in (report.ic_by_year_ci.iterrows() if report.ic_by_year_ci is not None else [])
+         if np.isfinite(rec["mean"])]
         or [["—", "—", "—", "—", "—", "—"]],
         "注：牛市占比=该年交易日中处于牛市状态的比例；用于判断「状态差异」是否被年份结构混淆。")}
 <p class="small">{_esc(sig_note)}</p>
@@ -1335,7 +1709,9 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 收益是否只是市值/行业暴露，以及扣费、卖出端与容量之后的可行性。</p>
 {nav_fig}
 {quant_table}
+{winsor_block}
 {filter_block}
+{filter_opposite_block}
 <h3>多空净值、回撤与分年收益</h3>
 {perf_fig}
 <div class="grid2">{perf_table}{annual_table}</div>
@@ -1355,11 +1731,16 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
     <h3>结论：{_esc(rating['grade'])} 级 · {_esc(rating['quadrant'])}</h3>
     <p>{_esc(rating['usage'])}</p>
     <p class="small">评级看综合分与否决，象限看时间×空间；两者不一致时以评级为准，
-    象限只说明短板在哪。若评级为 D，归档，不建议单独使用或做过滤。</p>
+    象限只说明短板在哪。
+    {("当前 D 是「按 registry +1 先验」的归档结论；出现方向复核/过滤候选时，"
+      "不等于因子无信息，详见下方方向复核。") if rating.get("review_candidate")
+     else "若评级为 D，归档，不建议单独使用或做过滤。"}</p>
     <p><b>失效归因：</b>{_esc(rating.get('attribution', {}).get('label', '—'))}
     —— {_esc(rating.get('attribution', {}).get('reason', '—'))}</p>
     <p><b>评级说明：</b>{_esc(cap_note)}</p>
     <p><b>反向评估：</b>{_esc(rev_note)}</p>
+    {direction_block}
+    {mechanism_block}
     <p><b>一票否决项：</b></p>
     <ul>{verdict_items}</ul>
     <p><b>关键判断：</b></p>
@@ -1370,13 +1751,16 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
   <div>
     {quad_svg}
     <p class="small">时间维度 = 100×(0.4×年份 CI 显著率 + 0.3×状态 CI 显著率 + 0.3×滚动 12m IC 同号率)；
-    空间维度 = 100×clip(0.7×max(ρ,0) + 0.3×min(1,IC/0.06), 0, 1)。x=空间、y=时间，中线=60；
+    空间维度 = 100×clip(0.55×max(ρ,0) + 0.25×max(0,min(1,IC/0.06)) + 0.20×顶档特异度×max(0,1−|ρ|), 0, 1)。
+    x=空间、y=时间，中线=60；
     右上核心、右下择时、左上过滤、左下淘汰。</p>
     <div class="cap" style="font-size:12px;color:var(--muted);margin-top:6px;">
       <b>图 4-1</b>空间区分度 vs 时间稳定性。
     </div>
   </div>
 </div>
+{tail_block}
+{tradability_block}
 {advice_block}
 <h3>评级规则（可复核）</h3>
 {rules_table}
@@ -1404,11 +1788,11 @@ regime 基准用日线完整的创业板指（399006）；可成交占比的分�
 <p style="font-size:12px;color:var(--muted)">
 <b>方法说明</b>：IC 为逐日横截面 Spearman 秩相关；NW t 经 Newey-West 调整（lag = h−1），
 独立 t 为每 h 个交易日取一个观测；分层组合等权、非重叠换仓、T+1 开盘买入，
-成本按换手率 × 单腿往返 20bp（多空合计 40bp）扣除；市场状态由创业板指（399006）的 20 日动量与 MA20 联合判定；
+成本按换手率 × 单腿往返 20bp（多空合计 40bp）扣除；市场状态由创业板指（399006）的 200 日均线 ±3% 联合判定；
 中性化用逐日横截面回归残差。方向由先验给定，<b>不在本样本内翻转</b>；ρ 与价差用期均值，年化只作展示。
 </p>
 <p style="font-size:12px;color:var(--muted)">
-<b>已知局限</b>：① {("样本按财务覆盖度选取、仅 " + f"{report.n_dates / 242:.1f}" + " 年，财务重述未逐期回溯；") if kind == "financial" else (("样本池为 " + str(selection) + "（不使用固定基准日选池），库内无历史行情的退市股仍缺失；") if kind == "universe" else ("样本池固定于 " + str(pool_date) + "，退市股缺失带来幸存者偏差；"))}
+<b>已知局限</b>：① {("样本按财务覆盖度选取、仅 " + f"{report.n_dates / 242:.1f}" + " 年，财务重述未逐期回溯；") if kind == "financial" else (("样本池为 " + str(selection) + "，主口径为全 A 剔北证+有效观测（不使用固定基准日选池），库内无历史行情的退市股仍缺失；") if kind == "universe" else ("样本池固定于 " + str(pool_date) + "，主口径剔北证+有效观测，退市股缺失带来幸存者偏差；"))}
 ② 多空组合假设可融券卖空，A 股实际融券成本与券源未计入；
 ③ 行业分类为当前映射，中性化存在前视；
 ④ ST 状态只能取当前值，历史涨跌停幅度可能低估；
