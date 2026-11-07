@@ -4,6 +4,7 @@ from .index_source import IndexMarketSource
 from .sina_source import SinaMinuteSource
 from .tencent_source import TencentQuoteSource
 from .tushare_source import TushareMarketSource
+from .zzshare_source import ZzshareMarketSource
 
 __all__ = [
     "AkshareMarketSource",
@@ -12,4 +13,5 @@ __all__ = [
     "SinaMinuteSource",
     "TencentQuoteSource",
     "TushareMarketSource",
+    "ZzshareMarketSource",
 ]

@@ -16,7 +16,9 @@
 数据源差异：
 - ``baostock``：5/15/30/60min，历史长，需登录；
 - ``akshare``：1/5/15/30/60min，接口限频，近端数据；
-- ``sina``：1/5/15/30/60min，5min 约 21 个交易日，最快但短。
+- ``sina``：1/5/15/30/60min，5min 约 21 个交易日，最快但短；
+- ``zzshare``：1/5/15/30/60min，带 token 后 60 次/分，可按区间一次取多天，
+  是最稳的分钟源；日线 180 次/分（见 ``config.zzshare``）。
 """
 
 from __future__ import annotations
@@ -60,7 +62,7 @@ DEFAULT_CODES = (
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="分钟线试点抓取")
-    parser.add_argument("--source", default="baostock", choices=["baostock", "akshare", "sina"])
+    parser.add_argument("--source", default="baostock", choices=["baostock", "akshare", "sina", "zzshare"])
     parser.add_argument("--freq", default="5min", choices=["1min", "5min", "15min", "30min", "60min"])
     parser.add_argument("--start", required=True)
     parser.add_argument("--end", required=True)

@@ -38,7 +38,7 @@
 | | `rate_limiter.py` / `exceptions.py` / `progress.py` | 限流、异常体系、进度上报 |
 | `market/` | `loader.py` | `MarketDataLoader`：增量判断 + 复权 + 实时补尾 |
 | | `fetcher.py` | `MarketDataFetcher`：多源调度与写入 |
-| | `sources/*.py` | tushare / baostock / akshare / sina / tencent / index |
+| | `sources/*.py` | tushare / baostock / akshare / sina / tencent / index / zzshare |
 | | `adjust.py` / `adj_factors.py` | 复权因子应用 |
 | | `intraday.py` | 分时指标：涨跌停价、封板时间、VWAP 偏离 |
 | `financial/` | `service.py` | `FinancialDataService`：报表/指标/估值同步与 PIT 查询 |
@@ -49,6 +49,11 @@
 | `concept/` | `service.py` | 板块目录、成分、板块日线、个股↔板块映射 |
 | `disclosure/` | `service.py` | 财报披露日历、公告 |
 | `api/` | `*_tools.py` / `runtime.py` / `utils.py` | MCP 工具注册、单例管理、JSON 序列化 |
+
+**zzshare（分钟线补充源）**：`sources/zzshare_source.py`，通过 `config.zzshare.token` 鉴权；
+带 token 时限频 `stk_mins` 60 次/分、`daily` 180 次/分，源内按 endpoint 节流并自动重试。
+`stk_mins` 单次最多 1000 根 bar，适配器会按日期二分拉取（不会静默截断）。
+用法：`python scripts/fetch_minute_pilot.py --source zzshare --freq 5min --start ... --end ... --codes "600519,000001"`。
 
 ### 1.4 数据流（以日线为例）
 

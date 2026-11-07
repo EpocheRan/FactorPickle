@@ -130,4 +130,5 @@ RUN_LIVE_TESTS=1 python -m pytest   # 额外跑真实数据源 / QuestDB 用例
 
 ## 数据来源
 
-Tushare、AkShare、BaoStock、腾讯行情。商业使用时请遵守各数据源许可协议。
+Tushare、AkShare、BaoStock、腾讯行情；分钟线可选用 zzshare（zzquant，需在 `config.json` 的 `zzshare.token` 配置）。
+商业使用时请遵守各数据源许可协议。

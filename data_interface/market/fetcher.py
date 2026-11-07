@@ -38,6 +38,7 @@ from .sources import (
     SinaMinuteSource,
     TencentQuoteSource,
     TushareMarketSource,
+    ZzshareMarketSource,
 )
 
 logger = logging.getLogger("DataInterface.MarketFetcher")
@@ -77,6 +78,7 @@ class MarketDataFetcher:
         tencent: TencentQuoteSource | None = None,
         tushare: TushareMarketSource | None = None,
         sina: SinaMinuteSource | None = None,
+        zzshare: ZzshareMarketSource | None = None,
     ):
         self.config = config or get_config()
         self.source = source
@@ -87,6 +89,7 @@ class MarketDataFetcher:
         self._tencent = tencent
         self._tushare = tushare
         self._sina = sina
+        self._zzshare = zzshare
         self._adj_cache: dict[str, tuple[float | None, float]] = {}
 
     # ------------------------------------------------------------------ 依赖
@@ -130,6 +133,12 @@ class MarketDataFetcher:
             )
         return self._sina
 
+    @property
+    def zzshare(self) -> ZzshareMarketSource:
+        if self._zzshare is None:
+            self._zzshare = ZzshareMarketSource(self.config)
+        return self._zzshare
+
     def supports_frequency(self, freq: str) -> bool:
         """该数据源是否支持指定频率（用于增量源优先级过滤）。"""
         if self.source == "tushare":
@@ -138,6 +147,8 @@ class MarketDataFetcher:
             return self.baostock.available(freq)
         if self.source == "sina":
             return SinaMinuteSource.available(freq)
+        if self.source == "zzshare":
+            return ZzshareMarketSource.available(freq)
         return True
 
     def close(self) -> None:
@@ -166,6 +177,8 @@ class MarketDataFetcher:
             frame = self.tushare.fetch_ohlc(stock_code, start_date, end_date, freq)
         elif self.source == "sina":
             frame = self.sina.fetch_ohlc(stock_code, start_date, end_date, freq)
+        elif self.source == "zzshare":
+            frame = self.zzshare.fetch_ohlc(stock_code, start_date, end_date, freq)
         elif self.source == "questdb":
             frame = self._fetch_ohlc_from_questdb(stock_code, start_date, end_date, freq)
         else:
