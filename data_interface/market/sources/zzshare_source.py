@@ -156,28 +156,51 @@ class ZzshareMarketSource:
         frame["type"] = ticker_type(code)
         return frame
 
-    #: ``stk_mins`` 单次最多返回 1000 根 bar，超过就按日期二分，避免静默截断。
+    #: ``stk_mins`` 单次最多返回 1000 根 bar。直接按整段请求会被截断，
+    #: 而"从整段开始二分"会白白多发一倍请求（内部节点也要发一次），
+    #: 所以先按频率估算每日 bar 数，切成 <950 根的小窗口，再对仍触顶的窗口二分。
     _MINUTE_ROW_CAP = 1000
+    _BARS_PER_DAY = {"1min": 240, "5min": 48, "15min": 16, "30min": 8, "60min": 4}
+
+    def _minute_chunk_days(self, freq: str) -> int:
+        per_day = self._BARS_PER_DAY.get(freq, 48)
+        trade_days = max(1, int(950 / per_day))
+        return max(1, int(trade_days * 7 / 5))  # 交易日 -> 自然日（含周末）
 
     def _fetch_minute_chunked(
         self, code: str, start: str, end: str, freq: str, depth: int = 0
     ) -> pd.DataFrame:
+        frames: list[pd.DataFrame] = []
+        cursor = pd.Timestamp(start)
+        end_dt = pd.Timestamp(end)
+        step = self._minute_chunk_days(freq)
+        while cursor <= end_dt:
+            chunk_end = min(cursor + pd.Timedelta(days=step - 1), end_dt)
+            part = self._fetch_minute_window(code, cursor, chunk_end, freq, depth)
+            if part is not None and not part.empty:
+                frames.append(part)
+            cursor = chunk_end + pd.Timedelta(days=1)
+        if not frames:
+            return pd.DataFrame()
+        return pd.concat(frames, ignore_index=True)
+
+    def _fetch_minute_window(
+        self, code: str, start, end, freq: str, depth: int
+    ) -> pd.DataFrame:
         raw = self._call(
             "stk_mins",
             ts_code=to_ts_code(code),
-            start_time=f"{start} 09:30:00",
-            end_time=f"{end} 15:00:00",
+            start_time=f"{start.strftime('%Y-%m-%d')} 09:30:00",
+            end_time=f"{end.strftime('%Y-%m-%d')} 15:00:00",
             freq=freq,
         )
         if raw is None or raw.empty:
             return pd.DataFrame()
-        if len(raw) >= self._MINUTE_ROW_CAP and start < end and depth < 10:
-            start_dt = pd.Timestamp(start)
-            end_dt = pd.Timestamp(end)
-            mid = start_dt + (end_dt - start_dt) / 2
-            left = self._fetch_minute_chunked(code, start, mid.strftime("%Y-%m-%d"), freq, depth + 1)
-            right = self._fetch_minute_chunked(
-                code, (mid + pd.Timedelta(days=1)).strftime("%Y-%m-%d"), end, freq, depth + 1
+        if len(raw) >= self._MINUTE_ROW_CAP and start < end and depth < 8:
+            mid = start + (end - start) / 2
+            left = self._fetch_minute_window(code, start, mid, freq, depth + 1)
+            right = self._fetch_minute_window(
+                code, mid + pd.Timedelta(days=1), end, freq, depth + 1
             )
             parts = [frame for frame in (left, right) if frame is not None and not frame.empty]
             return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
