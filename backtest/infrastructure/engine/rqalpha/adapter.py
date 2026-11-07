@@ -206,11 +206,49 @@ class StrategyAdapter:
                     self._queue_buy(code, delta, "rebalance_in")
                 elif delta < 0:
                     self._queue_sell(code, min(-delta, sellable), "rebalance_trim")
-            return
 
-        # 非调仓日不做“排名漂移”卖出：横截面策略只在调仓日换仓，
-        # buffer 的保留逻辑应由调仓日目标构建处理，不能每天清仓。
-        return
+        # 横截面策略也允许在持仓上注册止损/移动止损；默认 on_bar 是 no-op。
+        # 非调仓日不做排名漂移卖出，但止损条件仍然每天检查。
+        self._on_cross_holdings(context, bar_dict, positions)
+
+    def _on_cross_holdings(self, context, bar_dict, positions) -> None:
+        """给横截面持仓一个 on_bar 钩子，用于注册/维护止损。"""
+        runtime = get_runtime()
+        now = pd.Timestamp(Environment.get_instance().trading_dt)
+        dt = now if runtime.source.is_minute else now.normalize()
+        equity = float(context.portfolio.total_value)
+        cash = float(context.portfolio.cash)
+        for oid, position in positions.items():
+            code = code_of(oid)
+            bar = _bar(bar_dict, oid)
+            if bar is None:
+                continue
+            quantity = float(getattr(position, "quantity", 0.0) or 0.0)
+            if quantity <= 0:
+                continue
+            ctx = StrategyContext(
+                symbol=code,
+                dt=dt,
+                open=float(bar.open),
+                high=float(bar.high),
+                low=float(bar.low),
+                close=float(bar.close),
+                hfq_close=runtime.source.hfq_close(oid, Environment.get_instance().trading_dt),
+                pos=quantity,
+                cash=cash,
+                equity=equity,
+                weight=(
+                    float(getattr(position, "market_value", 0.0) or 0.0) / equity
+                    if equity > 0
+                    else 0.0
+                ),
+                bars_held=int(runtime.bars_held.get(code, 0)),
+                panel=runtime.panel,
+                avg_price=float(getattr(position, "avg_price", 0.0) or 0.0),
+            )
+            runtime.strategy.on_bar(ctx)
+            if ctx.intent.has_order or ctx.intent.trailing_pct is not None or ctx.intent.stop_loss is not None or ctx.intent.stop_loss_pct is not None or ctx.intent.hold_bars is not None:
+                self._apply_intent(ctx, oid, code, float(bar.close), position)
 
     # ------------------------------------------------------------------ stops
     def _manage_stops(self, context, bar_dict) -> None:
@@ -234,7 +272,12 @@ class StrategyAdapter:
             if state.stop is not None:
                 trigger = float(bar.low) if runtime.source.is_minute else float(bar.close)
                 if trigger <= float(state.stop):
-                    self._queue_sell(code, self._sellable(position, code), "stop_loss")
+                    sellable = self._sellable(position, code)
+                    if sellable <= 0:
+                        # RQAlpha 的 position.sellable 在部分持仓路径上为 0，
+                        # 止损单先用持仓量兜底；T+1 仍由撮合层拒绝当日卖出。
+                        sellable = quantity
+                    self._queue_sell(code, sellable, "stop_loss")
 
     # ------------------------------------------------------------------ intent
     def _apply_intent(self, ctx: StrategyContext, oid: str, code: str, price: float, position) -> None:
