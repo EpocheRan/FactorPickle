@@ -1748,9 +1748,9 @@ function buildOverview() {
   const srcX = 65, srcW = 1110, srcY = 6, srcH = 54;
   const srcGroup = svgEl('g');
   srcGroup.appendChild(svgEl('rect', {class:'achip', x:srcX, y:srcY, width:srcW, height:srcH, rx:10}));
-  srcGroup.appendChild(svgEl('circle', {cx:srcX + 18, cy:srcY + 21, r:3.5, fill:'#5b6b82'}));
-  srcGroup.appendChild(svgEl('text', {class:'achiptitle', x:srcX + 32, y:srcY + 25}, `外部数据源 · ${SOURCES.length} 个接口`));
-  srcGroup.appendChild(svgEl('text', {class:'achipsub', x:srcX + 32, y:srcY + 42}, SOURCES.join(' · ')));
+  srcGroup.appendChild(svgEl('rect', {x:srcX + 8, y:srcY + 8, width:3.5, height:srcH - 16, rx:1.7, fill:'#94a3b8'}));
+  srcGroup.appendChild(svgEl('text', {class:'achiptitle', x:srcX + 28, y:srcY + 25}, `外部数据源 · ${SOURCES.length} 个接口`));
+  srcGroup.appendChild(svgEl('text', {class:'achipsub', x:srcX + 28, y:srcY + 42}, SOURCES.join(' · ')));
   srcRow.appendChild(srcGroup);
   srcArrows.appendChild(svgEl('path', {
     class:'aarrow', 'marker-end':'url(#arw)',
@@ -1772,7 +1772,7 @@ function buildOverview() {
     const x = gx + i * (gw + ggap);
     const dom = DOMAIN_BY_ID[grp.d[0]];
     gWrap.appendChild(svgEl('rect', {x, y:gy, width:gw, height:gh, rx:9, fill:'rgba(7,14,24,.6)', stroke:'rgba(148,163,184,.13)'}));
-    gWrap.appendChild(svgEl('rect', {x:x + 9, y:gy + 0.5, width:gw - 18, height:2.5, rx:1.2, fill:dom.color, opacity:.8}));
+    gWrap.appendChild(svgEl('rect', {x:x + 9, y:gy + 8, width:gw - 18, height:2.5, rx:1.2, fill:dom.color, opacity:.8}));
     gWrap.appendChild(svgEl('text', {class:'gtitle', x:x + 12, y:gy + 21}, grp.t));
     grp.rows.forEach((name, j) => {
       gWrap.appendChild(svgEl('text', {class:'gtab', x:x + 12, y:gy + 44 + j * 17}, name));
