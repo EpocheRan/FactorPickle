@@ -42,14 +42,8 @@ def _with_ts(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _ohlc_columns(table: str) -> str:
-    """按表返回 OHLCV 列清单。
-
-    分钟线（ohlcv_5m/15m/…)没有 turnover 列；日线/周线有，而换手类因子
-    （``liquidity.turnover_std_bias_*``）必须靠它，缺列会退化成全 NaN 信号。
-    """
-    columns = "open, high, low, close, volume, amount, adj_factor"
-    if table in ("ohlcv_1d", "ohlcv_1w"):
-        columns = columns.replace("amount,", "amount, turnover,")
+    """按表返回 OHLCV 列清单（分钟线与日线字段一致，均含 turnover）。"""
+    columns = "open, high, low, close, volume, amount, turnover, adj_factor"
     return columns
 
 

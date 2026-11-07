@@ -445,8 +445,8 @@ class MarketDataFetcher:
                     _to_float(row.get("amount")) or 0.0,
                 ]
             )
-            if not freq.endswith("min"):
-                values.append(_to_float(row.get("turnover")))
+            # 分钟线与日线字段保持一致（turnover / adj_factor 均可为 NULL）
+            values.append(_to_float(row.get("turnover")))
             values.append(_to_float(row.get("adj_factor")))
             code = normalize_code(row.get("code"))
             values.append(code)

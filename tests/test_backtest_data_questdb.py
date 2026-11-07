@@ -92,14 +92,12 @@ def test_questdb_data_source_missing_factor_marks_fallback():
     assert bundle.frame["hfq_close"].tolist() == [10.0, 11.0]
 
 
-def test_ohlc_columns_include_turnover_for_daily_tables():
-    """换手类因子依赖 turnover；分钟线没有该列，不能拼进 SELECT。"""
+def test_ohlc_columns_include_turnover_for_all_tables():
+    """分钟线与日线字段一致：都带 turnover（缺列会让换手类因子退化为 NaN）。"""
     from backtest.infrastructure.data.questdb import _ohlc_columns
 
-    assert "turnover" in _ohlc_columns("ohlcv_1d")
-    assert "turnover" in _ohlc_columns("ohlcv_1w")
-    assert "turnover" not in _ohlc_columns("ohlcv_5m")
-    assert "turnover" not in _ohlc_columns("ohlcv_15m")
+    for table in ("ohlcv_1d", "ohlcv_1w", "ohlcv_5m", "ohlcv_15m"):
+        assert "turnover" in _ohlc_columns(table)
 
 
 def test_missing_turnover_column_becomes_nan():

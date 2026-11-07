@@ -51,6 +51,7 @@ OHLC_COLUMNS_MINUTE = [
     "close",
     "volume",
     "amount",
+    "turnover",
     "adj_factor",
     "code",
     "market",

@@ -28,21 +28,17 @@ OHLC_PARTITION = {
 }
 
 #: 需要在存量库上补齐的列（(列名, 类型)），迁移脚本与 init 共用
-OHLC_EXTRA_COLUMNS = (("adj_factor", "DOUBLE"), ("type", "SYMBOL"))
+OHLC_EXTRA_COLUMNS = (("turnover", "DOUBLE"), ("adj_factor", "DOUBLE"), ("type", "SYMBOL"))
 
 
 def _ohlc_sql(table: str, freq: str) -> str:
     partition = OHLC_PARTITION[freq]
+    # 分钟线与日线字段保持一致（turnover 由写入方决定是否有值，可为 NULL）
     columns = (
         "ts TIMESTAMP, open DOUBLE, high DOUBLE, low DOUBLE, close DOUBLE, "
-        "volume LONG, amount DOUBLE, adj_factor DOUBLE, code SYMBOL, market SYMBOL, type SYMBOL"
+        "volume LONG, amount DOUBLE, turnover DOUBLE, adj_factor DOUBLE, "
+        "code SYMBOL, market SYMBOL, type SYMBOL"
     )
-    if not freq.endswith("min"):
-        columns = (
-            "ts TIMESTAMP, open DOUBLE, high DOUBLE, low DOUBLE, close DOUBLE, "
-            "volume LONG, amount DOUBLE, turnover DOUBLE, adj_factor DOUBLE, "
-            "code SYMBOL, market SYMBOL, type SYMBOL"
-        )
     return (
         f'CREATE TABLE IF NOT EXISTS "{table}" ({columns}) '
         f"TIMESTAMP(ts) PARTITION BY {partition} WAL "
