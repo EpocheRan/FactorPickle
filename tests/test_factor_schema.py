@@ -59,7 +59,11 @@ def test_value_tables_are_versioned():
     for sql in (daily, announce):
         assert "source_version" in sql
         assert "version" in sql
-    assert "version, source_version" in daily
+    # 2026-11-05 起：daily 改为「同一交易日/代码/因子重算即覆盖」，
+    # version / source_version 只作审计列，不再进 DEDUP 键；
+    # 公告表仍保留按报告期的多版本键。
+    assert "DEDUP UPSERT KEYS(ts, code, factor_id)" in daily
+    assert "version, source_version" in announce
     # 事件表必须保留报告期与公告日
     assert "report_period" in announce
     assert "announce_date" in announce

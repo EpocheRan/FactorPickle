@@ -262,8 +262,23 @@ class FinancialDataService:
 
         now = now_cn()
         snapshot_ts = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        profiles = []
+        # 同一代码可能同时出现在 L 与 D 两份名单（例：600018 既有 2006 年退市的
+        # "上港集箱"，也有现在在市的"上港集团"）。按 L > P > D 去重，避免旧退市
+        # 记录把在市状态覆盖掉。
+        priority = {"L": 3, "P": 2, "D": 1}
+        best: dict[str, tuple[int, dict[str, Any], str]] = {}
         for fallback_status, raw in rows:
+            code = normalize_code(str(raw.get("ts_code") or ""))
+            if not code:
+                continue
+            status = str(raw.get("list_status") or fallback_status)
+            rank = priority.get(status, 0)
+            current = best.get(code)
+            if current is None or rank > current[0]:
+                best[code] = (rank, raw, status)
+
+        profiles = []
+        for _rank, raw, fallback_status in best.values():
             ts_code = str(raw.get("ts_code") or "")
             code = normalize_code(ts_code)
             if not code or not is_a_share_code(code):

@@ -63,7 +63,8 @@ def test_ths_daily_columns_and_pct_change():
     assert frame["volume"].iloc[0] == 24504670000
     assert frame["pct_chg"].iloc[0] != frame["pct_chg"].iloc[0]  # NaN
     assert frame["pct_chg"].iloc[1] == pytest.approx(1188.0 / 1232.0 - 1)
-    assert ak.index_kwargs["start_date"] == "20261020"
+    # 为了给首日算 pct_chg，取数窗口会往前多要 10 天缓冲，返回前再裁回请求区间
+    assert ak.index_kwargs["start_date"] == "20261010"
     assert ak.index_kwargs["end_date"] == "20261027"
 
 

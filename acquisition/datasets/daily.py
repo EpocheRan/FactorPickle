@@ -4,6 +4,15 @@ from __future__ import annotations
 
 from .base import *  # noqa: F401,F403
 
+#: Tushare ts_code 后缀 -> 交易所。必须按后缀判定，不能按 6 位代码猜：
+#: 000001 既是上证指数（SH）也是平安银行（SZ），按代码猜会写错 market/type。
+_TS_SUFFIX_MARKET = {"SH": "SSE", "SZ": "SZSE", "BJ": "BSE"}
+
+
+def _market_from_ts_code(ts_code: pd.Series) -> pd.Series:
+    suffix = ts_code.astype(str).str.split(".").str[-1].str.upper()
+    return suffix.map(_TS_SUFFIX_MARKET).fillna("")
+
 
 class DailySyncMixin:
     def sync_daily(
@@ -297,6 +306,8 @@ class DailySyncMixin:
             return frame
         frame["ts"] = pd.to_datetime(frame["trade_date"], errors="coerce")
         frame["code"] = frame["ts_code"].astype(str).str.split(".").str[0].map(normalize_code)
+        frame["market"] = _market_from_ts_code(frame["ts_code"])
+        frame["type"] = "stock"
         for source in ("open", "high", "low", "close"):
             frame[source] = pd.to_numeric(frame.get(source), errors="coerce")
         # Tushare daily: vol 单位「手」-> 股，amount 单位「千元」-> 元
@@ -316,7 +327,9 @@ class DailySyncMixin:
         frame["turnover"] = frame["code"].map(turnover).astype("float64")
         frame = frame.dropna(subset=["ts", "code", "open", "high", "low", "close"])
         frame.set_index("ts", inplace=True)
-        return frame[["code", "open", "high", "low", "close", "volume", "amount", "turnover"]]
+        return frame[
+            ["code", "market", "type", "open", "high", "low", "close", "volume", "amount", "turnover"]
+        ]
 
     @staticmethod
     def _fund_daily_frame(raw_rows: list[dict[str, Any]]) -> pd.DataFrame:
@@ -331,9 +344,13 @@ class DailySyncMixin:
         frame["volume"] = pd.to_numeric(frame.get("vol"), errors="coerce").fillna(0) * 100
         frame["amount"] = pd.to_numeric(frame.get("amount"), errors="coerce").fillna(0) * 1000
         frame["turnover"] = pd.NA
+        frame["market"] = _market_from_ts_code(frame["ts_code"])
+        frame["type"] = frame["code"].map(ticker_type)
         frame = frame.dropna(subset=["ts", "code", "open", "high", "low", "close"])
         frame.set_index("ts", inplace=True)
-        return frame[["code", "open", "high", "low", "close", "volume", "amount", "turnover"]]
+        return frame[
+            ["code", "market", "type", "open", "high", "low", "close", "volume", "amount", "turnover"]
+        ]
 
     def _ensure_fund_universe(self) -> int:
         """确保场内基金基础信息已落库（ETF/LOF 查询与同步都依赖它）。"""

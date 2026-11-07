@@ -167,7 +167,13 @@ def ticker_type(code: object) -> str:
         return "stock"
     if normalized.startswith(("16", "501", "502", "506")):
         return "lof"
-    if normalized.startswith(("51", "52", "53", "55", "56", "58", "159")):
+    # 深市 15 段：159 是 ETF，其余（150/151/158 等）是分级/LOF 等场内基金。
+    # 此前 158xxx 落到 stock，导致 54 只基金被当成股票写进行情表。
+    if normalized.startswith("159"):
+        return "etf"
+    if normalized.startswith("15"):
+        return "lof"
+    if normalized.startswith(("51", "52", "53", "55", "56", "58")):
         return "etf"
     if normalized.startswith(_FUND_PREFIXES):
         return "fund"
