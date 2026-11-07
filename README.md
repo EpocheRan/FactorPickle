@@ -15,7 +15,7 @@
 ## 架构
 
 ```text
-数据源（Tushare / BaoStock / AkShare / 腾讯 / 新浪）
+数据源（Tushare / BaoStock / AkShare / 腾讯 / 新浪 / zzshare）
         │
         ▼
 acquisition ── 唯一采集入口：Orchestrator + REAL_SYNCERS
@@ -98,6 +98,9 @@ python -m acquisition run --datasets ohlcv_1d,factors,screener
 
 - **单一存储**：QuestDB 是唯一事实源，WAL + DEDUP UPSERT；不支持 DELETE，删除按分区重建。
 - **价格口径**：存不复权价 + 累计复权因子，复权在读取时计算。
+- **分钟线与日线同构**：12 字段一致（含 `turnover` / `adj_factor` / `type`），
+  `adj_factor` 按 `(code, date)` 取日线当日因子；`turnover` 用日线隐含流通股本折算，
+  日内加总 = 日线换手率；停牌日假 bar 不落库。详见 [docs/design/minute_data_v1.md](docs/design/minute_data_v1.md)。
 - **市场与品种**：`market` 是交易所（`SSE` / `SZSE` / `BSE`），`type` 是品种（`stock` / `etf` / `lof` / `fund` / `idx`）。
 - **时点正确**：财务按 `publish_date` 过滤，板块成分按 `as_of` 取最近整组快照。
 - **写入边界**：raw 表只由 `data_interface` 写，因子表只由 `factor_engine` 写。
@@ -130,5 +133,9 @@ RUN_LIVE_TESTS=1 python -m pytest   # 额外跑真实数据源 / QuestDB 用例
 
 ## 数据来源
 
-Tushare、AkShare、BaoStock、腾讯行情；分钟线可选用 zzshare（zzquant，需在 `config.json` 的 `zzshare.token` 配置）。
-商业使用时请遵守各数据源许可协议。
+Tushare、AkShare、BaoStock、腾讯行情；分钟线用 zzshare（zzquant，需在 `config.json` 的
+`zzshare.token` 配置，带 token 时 60 次/分）。
+
+- **分钟线**：`stk_mins` 1/5/15/30/60min，可回溯到 2010-01-04，单次最多 1,000 根 bar；
+  当前 `ohlcv_5m` 覆盖沪深300 近一年（332 只、382 万行），字段与日线一致；
+- 商业使用时请遵守各数据源许可协议。

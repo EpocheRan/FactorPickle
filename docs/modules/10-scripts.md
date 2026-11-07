@@ -41,6 +41,8 @@
 | `research_reversal_regimes.py` | 分市场状态的最优阈值 | `--codes 500` |
 | `research_composite_demo.py` | 复合因子 + 中性化演示 | — |
 | `research_limitup_check.py` | 涨停可成交性检验 | `--pool 500` |
+| `export_index_minutes.py` | 按指数成分导出分钟线 CSV（含 adj/turnover，断点续跑） | `--index 000300.SH --start ... --end ... --freq 5min --out output/xxx.csv` |
+| `import_minutes_csv.py` | 分钟线 CSV 落库（join 日线因子） | `--csv output/xxx.csv --freq 5min` |
 | `compact-docker-vhdx.ps1` | **重建 Docker 数据盘**（回收 vhdx 空转空间） | 管理员 PowerShell，见 §1.3.1 |
 
 ### 1.3.1 Docker 数据盘回收（PowerShell）

@@ -29,9 +29,9 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
                                      │ 写入
                                      ▼
                  ┌──────────────────────────────────────────────┐
-                 │      QuestDB（ohlcv_1d / fin_* / moneyflow /  │
-                 │       margin_detail / top_list / block_trade /│
-                 │       concept_* / factor_value_* ...）        │
+                 │  QuestDB：ohlcv_1d / ohlcv_5m / fin_* / ...  │
+                 │  margin_detail / top_list / block_trade / ...│
+                 │  concept_* / factor_value_* / index_weight   │
                  └───────────────────┬──────────────────────────┘
                                      │ 读取
                                      ▼
@@ -102,6 +102,7 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 | [design/factor_report_v2.md](design/factor_report_v2.md) | 因子报告 v2：方向、价差、成本、断言、归因 |
 | [design/backtest_architecture.md](design/backtest_architecture.md) | 回测引擎详细架构（RQAlpha + 自建账本） |
 | [design/data_pipeline_v1.md](design/data_pipeline_v1.md) | 分时/板块映射/披露三条 P0–P2 数据链路 |
+| [design/minute_data_v1.md](design/minute_data_v1.md) | 分钟线：zzshare 源、1,000 根上限、与日线同构的字段/复权/换手率、停牌假 bar 规则 |
 
 ### 4.2 指南
 

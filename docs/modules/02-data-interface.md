@@ -52,8 +52,14 @@
 
 **zzshare（分钟线补充源）**：`sources/zzshare_source.py`，通过 `config.zzshare.token` 鉴权；
 带 token 时限频 `stk_mins` 60 次/分、`daily` 180 次/分，源内按 endpoint 节流并自动重试。
-`stk_mins` 单次最多 1000 根 bar，适配器会按日期二分拉取（不会静默截断）。
+`stk_mins` 单次最多 1000 根 bar，适配器会按频率预切窗口（5min 每窗 26 天），触顶再二分，不会静默截断。
 用法：`python scripts/fetch_minute_pilot.py --source zzshare --freq 5min --start ... --end ... --codes "600519,000001"`。
+
+**分钟表存储契约**：`ohlcv_1m/5m/15m/30m/60m` 与 `ohlcv_1d` **同构**（12 列，
+含 `turnover` / `adj_factor` / `type`），`DEDUP UPSERT KEYS(ts, code, market, type)`。
+价格是不复权价；`adj_factor` 按 `(code, date)` 取日线当日因子，`turnover` 按日线隐含流通股本折算。
+批量导出/落库：`scripts/export_index_minutes.py` / `scripts/import_minutes_csv.py`，
+细节见 [../design/minute_data_v1.md](../design/minute_data_v1.md)。
 
 ### 1.4 数据流（以日线为例）
 
