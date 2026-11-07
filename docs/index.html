@@ -688,7 +688,7 @@
             <!-- acquisition -->
             <g>
               <rect class="abox" x="65" y="86" width="1110" height="62" rx="12" fill="url(#gAcq)"/>
-              <rect x="65" y="86" width="3.5" height="62" rx="1.7" fill="#f59e0b"/>
+              <rect x="73" y="94" width="3.5" height="46" rx="1.7" fill="#f59e0b"/>
               <text class="atitle" x="86" y="113">acquisition · 采集编排</text>
               <text class="asub" x="86" y="131">Scope → Orchestrator.run(REAL_SYNCERS) · BuildOrchestrator.ensure_snapshot</text>
               <text class="abadge" x="1159" y="113" text-anchor="end">增量 · 断点续跑 · 快照调度</text>
@@ -697,7 +697,7 @@
             <!-- data interface -->
             <g>
               <rect class="abox" x="65" y="182" width="1110" height="62" rx="12" fill="url(#gDi)"/>
-              <rect x="65" y="182" width="3.5" height="62" rx="1.7" fill="#22d3ee"/>
+              <rect x="73" y="190" width="3.5" height="46" rx="1.7" fill="#22d3ee"/>
               <text class="atitle" x="86" y="209">data_interface · 唯一数据访问层</text>
               <text class="asub" x="86" y="227">QuestDBClient · MarketDataLoader.ohlc · FinancialDataService.get_statements · SentimentService.sync</text>
               <text class="abadge" x="1159" y="209" text-anchor="end">raw 表唯一写者 · 归一化 · 复权</text>
@@ -714,21 +714,21 @@
             <!-- layer E -->
             <g>
               <rect class="abox" x="65" y="516" width="300" height="74" rx="12"/>
-              <rect x="65" y="516" width="3.5" height="74" rx="1.7" fill="#3b82f6"/>
+              <rect x="73" y="524" width="3.5" height="58" rx="1.7" fill="#3b82f6"/>
               <text class="atitle" x="85" y="542">factors · 纯计算</text>
               <text class="asub" x="85" y="560">F.* 声明 · build_panel · compute_series</text>
               <text class="abadge" x="352" y="542" text-anchor="end">0 DB 依赖</text>
               <text class="abadge" x="85" y="578" style="fill:#5f7288">pandas / numpy only</text>
 
               <rect class="abox" x="395" y="516" width="350" height="74" rx="12"/>
-              <rect x="395" y="516" width="3.5" height="74" rx="1.7" fill="#6366f1"/>
+              <rect x="403" y="524" width="3.5" height="58" rx="1.7" fill="#6366f1"/>
               <text class="atitle" x="415" y="542">factor_engine · 因子物化</text>
               <text class="asub" x="415" y="560">build / ensure / read_latest · FactorStore</text>
               <text class="abadge" x="732" y="542" text-anchor="end">factor 表唯一写者</text>
               <text class="abadge" x="415" y="578" style="fill:#5f7288">registry · 长表 · latest · 对账</text>
 
               <rect class="abox" x="775" y="516" width="400" height="74" rx="12"/>
-              <rect x="775" y="516" width="3.5" height="74" rx="1.7" fill="#34d399"/>
+              <rect x="783" y="524" width="3.5" height="58" rx="1.7" fill="#34d399"/>
               <text class="atitle" x="795" y="542">position · 持仓与交易台账</text>
               <text class="asub" x="795" y="560">PositionManager · ATR / Grid 模式 · compute_ledger</text>
               <text class="abadge" x="1162" y="542" text-anchor="end">行情经 data_interface</text>
@@ -765,7 +765,7 @@
             <!-- MCP -->
             <g>
               <rect class="abox" x="65" y="742" width="1110" height="56" rx="12" fill="rgba(148,163,184,.05)"/>
-              <rect x="65" y="742" width="3.5" height="56" rx="1.7" fill="#94a3b8"/>
+              <rect x="73" y="750" width="3.5" height="40" rx="1.7" fill="#94a3b8"/>
               <text class="atitle" x="86" y="766">MCPserver · 统一工具出口</text>
               <text class="asub" x="86" y="784">HTTP / stdio · market · financial · moneyflow · concept · disclosure · factor · acquisition · screener · position</text>
               <text class="abadge" x="1159" y="766" text-anchor="end">FastMCP</text>
@@ -1772,7 +1772,7 @@ function buildOverview() {
     const x = gx + i * (gw + ggap);
     const dom = DOMAIN_BY_ID[grp.d[0]];
     gWrap.appendChild(svgEl('rect', {x, y:gy, width:gw, height:gh, rx:9, fill:'rgba(7,14,24,.6)', stroke:'rgba(148,163,184,.13)'}));
-    gWrap.appendChild(svgEl('rect', {x, y:gy, width:gw, height:2.5, rx:1.2, fill:dom.color, opacity:.8}));
+    gWrap.appendChild(svgEl('rect', {x:x + 9, y:gy + 0.5, width:gw - 18, height:2.5, rx:1.2, fill:dom.color, opacity:.8}));
     gWrap.appendChild(svgEl('text', {class:'gtitle', x:x + 12, y:gy + 21}, grp.t));
     grp.rows.forEach((name, j) => {
       gWrap.appendChild(svgEl('text', {class:'gtab', x:x + 12, y:gy + 44 + j * 17}, name));
