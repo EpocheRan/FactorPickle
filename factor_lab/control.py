@@ -19,6 +19,8 @@ def default_control() -> dict[str, Any]:
         "state": "running",
         "reason": "",
         "actor": "bootstrap",
+        "max_running": 4,
+        "drain_sec": 120,
         "updated_at": now_iso(),
     }
 
@@ -46,10 +48,20 @@ def set_state(state: str, *, reason: str = "", actor: str = "human") -> dict[str
         "state": state,
         "reason": reason,
         "actor": actor,
+        "max_running": int(load_control().get("max_running") or 4),
+        "drain_sec": int(load_control().get("drain_sec") or 120),
         "updated_at": now_iso(),
     }
     write_json_atomic(CONTROL_PATH, value)
     return value
+
+
+def is_running() -> bool:
+    return str(load_control().get("state")) == "running"
+
+
+def is_stopped() -> bool:
+    return str(load_control().get("state")) == "stopped"
 
 
 def assert_running() -> None:

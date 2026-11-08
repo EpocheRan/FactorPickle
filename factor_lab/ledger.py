@@ -6,9 +6,11 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from .clock import hlc_after, next_token
 from .config import LEDGER_PATH, LEDGER_SUMMARY_PATH, now_iso
 from .schemas import Hypothesis
 from .store import (
+    _lock_file,
     append_jsonl,
     read_jsonl_lines,
     sha256_json,
@@ -33,17 +35,24 @@ class Ledger:
         return rows[-1] if rows else None
 
     def append(self, event: str, payload: dict[str, Any], **extra: Any) -> dict[str, Any]:
-        last = self.last()
-        record: dict[str, Any] = {
-            "seq": int(last["seq"]) + 1 if last else 1,
-            "ts": now_iso(),
-            "event": event,
-            "payload": payload,
-            "prev_hash": str(last.get("hash")) if last else GENESIS,
-        }
-        record.update(extra)
-        record["hash"] = sha256_json(record)
-        append_jsonl(self.path, record)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with _lock_file(self.path):
+            last = self.last()
+            token = next_token()
+            record: dict[str, Any] = {
+                "seq": int(last["seq"]) + 1 if last else 1,
+                "ts": now_iso(),
+                "event": event,
+                "payload": payload,
+                "prev_hash": str(last.get("hash")) if last else GENESIS,
+                "event_id": f"evt-{token['event_seq']:08d}",
+                "event_seq": int(token["event_seq"]),
+                "event_hlc": str(token["event_hlc"]),
+                "node": str(token["node"]),
+            }
+            record.update(extra)
+            record["hash"] = sha256_json(record)
+            append_jsonl(self.path, record, lock=False)
         return record
 
     # ------------------------------------------------------------ domain events
@@ -59,6 +68,9 @@ class Ledger:
             {
                 "hypothesis_id": hypothesis.hypothesis_id,
                 "factor_id": hypothesis.factor_id,
+                "family_id": hypothesis.family_id,
+                "development_window": hypothesis.development_window,
+                "bet": hypothesis.bet,
                 "outcome_policy": hypothesis.outcome_policy,
                 "outcomes": [item.to_dict() for item in hypothesis.outcomes],
                 "registered_at": now_iso(),
@@ -74,6 +86,9 @@ class Ledger:
         factor_id: str,
         outcome: dict[str, Any],
         stage: str = "L1",
+        family_id: str | None = None,
+        parent_event_id: str | None = None,
+        family_kind: str = "development",
     ) -> dict[str, Any]:
         return self.append(
             "run_started",
@@ -82,6 +97,9 @@ class Ledger:
                 "trial_id": trial_id,
                 "hypothesis_id": hypothesis_id,
                 "factor_id": factor_id,
+                "family_id": family_id,
+                "family_kind": family_kind,
+                "parent_event_id": parent_event_id,
                 "outcome": outcome,
                 "stage": stage,
                 "started_at": now_iso(),
@@ -215,24 +233,40 @@ class Ledger:
         run_id: str,
         hypothesis_id: str,
         trial_id: str,
+        require_parent: bool = False,
     ) -> dict[str, Any]:
         hyp = self.find_hypothesis(hypothesis_id)
         run = self.find_run(run_id)
         issues: list[str] = []
+        order = "hlc"
         if hyp is None:
             issues.append("hypothesis_registered missing")
         if run is None:
             issues.append("run_started missing")
         if hyp is not None and run is not None:
-            try:
-                from datetime import datetime
+            hyp_hlc = str(hyp.get("event_hlc") or "")
+            run_hlc = str(run.get("event_hlc") or "")
+            if hyp_hlc and run_hlc:
+                if hlc_after(hyp_hlc, run_hlc):
+                    issues.append("hypothesis HLC is after run HLC")
+            else:
+                order = "legacy_timestamp"
+                try:
+                    from datetime import datetime
 
-                registered = datetime.fromisoformat(str(hyp["ts"]))
-                started = datetime.fromisoformat(str(run["ts"]))
-                if registered > started:
-                    issues.append("hypothesis registered after run started")
-            except Exception:
-                issues.append("timestamp parse failed")
+                    registered = datetime.fromisoformat(str(hyp["ts"]))
+                    started = datetime.fromisoformat(str(run["ts"]))
+                    if registered > started:
+                        issues.append("hypothesis registered after run started")
+                except Exception:
+                    issues.append("timestamp parse failed")
+            payload = run.get("payload") or {}
+            parent_event_id = payload.get("parent_event_id")
+            if parent_event_id:
+                if parent_event_id != hyp.get("event_id"):
+                    issues.append("parent_event_id does not match hypothesis event")
+            elif require_parent:
+                issues.append("parent_event_id missing")
         if run is not None:
             payload = run.get("payload") or {}
             if payload.get("trial_id") != trial_id:
@@ -242,19 +276,45 @@ class Ledger:
         return {
             "ok": not issues,
             "issues": issues,
+            "order": order,
             "hypothesis_seq": int(hyp["seq"]) if hyp else None,
             "run_seq": int(run["seq"]) if run else None,
+            "hypothesis_event_id": hyp.get("event_id") if hyp else None,
+            "run_event_id": run.get("event_id") if run else None,
         }
+
+    def family_trials(self, family_id: str | None, *, include_confirm: bool = False) -> set[str]:
+        trials: set[str] = set()
+        for record in self.records():
+            if record.get("event") != "run_started":
+                continue
+            payload = record.get("payload") or {}
+            if family_id is not None and payload.get("family_id") != family_id:
+                continue
+            if not include_confirm and payload.get("family_kind") == "confirm":
+                continue
+            trial = payload.get("trial_id")
+            if trial:
+                trials.add(str(trial))
+        return trials
 
     def summary(self) -> dict[str, Any]:
         records = self.records()
         counts = Counter(str(record.get("event")) for record in records)
-        trials = {
-            (record.get("payload") or {}).get("trial_id")
-            for record in records
-            if record.get("event") == "run_started"
-        }
-        trials.discard(None)
+        trials: set[str] = set()
+        family_trials: dict[str, set[str]] = {}
+        for record in records:
+            if record.get("event") != "run_started":
+                continue
+            payload = record.get("payload") or {}
+            trial = payload.get("trial_id")
+            if trial:
+                trials.add(str(trial))
+            if payload.get("family_kind") == "confirm":
+                continue
+            family = str(payload.get("family_id") or "legacy")
+            if trial:
+                family_trials.setdefault(family, set()).add(str(trial))
         verification = self.verify()
         return {
             "updated_at": now_iso(),
@@ -262,6 +322,7 @@ class Ledger:
             "records": len(records),
             "events": dict(counts),
             "distinct_trials": len(trials),
+            "family_trials": {family: len(items) for family, items in sorted(family_trials.items())},
             "repairs": len(verification["repairs"]),
             "unrepaired": len(verification["unrepaired"]),
             "ok": verification["ok"],

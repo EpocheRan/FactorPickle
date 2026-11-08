@@ -138,6 +138,8 @@
       <span>更新 <b>__GENERATED_AT__</b></span>
       <span>策略 <b id="m-policy">—</b></span>
       <span>账本 <b id="m-ledger">—</b></span>
+      <span>心跳 <b id="m-heartbeat">—</b></span>
+      <span>周期 <b id="m-cycle">—</b></span>
       <span>提交 <b id="m-commit">—</b></span>
     </div>
   </header>
@@ -277,6 +279,8 @@
     $('status-reason').textContent = (DATA.health?.reasons || []).join(' · ');
     $('m-policy').textContent = DATA.meta?.policy_version || '—';
     $('m-ledger').textContent = (DATA.meta?.ledger_head || '—').slice(0, 18);
+    $('m-heartbeat').textContent = DATA.heartbeat?.host_alive_at ? String(DATA.heartbeat.host_alive_at).slice(11, 19) : '—';
+    $('m-cycle').textContent = DATA.cycle?.cycle_id ? `${DATA.cycle.cycle_id} · ${t(DATA.cycle.status || '')}` : '—';
     $('m-commit').textContent = DATA.meta?.git_commit || '—';
     $('m-exp').textContent = DATA.meta?.experiment_count ?? 0;
     $('m-trials').textContent = DATA.ledger?.distinct_trials ?? 0;

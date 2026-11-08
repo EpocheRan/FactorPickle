@@ -308,6 +308,7 @@ def audit_experiment(root: Path, *, policy: dict[str, Any] | None = None, ledger
         run_id=run_id,
         hypothesis_id=str(manifest.get("hypothesis_id") or ""),
         trial_id=str(manifest.get("trial_id") or ""),
+        require_parent=bool(manifest.get("family_id")),
     )
     add(
         "orphan_run",
@@ -431,7 +432,13 @@ def audit_experiment(root: Path, *, policy: dict[str, Any] | None = None, ledger
     has_warn = any(item["status"] == "warn" for item in checks)
     verdict = "fail" if hard_fail else ("warn" if has_warn else "pass")
     summary = ledger.summary()
-    n_trials = int(summary.get("distinct_trials") or 0)
+    family_id = manifest.get("family_id")
+    if family_id:
+        n_trials = len(ledger.family_trials(str(family_id)))
+        n_scope = "family-development"
+    else:
+        n_trials = int(summary.get("distinct_trials") or 0)
+        n_scope = "legacy-global"
     p_value = two_sided_p(ic_t) if ic_t is not None else None
     q_value = None
     q_method = "unavailable"
@@ -445,7 +452,7 @@ def audit_experiment(root: Path, *, policy: dict[str, Any] | None = None, ledger
     q_note = (
         "single-trial raw p"
         if n_trials <= 1
-        else "Bonferroni fallback across distinct trials; BH batch to follow"
+        else "Bonferroni fallback across family trials; BH batch to follow"
     )
     net_2x = spread_gross - 2.0 * cost_mean if math.isfinite(cost_mean) and math.isfinite(spread_gross) else None
     audit = {
@@ -460,7 +467,10 @@ def audit_experiment(root: Path, *, policy: dict[str, Any] | None = None, ledger
         "policy": {"version": policy.get("version"), "sha256": policy.get("sha256")},
         "ledger": verification,
         "orphan": orphan,
+        "family_id": family_id,
         "n_trials": n_trials,
+        "n_scope": n_scope,
+        "n_at_decision": n_trials,
         "q_value": q_value,
         "q_method": q_method,
         "p_value": p_value,

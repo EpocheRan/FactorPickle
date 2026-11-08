@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from .config import EXPERIMENTS_DIR, now_iso
+from .store import _lock_file
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,8 @@ class Hypothesis:
     staging: str | None = None
     bet: str | None = None
     parent: str | None = None
+    family_id: str | None = None
+    development_window: str | None = None
     start: str = "2019-01-01"
     end: str | None = None
     created_at: str = field(default_factory=now_iso)
@@ -72,6 +76,11 @@ class Hypothesis:
             raise ValueError("outcome_policy=single requires exactly one outcome")
         if self.expected_sign not in (-1, 1):
             raise ValueError("expected_sign must be +1 or -1")
+        if not self.family_id:
+            family = self.bet or "general"
+            self.family_id = f"F-{family}-{self.start[:10]}"
+        if not self.development_window:
+            self.development_window = f"{self.start}:{self.end or 'open'}"
 
     def trial_ids(self) -> dict[str, str]:
         return {outcome.key(): trial_id(self.hypothesis_id, outcome) for outcome in self.outcomes}
@@ -91,6 +100,8 @@ class Hypothesis:
             "staging": self.staging,
             "bet": self.bet,
             "parent": self.parent,
+            "family_id": self.family_id,
+            "development_window": self.development_window,
             "start": self.start,
             "end": self.end,
             "created_at": self.created_at,
@@ -113,6 +124,8 @@ class Hypothesis:
             staging=data.get("staging"),
             bet=data.get("bet"),
             parent=data.get("parent"),
+            family_id=data.get("family_id"),
+            development_window=data.get("development_window"),
             start=str(data.get("start", "2019-01-01")),
             end=data.get("end"),
             created_at=str(data.get("created_at", now_iso())),
@@ -128,8 +141,8 @@ def trial_id(hypothesis_id: str, outcome: OutcomeSpec) -> str:
 def new_hypothesis_id(factor_id: str) -> str:
     stamp = now_iso()[:10].replace("-", "")
     slug = "".join(ch if ch.isalnum() else "-" for ch in factor_id).strip("-")[:28]
-    raw = f"{stamp}|{factor_id}|{now_iso()}".encode("utf-8")
-    return f"H-{stamp}-{slug}-{hashlib.sha1(raw).hexdigest()[:4]}"
+    raw = f"{stamp}|{factor_id}|{now_iso()}|{uuid.uuid4().hex}".encode("utf-8")
+    return f"H-{stamp}-{slug}-{hashlib.sha1(raw).hexdigest()[:8]}"
 
 
 def next_experiment_id() -> str:
@@ -140,6 +153,20 @@ def next_experiment_id() -> str:
     while f"E-{stamp}-{number:03d}" in existing:
         number += 1
     return f"E-{stamp}-{number:03d}"
+
+
+def reserve_experiment_id() -> str:
+    """Allocate and create an experiment directory atomically across processes."""
+    EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = now_iso()[:10].replace("-", "")
+    with _lock_file(EXPERIMENTS_DIR / ".experiment_id"):
+        existing = {path.name for path in EXPERIMENTS_DIR.glob(f"E-{stamp}-*")}
+        number = 1
+        while f"E-{stamp}-{number:03d}" in existing:
+            number += 1
+        exp_id = f"E-{stamp}-{number:03d}"
+        (EXPERIMENTS_DIR / exp_id).mkdir(parents=True, exist_ok=False)
+        return exp_id
 
 
 def experiment_dir(exp_id: str):

@@ -360,6 +360,10 @@ def build_dashboard_data() -> dict[str, Any]:
         "coverage": coverage,
         "storage": _storage_snapshot(),
         "control": read_json(config.CONTROL_PATH) or {"state": "not_configured"},
+        "heartbeat": read_json(config.HEARTBEAT_PATH),
+        "cycle": read_json(config.CYCLE_PATH),
+        "directive": read_json(config.DIRECTIVE_PATH),
+        "quarantine": read_json(config.QUARANTINE_PATH),
         "ledger": summary,
     }
 

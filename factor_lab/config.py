@@ -19,6 +19,8 @@ POLICY_DIR = LAB_ROOT / "policy"
 LEDGER_DIR = LAB_ROOT / "ledger"
 CONTROL_DIR = LAB_ROOT / "control"
 DASHBOARD_DIR = LAB_ROOT / "dashboard"
+PROGRESS_DIR = LAB_ROOT / "progress"
+CLOCK_DIR = LAB_ROOT / "clock"
 ARCHIVE_DIR = PROJECT_ROOT / "output" / "_archive"
 TRASH_DIR = PROJECT_ROOT / "output" / "_trash"
 
@@ -26,6 +28,14 @@ GATE_POLICY_PATH = POLICY_DIR / "gate_policy.json"
 LEDGER_PATH = LEDGER_DIR / "trial_ledger.jsonl"
 LEDGER_SUMMARY_PATH = LEDGER_DIR / "ledger_summary.json"
 CONTROL_PATH = CONTROL_DIR / "lab_control.json"
+DIRECTIVE_PATH = CONTROL_DIR / "directive.json"
+HEARTBEAT_PATH = CONTROL_DIR / "heartbeat.json"
+CYCLE_PATH = CONTROL_DIR / "cycle.json"
+SUPERVISOR_PATH = CONTROL_DIR / "supervisor.json"
+CLOCK_PATH = CLOCK_DIR / "event_clock.json"
+QUARANTINE_PATH = LAB_ROOT / "quarantine.json"
+RETENTION_POLICY_PATH = LAB_ROOT / "retention_policy.json"
+STORAGE_REPORT_PATH = LAB_ROOT / "storage_report.json"
 DASHBOARD_PATH = DASHBOARD_DIR / "lab_dashboard.html"
 DASHBOARD_DATA_PATH = DASHBOARD_DIR / "dashboard_data.json"
 DATA_COVERAGE_PATH = LAB_ROOT / "data_coverage.json"
@@ -44,6 +54,8 @@ def ensure_dirs() -> None:
         LEDGER_DIR,
         CONTROL_DIR,
         DASHBOARD_DIR,
+        PROGRESS_DIR,
+        CLOCK_DIR,
     ):
         path.mkdir(parents=True, exist_ok=True)
 

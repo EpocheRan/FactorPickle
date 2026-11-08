@@ -8,6 +8,7 @@ import json
 import math
 import os
 import time
+import uuid
 from contextlib import contextmanager
 from datetime import date, datetime
 from enum import Enum
@@ -88,7 +89,7 @@ def read_json(path: Path, default: Any = None) -> Any:
 
 def write_json_atomic(path: Path, payload: Any) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
     tmp.write_text(
         json.dumps(jsonable(payload), ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -132,9 +133,15 @@ def _lock_file(path: Path, timeout: float = 30.0):
             pass
 
 
-def append_jsonl(path: Path, record: dict[str, Any]) -> None:
+def append_jsonl(path: Path, record: dict[str, Any], *, lock: bool = True) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(jsonable(record), ensure_ascii=False, separators=(",", ":"))
+    if not lock:
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(line + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        return
     with _lock_file(path):
         with path.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(line + "\n")

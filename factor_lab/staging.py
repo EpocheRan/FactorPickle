@@ -75,6 +75,18 @@ def ensure_staged(factor_id: str) -> StagedFactor | None:
                 source="factor_lab.ideas",
             )
     if spec is None:
+        from .cycle_ideas import CYCLE_SPECS
+
+        cycle = next((item for item in CYCLE_SPECS if item.factor_id == factor_id), None)
+        if cycle is not None:
+            return stage_price_factor(
+                factor_id,
+                cycle.fn,
+                window=int(cycle.window),
+                unit=str(cycle.unit),
+                source="factor_lab.cycle_ideas",
+            )
+    if spec is None:
         raise KeyError(
             f"factor {factor_id!r} is neither registered nor known to the lab stager; "
             f"known lab factors: {sorted(PILOT_STAGERS)} + {len(_idea_factor_ids())} ideas"
@@ -90,8 +102,9 @@ def ensure_staged(factor_id: str) -> StagedFactor | None:
 
 def _idea_factor_ids() -> list[str]:
     from .ideas import IDEA_SPECS
+    from .cycle_ideas import CYCLE_SPECS
 
-    return [spec.factor_id for spec in IDEA_SPECS]
+    return [spec.factor_id for spec in IDEA_SPECS] + [spec.factor_id for spec in CYCLE_SPECS]
 
 
 def unstage(factor_id: str) -> None:

@@ -16,7 +16,7 @@ from .brief import build_brief, write_decision
 from .control import assert_running, ensure_control
 from .ledger import Ledger
 from .policy import init_policy, load_policy
-from .schemas import Hypothesis, artifact_paths, experiment_dir, next_experiment_id, trial_id
+from .schemas import Hypothesis, artifact_paths, experiment_dir, reserve_experiment_id, trial_id
 from .serialization import report_to_dict
 from .staging import ensure_staged
 from .store import write_json_atomic
@@ -35,9 +35,8 @@ def run_experiment(
     assert_running()
     policy = load_policy()
     ledger = Ledger()
-    exp_id = next_experiment_id()
+    exp_id = reserve_experiment_id()
     root = experiment_dir(exp_id)
-    root.mkdir(parents=True, exist_ok=False)
 
     outcome = hypothesis.outcomes[0]
     trial = trial_id(hypothesis.hypothesis_id, outcome)
@@ -57,16 +56,20 @@ def run_experiment(
             "expected_sign": hypothesis.expected_sign,
             "source": hypothesis.source,
             "bet": hypothesis.bet,
+            "family_id": hypothesis.family_id,
+            "development_window": hypothesis.development_window,
         },
     )
 
-    ledger.register_hypothesis(hypothesis)
+    hypothesis_event = ledger.register_hypothesis(hypothesis)
     ledger.start_run(
         run_id=run_id,
         trial_id=trial,
         hypothesis_id=hypothesis.hypothesis_id,
         factor_id=hypothesis.factor_id,
         outcome=outcome.to_dict(),
+        family_id=hypothesis.family_id,
+        parent_event_id=hypothesis_event.get("event_id"),
     )
 
     started = time.time()
@@ -77,6 +80,8 @@ def run_experiment(
         "factor_id": hypothesis.factor_id,
         "hypothesis_id": hypothesis.hypothesis_id,
         "trial_id": trial,
+        "family_id": hypothesis.family_id,
+        "development_window": hypothesis.development_window,
         "outcome": outcome.to_dict(),
         "params": {
             "start": hypothesis.start,
@@ -170,6 +175,7 @@ def run_experiment(
         "exp_id": exp_id,
         "run_id": run_id,
         "trial_id": trial,
+        "family_id": hypothesis.family_id,
         "experiment_dir": str(root),
         "manifest": str(root / "manifest.json"),
         "report": str(root / "report.json"),

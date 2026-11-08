@@ -54,6 +54,18 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("pilot", help="run the amount_bias P0 pilot and dashboard")
 
+    cycle_parser = sub.add_parser("cycle", help="run one Phase-0 research cycle")
+    cycle_parser.add_argument("--limit", type=int, default=4)
+    cycle_parser.add_argument("--profile", default="quick")
+    cycle_parser.add_argument("--heartbeat-interval", type=int, default=2)
+    cycle_parser.add_argument("--no-orthogonality", action="store_true")
+
+    directive_parser = sub.add_parser("directive", help="show or initialize research direction")
+    directive_parser.add_argument("action", choices=["show", "init"], nargs="?", default="show")
+
+    supervisor_parser = sub.add_parser("supervisor", help="show supervisor state")
+    supervisor_parser.add_argument("action", choices=["status"], nargs="?", default="status")
+
     mine_parser = sub.add_parser("mine", help="run the P1 idea batch")
     mine_parser.add_argument("--limit", type=int, default=23)
     mine_parser.add_argument("--profile", default="quick")
@@ -83,12 +95,23 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "init":
         from .examples import pilot_coverage
+        from .directive import ensure_directive
+        from .retention import ensure_policy
+        from .supervisor import write_heartbeat
 
         policy = init_policy()
         control = ensure_control()
+        directive = ensure_directive()
+        retention = ensure_policy()
+        write_heartbeat(interval_sec=120)
+        if not config.QUARANTINE_PATH.exists():
+            write_json_atomic(
+                config.QUARANTINE_PATH,
+                {"schema_version": "factor_lab.quarantine.v1", "updated_at": config.now_iso(), "items": []},
+            )
         if not config.DATA_COVERAGE_PATH.exists():
             write_json_atomic(config.DATA_COVERAGE_PATH, pilot_coverage())
-        _print({"policy": policy, "control": control})
+        _print({"policy": policy, "control": control, "directive": directive, "retention": retention})
         return 0
 
     if args.command == "control":
@@ -104,6 +127,41 @@ def main(argv: list[str] | None = None) -> int:
         dashboard = render_dashboard()
         result["dashboard"] = str(dashboard)
         _print(result)
+        return 0
+
+    if args.command == "cycle":
+        from .cycle import run_cycle
+
+        _print(
+            run_cycle(
+                limit=args.limit,
+                profile=args.profile,
+                heartbeat_interval=args.heartbeat_interval,
+                orthogonality=not args.no_orthogonality,
+            )
+        )
+        return 0
+
+    if args.command == "directive":
+        from .directive import ensure_directive, write_directive, default_directive
+
+        if args.action == "init":
+            _print(write_directive(default_directive()))
+        else:
+            _print(ensure_directive())
+        return 0
+
+    if args.command == "supervisor":
+        from .supervisor import read_supervisor
+
+        _print(
+            {
+                "supervisor": read_supervisor(),
+                "control": load_control(),
+                "heartbeat": read_json(config.HEARTBEAT_PATH),
+                "cycle": read_json(config.CYCLE_PATH),
+            }
+        )
         return 0
 
     if args.command == "mine":
