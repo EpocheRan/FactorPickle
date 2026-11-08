@@ -48,8 +48,11 @@ def test_policy_hash_roundtrip() -> None:
 
 def test_rho_ci_classification() -> None:
     assert classify_rho(0.91, 0.95) == "fail"
+    assert classify_rho(-0.95, -0.91) == "fail"
     assert classify_rho(0.60, 0.69) == "pass"
+    assert classify_rho(-0.69, -0.60) == "pass"
     assert classify_rho(0.60, 0.95) == "warn"
+    assert classify_rho(-0.2, 0.4) == "pass"
     assert classify_rho(None, None) == "warn"
 
 

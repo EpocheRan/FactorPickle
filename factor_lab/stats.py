@@ -24,12 +24,22 @@ def bonferroni(p: float, n_trials: int) -> float:
 
 
 def classify_rho(ci_low: float | None, ci_high: float | None, hard: float = 0.9, warn: float = 0.7) -> str:
-    """Classify a correlation interval using the frozen policy rule."""
+    """Classify a correlation interval using the frozen policy rule.
+
+    The frozen rule is about ``|rho|``.  If the interval crosses zero, the
+    effective lower magnitude is 0; otherwise use the smaller absolute bound.
+    """
     if ci_low is None or ci_high is None:
         return "warn"
-    if ci_low > hard:
+    low, high = float(ci_low), float(ci_high)
+    if low <= 0.0 <= high:
+        lo = 0.0
+    else:
+        lo = min(abs(low), abs(high))
+    hi = max(abs(low), abs(high))
+    if lo > hard:
         return "fail"
-    if ci_high < warn:
+    if hi < warn:
         return "pass"
     return "warn"
 
