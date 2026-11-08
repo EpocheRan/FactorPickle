@@ -60,6 +60,9 @@ def main(argv: list[str] | None = None) -> int:
     brief_parser = sub.add_parser("brief", help="build decision brief / decision for one experiment")
     brief_parser.add_argument("--experiment", required=True)
 
+    ortho_parser = sub.add_parser("orthogonality", help="compute P1 exposure correlation for one experiment")
+    ortho_parser.add_argument("--experiment", required=True)
+
     sub.add_parser("dashboard", help="render the dashboard from artifacts")
 
     ledger_parser = sub.add_parser("ledger", help="ledger utilities")
@@ -123,6 +126,12 @@ def main(argv: list[str] | None = None) -> int:
         brief = build_brief(root)
         decision = write_decision(root, brief, audit)
         _print({"brief": brief, "decision": decision})
+        return 0
+
+    if args.command == "orthogonality":
+        from .orthogonality import compute_orthogonality
+
+        _print(compute_orthogonality(_root(args.experiment)))
         return 0
 
     if args.command == "dashboard":

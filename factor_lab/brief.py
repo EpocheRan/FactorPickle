@@ -43,7 +43,7 @@ def _risk_list(report: dict[str, Any], audit: dict[str, Any]) -> list[str]:
     if turnover is not None:
         try:
             if float(turnover) > max_turnover:
-                risks.append(f"turnover {float(turnover):.0%} > cap {max_turnover:.0%}")
+                risks.append(f"换手 {float(turnover):.0%} > 上限 {max_turnover:.0%}")
         except (TypeError, ValueError):
             pass
     capacity = report.get("capacity") or {}
@@ -54,18 +54,25 @@ def _risk_list(report: dict[str, Any], audit: dict[str, Any]) -> list[str]:
                 multiple = capacity.get(key)
                 break
     if multiple is None:
-        risks.append("capacity not measured")
+        risks.append("容量未测")
     else:
         try:
             if float(multiple) < 3.0:
-                risks.append(f"capacity {float(multiple):.1f}x < 3x")
+                risks.append(f"容量 {float(multiple):.1f}× < 3×")
+        except (TypeError, ValueError):
+            pass
+    net_2x = (audit.get("metrics") or {}).get("net_2x_cost")
+    if net_2x is not None:
+        try:
+            if float(net_2x) <= 0:
+                risks.append("2× 成本后净价差为负")
         except (TypeError, ValueError):
             pass
     for check in audit.get("checks") or []:
         if isinstance(check, dict) and check.get("status") == "fail":
-            risks.append(f"audit fail: {check.get('check_id')}")
+            risks.append(f"审计失败：{check.get('check_id')}")
     if not risks:
-        risks.append("no material risk flagged by P0 checks")
+        risks.append("P0 检查未标出重大风险")
     return risks[:3]
 
 
@@ -114,7 +121,11 @@ def build_brief(root: Path) -> dict[str, Any]:
         },
         "incremental": {
             "max_rho": metrics.get("max_rho"),
-            "note": "P0: orthogonality tool pending; manual rho allowed only for process checks.",
+            "note": (
+                "exposure-only; rho_return pending"
+                if metrics.get("max_rho") is not None
+                else "P1 orthogonality pending"
+            ),
         },
         "trials": {
             "n": audit.get("n_trials"),

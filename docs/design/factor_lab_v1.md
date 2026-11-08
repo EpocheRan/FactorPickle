@@ -26,7 +26,8 @@ Factor Lab 写入：
 | `ledger/trial_ledger.jsonl` | hash chain、repair marker、hypothesis/run/outcome 事件 |
 | `experiments/<id>/manifest.json` | run_id、trial_id、outcome、数据版本、policy hash |
 | `experiments/<id>/report.json` | `FactorReport` 的紧凑序列化 |
-| `experiments/<id>/audit.json` | 确定性检查 + G3 交易性子检查 |
+| `experiments/<id>/audit.json` | 确定性检查 + G0.5 相关性 + G3 交易性子检查 |
+| `experiments/<id>/orthogonality.json` | P1：与 library snapshot 的暴露相关 + block bootstrap CI |
 | `experiments/<id>/decision_brief.json` | ≤2KB，人工决策摘要 |
 | `experiments/<id>/decision.json` | park / iterate / repair / promote |
 | `dashboard/lab_dashboard.html` | 自包含控制台，读汇总产物 |
@@ -52,8 +53,10 @@ Factor Lab 写入：
 - gate policy sha256；
 - ledger hash chain / repair / orphan run；
 - outcome 是否在预注册集合；
+- G0.5：`orthogonality.json` 的 exposure CI（下界 > 0.9 fail，上界 < 0.7 pass，跨区间 warn）；
 - turnover / capacity / 2× cost 的 G3 子检查；
-- rating 字段存在。
+- rating 字段存在；
+- `q_value`：单 trial 先记 raw p，多 trial BH 留到 batch。
 
 `audit.verdict` 是 G2 完整性；`audit.g3` 是交易性。两者分开，避免把“报告算错”和“因子不可交易”混为一谈。
 
@@ -66,11 +69,11 @@ python -m factor_lab dashboard
 生成 `output/factor_lab/dashboard/lab_dashboard.html`，读取 experiments、ledger、
 policy、portfolio、coverage、control。页面包含：
 
-- 红黄绿状态与 Attention 队列；
-- KPI：每周 hypothesis、每月 G3、hypothesis→G3、N、orphan、audit fail rate；
-- 门禁漏斗、trial 累计、bets；
-- experiment 表（过滤 / 搜索 / 点击详情）；
-- audit findings、data coverage、storage。
+- 红黄绿状态与「待处理」队列；
+- KPI：本周新增假设、本月进入 G3、假设→G3、去重 trial、孤儿 run、审计失败率；
+- 门禁漏斗、试验累计、研究押注；
+- 实验表（过滤 / 搜索 / 点击详情）；
+- 审计发现、数据覆盖、存储与清理。
 
 只读，不带 pause/approve 按钮；暂停走 `control`。
 
@@ -102,7 +105,7 @@ python -m factor_lab maintenance clean --apply  # 移到 output/_archive 或 _tr
 
 ## 8. 已知限制
 
-- `orthogonality.py` 不在 P0；G0.5 用 3 个因子的手工 rho 占位。
-- `q_value` 暂未计算；`n_trials` 先落盘。
-- `capacity` 与 2× cost 在 quick profile 下可能缺失，audit 记 warn。
-- 首个 pilot 是 D 级因子；P0 验收的是链路与门禁，不是 alpha。
+- `orthogonality.py` 目前只算 exposure 相关；`rho_return` 仍待补，G0.5 结论标注为 exposure-only。
+- `q_value` 单 trial 先记 raw p；多 trial BH 是 batch 步骤。
+- 2× cost 已由 `cost_mean` 重算；`capacity` 在 quick profile 下仍可能缺失，audit 记 warn。
+- 首个 pilot 是 D 级因子；P0/P1 验收的是链路与门禁，不是 alpha。

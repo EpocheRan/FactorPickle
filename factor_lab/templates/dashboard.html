@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Factor Lab · Control Room</title>
+<title>Factor Lab · 因子实验室控制台</title>
 <style>
   :root{
     --paper:#f6f1e7; --paper2:#fffdf8; --ink:#221c18; --muted:#6d6258;
@@ -68,8 +68,8 @@
   }
   .filters input:focus,.filters select:focus{border-color:var(--burgundy2)}
   .table-wrap{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:10px;background:var(--paper2)}
-  table{width:100%;border-collapse:collapse;min-width:980px}
-  th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;font-size:11.5px;vertical-align:top}
+  table{width:100%;border-collapse:collapse;min-width:900px}
+  th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:11px;vertical-align:top}
   th{background:#efe7da;font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;position:sticky;top:0;z-index:2}
   tbody tr{cursor:pointer} tbody tr:hover{background:rgba(166,124,61,.06)}
   tr:last-child td{border-bottom:none}
@@ -133,18 +133,18 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="brand">Factor Lab <span>CONTROL ROOM</span></div>
+    <div class="brand">Factor Lab <span>控制台</span></div>
     <div class="top-meta">
-      <span>UPDATED <b>__GENERATED_AT__</b></span>
-      <span>POLICY <b id="m-policy">—</b></span>
-      <span>LEDGER <b id="m-ledger">—</b></span>
-      <span>COMMIT <b id="m-commit">—</b></span>
+      <span>更新 <b>__GENERATED_AT__</b></span>
+      <span>策略 <b id="m-policy">—</b></span>
+      <span>账本 <b id="m-ledger">—</b></span>
+      <span>提交 <b id="m-commit">—</b></span>
     </div>
   </header>
 
   <section class="hero">
     <div class="hero-card">
-      <div class="eyebrow">LAB STATUS</div>
+      <div class="eyebrow">实验室状态</div>
       <div class="status-line"><span id="status-dot" class="status-dot"></span><h1 id="status-label">—</h1></div>
       <p class="status-reason" id="status-reason"></p>
     </div>
@@ -156,73 +156,73 @@
   <section class="grid">
     <div class="panel">
       <div class="panel-head">
-        <h2>Experiments</h2>
+        <h2>实验记录</h2>
         <span class="sub" id="table-count">—</span>
       </div>
       <div class="filters">
-        <input id="q" type="search" placeholder="search factor / id / bet" />
-        <select id="f-status"><option value="">all status</option><option>pass</option><option>warn</option><option>fail</option><option>pending</option></select>
-        <select id="f-g3"><option value="">all G3</option><option>pass</option><option>warn</option><option>fail</option><option>pending</option></select>
-        <select id="f-bet"><option value="">all bets</option></select>
+        <input id="q" type="search" placeholder="搜索因子 / 编号 / 押注" />
+        <select id="f-status"><option value="">全部审计状态</option><option value="pass">通过</option><option value="warn">警告</option><option value="fail">失败</option><option value="pending">待定</option></select>
+        <select id="f-g3"><option value="">全部 G3</option><option value="pass">通过</option><option value="warn">边界</option><option value="fail">失败</option><option value="pending">待定</option></select>
+        <select id="f-bet"><option value="">全部押注</option></select>
       </div>
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>Exp</th><th>Factor</th><th>Bet</th><th>Gate</th><th>IC</th><th>Net/5d</th><th>Turn</th><th>ρ</th><th>N/q</th><th>Audit</th><th>Decision</th><th>Age</th>
+            <th>实验</th><th>因子</th><th>押注</th><th>门禁</th><th>IC</th><th>净价差/5日</th><th>换手</th><th>ρ</th><th>N/q</th><th>审计</th><th>决策</th><th>时间</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
     </div>
     <aside class="panel">
-      <div class="panel-head"><h2>Attention</h2><span class="sub">human queue</span></div>
+      <div class="panel-head"><h2>待处理</h2><span class="sub">人工队列</span></div>
       <div class="stack" id="attention"></div>
     </aside>
   </section>
 
   <section class="grid3">
     <div class="panel">
-      <div class="panel-head"><h2>Gate funnel</h2><span class="sub">P0 counts</span></div>
+      <div class="panel-head"><h2>门禁漏斗</h2><span class="sub">P0 计数</span></div>
       <div id="funnel"></div>
     </div>
     <div class="panel">
-      <div class="panel-head"><h2>Trial accumulation</h2><span class="sub">ledger</span></div>
-      <svg class="chart" id="trial-chart" viewBox="0 0 600 170" role="img" aria-label="trial accumulation"></svg>
+      <div class="panel-head"><h2>试验累计</h2><span class="sub">账本</span></div>
+      <svg class="chart" id="trial-chart" viewBox="0 0 600 170" role="img" aria-label="试验累计"></svg>
     </div>
     <div class="panel">
-      <div class="panel-head"><h2>Bets</h2><span class="sub">portfolio</span></div>
+      <div class="panel-head"><h2>研究押注</h2><span class="sub">组合</span></div>
       <div class="bets" id="bets"></div>
     </div>
   </section>
 
   <section class="grid2">
     <div class="panel">
-      <div class="panel-head"><h2>Audit findings</h2><span class="sub" id="finding-count">—</span></div>
+      <div class="panel-head"><h2>审计发现</h2><span class="sub" id="finding-count">—</span></div>
       <div id="findings"></div>
     </div>
     <div class="panel">
-      <div class="panel-head"><h2>Data coverage</h2><span class="sub">manual P0 table</span></div>
+      <div class="panel-head"><h2>数据覆盖</h2><span class="sub">P0 手工表</span></div>
       <div id="coverage"></div>
     </div>
   </section>
 
   <section class="panel">
-    <div class="panel-head"><h2>Storage / maintenance</h2><span class="sub" id="storage-total">—</span></div>
+    <div class="panel-head"><h2>存储与清理</h2><span class="sub" id="storage-total">—</span></div>
     <div id="storage"></div>
   </section>
 
   <div class="foot">
-    <span>Factor Lab v0.1 · read-only dashboard</span>
-    <span>experiments <b id="m-exp">—</b></span>
-    <span>trials <b id="m-trials">—</b></span>
-    <span>control <b id="m-control">—</b></span>
+    <span>Factor Lab v0.1 · 只读控制台</span>
+    <span>实验 <b id="m-exp">—</b></span>
+    <span>试验 <b id="m-trials">—</b></span>
+    <span>控制 <b id="m-control">—</b></span>
   </div>
 </div>
 
 <div class="overlay" id="overlay" hidden></div>
 <aside class="drawer" id="drawer" hidden>
   <div class="drawer-head">
-    <div><div class="eyebrow" id="d-eyebrow">EXPERIMENT</div><h3 id="d-title">—</h3></div>
+    <div><div class="eyebrow" id="d-eyebrow">实验</div><h3 id="d-title">—</h3></div>
     <button class="x" id="d-close" aria-label="close">×</button>
   </div>
   <div id="d-body"></div>
@@ -234,29 +234,58 @@
   const DATA = JSON.parse(document.getElementById('lab-data').textContent);
   const $ = (id) => document.getElementById(id);
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const fmt = (v) => (v === null || v === undefined || Number.isNaN(Number(v))) ? 'n/a' : Number(v).toFixed(3);
-  const pct = (v) => (v === null || v === undefined || Number.isNaN(Number(v))) ? 'n/a' : (Number(v) * 100).toFixed(2) + '%';
+  const LABEL = {
+    pass:'通过', warn:'警告', fail:'失败', pending:'待定', green:'绿灯', yellow:'黄灯', red:'红灯',
+    running:'运行中', success:'成功', failed:'失败', not_configured:'未配置',
+    park:'归档', iterate:'迭代', repair:'修复', promote:'晋升', 'promote to G4':'晋升 G4',
+    explore:'探索', exploit:'推进', confirmed:'已确认',
+    'G3 pass':'G3 通过', 'G3 boundary':'G3 边界', 'G3 fail':'G3 失败', 'G2 fail':'G2 失败'
+  };
+  const CHECK = {
+    artifacts:'产物齐全', run_id:'run_id 一致', params:'参数与窗口', sample:'样本覆盖',
+    ic_recompute:'IC 重算', spread_recompute:'毛价差重算', cost_identity:'成本恒等式',
+    monotonicity:'单调性', policy:'策略哈希', ledger_chain:'账本链', orphan_run:'孤儿 run',
+    outcome_pre_registered:'预注册口径', g3_tradeability:'G3 交易性', report_diagnostics:'报告诊断',
+    rating:'评级字段', turnover:'换手上限', capacity:'容量倍数', cost_sensitivity:'2× 成本', orthogonality:'G0.5 相关性'
+  };
+  const t = (v) => LABEL[String(v)] || String(v ?? '');
+  const checkTitle = (c) => CHECK[c.check_id] || c.title || c.check_id;
+  const fmt = (v) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(3);
+  const pct = (v) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : (Number(v) * 100).toFixed(2) + '%';
   const dlabel = (v) => String(v || '').slice(0, 10);
+  const zhText = (s) => String(s ?? '')
+    .replace(/no fail \(warn only\)/gi, '无失败（仅警告）')
+    .replace(/\bfail\b/gi, '失败')
+    .replace(/\bwarn\b/gi, '警告')
+    .replace(/\bpass\b/gi, '通过')
+    .replace(/\bmissing\b/gi, '缺失')
+    .replace(/\bexpected\b/gi, '期望')
+    .replace(/\bchecks\b/gi, '项检查')
+    .replace(/cost net/gi, '成本后净价差')
+    .replace(/2x net/gi, '2× 净价差')
+    .replace(/2x/gi, '2×')
+    .replace(/\b(\d+)x\b/gi, '$1×')
+    .replace(/\bn\/a\b/gi, '—');
   const bytes = (n) => { if (!n) return '0 B'; const u=['B','KB','MB','GB','TB']; let i=0; let x=Number(n); while(x>=1024&&i<u.length-1){x/=1024;i++;} return x.toFixed(1)+' '+u[i]; };
-  const badge = (v, cls) => `<span class="badge ${esc(cls || v || 'muted')}">${esc(v || 'n/a')}</span>`;
+  const badge = (v, cls) => `<span class="badge ${esc(cls || v || 'muted')}">${esc(t(v) || '—')}</span>`;
 
   function statusClass(level){ return level === 'green' ? 'green' : level === 'red' ? 'red' : 'yellow'; }
   function renderHeader(){
     const level = DATA.health?.level || 'yellow';
     $('status-dot').className = 'status-dot ' + statusClass(level);
-    $('status-label').textContent = level === 'green' ? 'GREEN · running within bounds' : level === 'red' ? 'RED · stop and inspect' : 'YELLOW · restricted';
+    $('status-label').textContent = level === 'green' ? '绿灯 · 运行正常' : level === 'red' ? '红灯 · 停止检查' : '黄灯 · 受限运行';
     $('status-reason').textContent = (DATA.health?.reasons || []).join(' · ');
     $('m-policy').textContent = DATA.meta?.policy_version || '—';
     $('m-ledger').textContent = (DATA.meta?.ledger_head || '—').slice(0, 18);
     $('m-commit').textContent = DATA.meta?.git_commit || '—';
     $('m-exp').textContent = DATA.meta?.experiment_count ?? 0;
     $('m-trials').textContent = DATA.ledger?.distinct_trials ?? 0;
-    $('m-control').textContent = DATA.control?.state || 'not_configured';
+    $('m-control').textContent = t(DATA.control?.state || '未配置');
     $('hero-side').innerHTML = [
-      ['Distinct trials', DATA.ledger?.distinct_trials ?? 0, 'ledger'],
-      ['G3 candidates', (DATA.experiments || []).filter(e => e.verdict !== 'fail' && e.g3 !== 'fail').length, 'research'],
-      ['Open attention', (DATA.attention || []).length, 'human'],
-      ['Policy', DATA.meta?.policy_version || '—', 'gate'],
+      ['去重 trial', DATA.ledger?.distinct_trials ?? 0, '账本'],
+      ['G3 候选', (DATA.experiments || []).filter(e => e.verdict !== 'fail' && e.g3 !== 'fail').length, '研究'],
+      ['待处理', (DATA.attention || []).length, '人工'],
+      ['策略版本', DATA.meta?.policy_version || '—', '门禁'],
     ].map(([k,v,s]) => `<div class="mini-stat"><b>${esc(v)}</b><span>${esc(k)} · ${esc(s)}</span></div>`).join('');
   }
 
@@ -274,28 +303,28 @@
       return (!q || hay.includes(q)) && (!status || e.verdict === status) && (!g3 || e.g3 === g3) && (!bet || e.bet === bet);
     });
     $('table-count').textContent = `${rows.length} / ${(DATA.experiments || []).length}`;
-    if (!rows.length) { $('tbody').innerHTML = `<tr><td colspan="12"><div class="empty">no experiments match this filter</div></td></tr>`; return; }
+    if (!rows.length) { $('tbody').innerHTML = `<tr><td colspan="12"><div class="empty">没有匹配当前筛选的实验</div></td></tr>`; return; }
     $('tbody').innerHTML = rows.map(e => `
       <tr data-id="${esc(e.id)}">
         <td class="mono">${esc(e.id)}</td>
-        <td>${esc(e.factor)}<div class="muted mono">${esc(e.horizon)}d · ${esc(e.universe)}</div></td>
+        <td>${esc(e.factor)}<div class="muted mono">${esc(e.horizon)} 天 · ${esc(e.universe)}</div></td>
         <td>${esc(e.bet)}</td>
         <td>${badge(e.gate || e.g3, e.g3 === 'fail' ? 'fail' : e.g3 === 'warn' ? 'warn' : 'pass')}</td>
         <td class="mono">${fmt(e.ic)}<div class="muted mono">t ${fmt(e.ic_t)}</div></td>
         <td class="mono">${pct(e.net)}</td>
-        <td class="mono">${e.turnover == null ? 'n/a' : (e.turnover * 100).toFixed(0) + '%'}</td>
-        <td class="mono">${e.max_rho == null ? 'pending' : Number(e.max_rho).toFixed(2)}</td>
-        <td class="mono">${e.n_trials ?? '—'} / ${e.q_value == null ? 'q n/a' : Number(e.q_value).toFixed(2)}</td>
+        <td class="mono">${e.turnover == null ? '—' : (e.turnover * 100).toFixed(0) + '%'}</td>
+        <td class="mono">${e.max_rho == null ? '待算' : Number(e.max_rho).toFixed(2)}</td>
+        <td class="mono">${e.n_trials ?? '—'} / ${e.q_value == null ? 'q 待算' : Number(e.q_value).toFixed(2)}</td>
         <td>${badge(e.verdict, e.verdict === 'fail' ? 'fail' : e.verdict === 'warn' ? 'warn' : 'pass')}</td>
         <td>${badge(e.recommend || e.decision || 'pending', e.decision === 'promote' ? 'pass' : e.recommend === 'iterate' ? 'warn' : e.recommend === 'repair' ? 'fail' : 'muted')}</td>
-        <td class="mono">${e.age_days == null ? '—' : e.age_days.toFixed(1) + 'd'}</td>
+        <td class="mono">${e.age_days == null ? '—' : e.age_days.toFixed(1) + ' 天'}</td>
       </tr>`).join('');
     document.querySelectorAll('#tbody tr[data-id]').forEach(tr => tr.addEventListener('click', () => openDetail(tr.dataset.id)));
   }
 
   function renderAttention(){
     const items = DATA.attention || [];
-    $('attention').innerHTML = items.length ? items.map(a => `<div class="att ${a.level}" ${a.exp_id ? `data-id="${esc(a.exp_id)}"` : ''}><div class="h">${badge(a.level, a.level)} ${esc(a.title)}</div><div class="d">${esc(a.detail)}</div></div>`).join('') : `<div class="empty">nothing needs attention</div>`;
+    $('attention').innerHTML = items.length ? items.map(a => `<div class="att ${a.level}" ${a.exp_id ? `data-id="${esc(a.exp_id)}"` : ''}><div class="h">${badge(a.level, a.level)} ${esc(a.title)}</div><div class="d">${esc(a.detail)}</div></div>`).join('') : `<div class="empty">当前没有待处理项</div>`;
     document.querySelectorAll('.att[data-id]').forEach(el => el.addEventListener('click', () => openDetail(el.dataset.id)));
   }
 
@@ -308,7 +337,7 @@
   function renderTrials(){
     const pts = DATA.ledger_points || [];
     const svg = $('trial-chart');
-    if (!pts.length) { svg.innerHTML = `<text x="20" y="85">no ledger points</text>`; return; }
+    if (!pts.length) { svg.innerHTML = `<text x="20" y="85">暂无账本数据</text>`; return; }
     const w=600, h=170, padL=36, padR=12, padT=16, padB=26;
     const nMax = Math.max(1, ...pts.map(p => Number(p.n||0)));
     const xs = pts.map((p,i) => padL + (w-padL-padR) * (pts.length === 1 ? 0.5 : i/(pts.length-1)));
@@ -320,54 +349,54 @@
 
   function renderBets(){
     const bets = DATA.bets || [];
-    $('bets').innerHTML = bets.length ? bets.map(b => `<div class="bet"><div class="t"><b>${esc(b.bet)}</b><span>${badge(b.status, b.status === 'confirmed' ? 'pass' : 'gold')}</span></div><div class="m"><div>experiments<b>${b.experiments}</b></div><div>trials<b>${b.trials}</b></div><div>G3<b>${b.g3}</b></div></div></div>`).join('') : `<div class="empty">no bets yet</div>`;
+    $('bets').innerHTML = bets.length ? bets.map(b => `<div class="bet"><div class="t"><b>${esc(b.bet)}</b><span>${badge(b.status, b.status === 'confirmed' ? 'pass' : 'gold')}</span></div><div class="m"><div>实验<b>${b.experiments}</b></div><div>试验<b>${b.trials}</b></div><div>G3<b>${b.g3}</b></div></div></div>`).join('') : `<div class="empty">还没有押注</div>`;
   }
 
   function renderFindings(){
     const items = DATA.audit_findings || [];
     $('finding-count').textContent = `${items.length} findings`;
-    $('findings').innerHTML = items.length ? items.map(f => `<div class="finding"><span class="id">${esc(f.exp_id)}</span><span>${badge(f.status, f.status === 'fail' ? 'fail' : 'warn')}</span><span><b>${esc(f.check_id)}</b><div class="d">${esc(f.actual)} · expected ${esc(f.expected)}</div></span></div>`).join('') : `<div class="empty">no audit warnings</div>`;
+    $('findings').innerHTML = items.length ? items.map(f => `<div class="finding"><span class="id">${esc(f.exp_id)}</span><span>${badge(f.status, f.status === 'fail' ? 'fail' : 'warn')}</span><span><b>${esc(checkTitle(f))}</b><div class="d">${esc(zhText(f.actual))} · 期望 ${esc(zhText(f.expected))}</div></span></div>`).join('') : `<div class="empty">没有审计警告</div>`;
   }
 
   function renderCoverage(){
     const rows = DATA.coverage || [];
-    $('coverage').innerHTML = rows.length ? `<div class="table-wrap" style="max-height:230px"><table style="min-width:0;width:100%"><thead><tr><th>Field</th><th>Start</th><th>Coverage</th><th>PIT</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="mono">${esc(r.table)}.${esc(r.field)}</td><td class="mono">${esc(r.start)}</td><td class="mono">${r.coverage == null ? '—' : pct(r.coverage)}</td><td>${badge(r.pit ? 'yes' : 'no', r.pit ? 'pass' : 'warn')}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">data_coverage.json not provided; P0 expects a manual table</div>`;
+    $('coverage').innerHTML = rows.length ? `<div class="table-wrap" style="max-height:230px"><table style="min-width:0;width:100%"><thead><tr><th>字段</th><th>起始</th><th>覆盖率</th><th>PIT</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="mono">${esc(r.table)}.${esc(r.field)}</td><td class="mono">${esc(r.start)}</td><td class="mono">${r.coverage == null ? '—' : pct(r.coverage)}</td><td>${badge(r.pit ? '有' : '无', r.pit ? 'pass' : 'warn')}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">未提供 data_coverage.json；P0 先用手工表</div>`;
   }
 
   function renderStorage(){
     const s = DATA.storage || {};
-    $('storage-total').textContent = `${bytes(s.output_bytes)} output · ${bytes(s.panel_cache)} panel`;
+    $('storage-total').textContent = `${bytes(s.output_bytes)} 输出 · ${bytes(s.panel_cache)} 面板缓存`;
     const rows = s.top || [];
     const max = Math.max(1, ...rows.map(r => Number(r.bytes||0)));
-    $('storage').innerHTML = rows.map(r => `<div class="storage-row"><span class="mono">${esc(r.name)}</span><div class="bar"><i style="width:${(Number(r.bytes||0)/max*100).toFixed(1)}%;background:#a67c3d"></i></div><span class="n">${bytes(r.bytes)}</span></div>`).join('') || `<div class="empty">no storage snapshot</div>`;
+    $('storage').innerHTML = rows.map(r => `<div class="storage-row"><span class="mono">${esc(r.name)}</span><div class="bar"><i style="width:${(Number(r.bytes||0)/max*100).toFixed(1)}%;background:#a67c3d"></i></div><span class="n">${bytes(r.bytes)}</span></div>`).join('') || `<div class="empty">暂无存储快照</div>`;
   }
 
   function metric(k,v){ return `<div class="metric"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`; }
   function checkRow(c){
-    return `<div class="check"><span class="id">${esc(c.check_id)}</span><span>${badge(c.status, c.status === 'fail' ? 'fail' : c.status === 'warn' ? 'warn' : 'pass')} <b>${esc(c.title)}</b><div class="a">${esc(c.actual)} · expected ${esc(c.expected)}${c.note ? ' · ' + esc(c.note) : ''}</div></span></div>`;
+    return `<div class="check"><span class="id">${esc(c.check_id)}</span><span>${badge(c.status, c.status === 'fail' ? 'fail' : c.status === 'warn' ? 'warn' : 'pass')} <b>${esc(checkTitle(c))}</b><div class="a">${esc(zhText(c.actual))} · 期望 ${esc(zhText(c.expected))}${c.note ? ' · ' + esc(zhText(c.note)) : ''}</div></span></div>`;
   }
 
   function openDetail(id){
     const e = (DATA.experiments || []).find(x => x.id === id);
     if (!e) return;
     const d = e.detail || {};
-    $('d-eyebrow').textContent = `${e.id} · ${e.status}`;
+    $('d-eyebrow').textContent = `${e.id} · ${t(e.status)}`;
     $('d-title').textContent = e.factor || e.id;
     const metrics = [
-      ['IC', fmt(e.ic)], ['IC t', fmt(e.ic_t)], ['Net/5d', pct(e.net)], ['Turnover', e.turnover == null ? 'n/a' : (e.turnover*100).toFixed(0)+'%'],
-      ['Grade', e.grade || 'n/a'], ['Score', e.score == null ? 'n/a' : Number(e.score).toFixed(1)], ['N trials', e.n_trials ?? '—'], ['q', e.q_value == null ? 'n/a' : Number(e.q_value).toFixed(3)],
+      ['IC', fmt(e.ic)], ['IC t', fmt(e.ic_t)], ['净价差/5日', pct(e.net)], ['换手', e.turnover == null ? '—' : (e.turnover*100).toFixed(0)+'%'],
+      ['评级', e.grade || '—'], ['分数', e.score == null ? '—' : Number(e.score).toFixed(1)], ['N 试验', e.n_trials ?? '—'], ['q', e.q_value == null ? '待算' : Number(e.q_value).toFixed(3)],
     ];
     const checks = (d.audit_checks || []).map(checkRow).join('');
     const brief = d.brief || {};
     const paths = d.paths || {};
     $('d-body').innerHTML = `
-      <div class="stack" style="grid-template-columns:1fr 1fr;display:grid">${badge(e.verdict, e.verdict)} ${badge('G3 ' + (e.g3||'n/a'), e.g3)}</div>
-      <h4>Metrics</h4><div class="metric-grid">${metrics.map(([k,v])=>metric(k,v)).join('')}</div>
-      <h4>Decision brief</h4>
-      <div class="metric-grid">${metric('Gate', brief.gate || e.gate || 'n/a')}${metric('Recommend', brief.recommend || 'n/a')}${metric('Bet', brief.bet || e.bet)}${metric('Trials', (brief.trials && brief.trials.n != null) ? brief.trials.n : (e.n_trials ?? '—'))}</div>
-      <div style="margin-top:8px;font-size:12px"><b>Risks:</b> ${esc((brief.risks || []).join('; ') || 'n/a')}</div>
-      <h4>Audit checks</h4>${checks || '<div class="empty">no audit yet</div>'}
-      <h4>Artifact paths</h4><div class="paths">${Object.entries(paths).map(([k,v])=>`<div>${esc(k)}: ${esc(v)}</div>`).join('') || '<div class="muted">none</div>'}</div>
+      <div class="stack" style="grid-template-columns:1fr 1fr;display:grid">${badge(e.verdict, e.verdict)} ${badge('G3 ' + (e.g3||'—'), e.g3)}</div>
+      <h4>关键指标</h4><div class="metric-grid">${metrics.map(([k,v])=>metric(k,v)).join('')}</div>
+      <h4>决策摘要</h4>
+      <div class="metric-grid">${metric('门禁', brief.gate || e.gate || '—')}${metric('建议', brief.recommend || '—')}${metric('押注', brief.bet || e.bet)}${metric('试验', (brief.trials && brief.trials.n != null) ? brief.trials.n : (e.n_trials ?? '—'))}</div>
+      <div style="margin-top:8px;font-size:12px"><b>风险：</b> ${esc((brief.risks || []).join('；') || '—')}</div>
+      <h4>审计检查</h4>${checks || '<div class="empty">还没有审计结果</div>'}
+      <h4>产物路径</h4><div class="paths">${Object.entries(paths).map(([k,v])=>`<div>${esc(k)}: ${esc(v)}</div>`).join('') || '<div class="muted">无</div>'}</div>
     `;
     $('drawer').hidden = false; $('overlay').hidden = false;
   }
@@ -375,7 +404,7 @@
 
   function initBets(){
     const bets = [...new Set((DATA.experiments || []).map(e => e.bet))];
-    $('f-bet').innerHTML = '<option value="">all bets</option>' + bets.map(b=>`<option>${esc(b)}</option>`).join('');
+    $('f-bet').innerHTML = '<option value="">全部押注</option>' + bets.map(b=>`<option>${esc(b)}</option>`).join('');
   }
 
   $('d-close').addEventListener('click', closeDetail);

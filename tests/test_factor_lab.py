@@ -10,6 +10,7 @@ from factor_lab import control, dashboard
 from factor_lab.ledger import Ledger
 from factor_lab.policy import default_policy, verify_policy
 from factor_lab.schemas import Hypothesis, OutcomeSpec, trial_id
+from factor_lab.stats import classify_rho, two_sided_p
 from factor_lab.store import jsonable, read_json, write_json_atomic
 
 
@@ -43,6 +44,18 @@ def test_policy_hash_roundtrip() -> None:
     tampered["sha256"] = "bad"
     assert not verify_policy(tampered)[0]
     assert expected == policy["sha256"]
+
+
+def test_rho_ci_classification() -> None:
+    assert classify_rho(0.91, 0.95) == "fail"
+    assert classify_rho(0.60, 0.69) == "pass"
+    assert classify_rho(0.60, 0.95) == "warn"
+    assert classify_rho(None, None) == "warn"
+
+
+def test_two_sided_p() -> None:
+    assert two_sided_p(0.0) == 1.0
+    assert 0.0 < two_sided_p(2.0) < 0.05
 
 
 def test_ledger_chain_and_orphan_check(tmp_path: Path) -> None:
@@ -152,4 +165,4 @@ def test_dashboard_renders_embedded_data(tmp_path: Path, monkeypatch: pytest.Mon
     html = out.read_text(encoding="utf-8")
     assert "Factor Lab" in html
     assert "liquidity.amount_bias_21_252" in html
-    assert "CONTROL ROOM" in html
+    assert "控制台" in html

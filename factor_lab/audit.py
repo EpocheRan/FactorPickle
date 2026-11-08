@@ -19,6 +19,7 @@ from . import config
 from .ledger import Ledger
 from .policy import load_policy
 from .schemas import OutcomeSpec
+from .stats import two_sided_p
 from .store import read_json, write_json_atomic
 
 
@@ -329,6 +330,23 @@ def audit_experiment(root: Path, *, policy: dict[str, Any] | None = None, ledger
         f"one of {sorted(outcome_keys)}",
     )
 
+    # ------------------------------------------------------------- orthogonality
+    orthogonality = read_json(root / "orthogonality.json") or {}
+    if orthogonality:
+        rho_status = str(orthogonality.get("decision") or "warn")
+        add(
+            "orthogonality",
+            "G0.5 exposure correlation",
+            rho_status if rho_status in ("pass", "warn", "fail") else "warn",
+            f"max|rho|={orthogonality.get('max_abs_rho')} nearest={orthogonality.get('nearest')} CI=[{orthogonality.get('ci_low')}, {orthogonality.get('ci_high')}]",
+            "CI lower > hard => fail; upper < warn => pass; crossing => warn",
+            "exposure-only; rho_return pending",
+        )
+        max_rho = orthogonality.get("max_abs_rho")
+    else:
+        add("orthogonality", "G0.5 exposure correlation", "warn", "not computed", "P1 orthogonality.py")
+        max_rho = None
+
     # ------------------------------------------------------------- G3 tradeability
     turnover = report.get("turnover")
     max_turnover = float((policy.get("thresholds") or {}).get("max_turnover_5d", 0.6))
@@ -374,6 +392,17 @@ def audit_experiment(root: Path, *, policy: dict[str, Any] | None = None, ledger
     sensitivity = report.get("sensitivity")
     if sensitivity:
         g3_checks.append(_check("cost_sensitivity", "2x cost still positive", "pass", "reported", "check sensitivity table"))
+    elif gross_mean is not None and math.isfinite(cost_mean):
+        net_2x = spread_gross - 2.0 * cost_mean
+        g3_checks.append(
+            _check(
+                "cost_sensitivity",
+                "2x cost still positive",
+                "pass" if net_2x > 0 else "fail",
+                f"2x net={net_2x:.8f}",
+                "2x cost net > 0",
+            )
+        )
     else:
         g3_checks.append(_check("cost_sensitivity", "2x cost still positive", "warn", "missing", "2x cost net > 0"))
 
@@ -402,20 +431,35 @@ def audit_experiment(root: Path, *, policy: dict[str, Any] | None = None, ledger
     has_warn = any(item["status"] == "warn" for item in checks)
     verdict = "fail" if hard_fail else ("warn" if has_warn else "pass")
     summary = ledger.summary()
+    n_trials = int(summary.get("distinct_trials") or 0)
+    p_value = two_sided_p(ic_t) if ic_t is not None else None
+    q_value = None
+    q_method = "unavailable"
+    if p_value is not None:
+        if n_trials <= 1:
+            q_value = p_value
+            q_method = "single-trial: raw p"
+        else:
+            q_value = min(1.0, p_value * n_trials)
+            q_method = "Bonferroni fallback (P0); BH batch to follow"
+    net_2x = spread_gross - 2.0 * cost_mean if math.isfinite(cost_mean) and math.isfinite(spread_gross) else None
     audit = {
         "schema_version": config.SCHEMA_VERSION,
         "exp_id": root.name,
         "run_id": run_id,
         "verdict": verdict,
         "g3": g3,
+        "g0_5": (orthogonality.get("decision") if isinstance(orthogonality, dict) else None),
         "checks": checks,
         "g3_checks": g3_checks,
         "policy": {"version": policy.get("version"), "sha256": policy.get("sha256")},
         "ledger": verification,
         "orphan": orphan,
-        "n_trials": summary.get("distinct_trials"),
-        "q_value": None,
-        "q_note": "P0 does not compute an adjusted q yet; n_trials is recorded for the G2/G3 handoff.",
+        "n_trials": n_trials,
+        "q_value": q_value,
+        "q_method": q_method,
+        "p_value": p_value,
+        "q_note": "P0 records a single-trial raw p; multi-trial BH is a batch step.",
         "metrics": {
             "ic": ic_mean,
             "ic_t": ic_t,
@@ -423,9 +467,10 @@ def audit_experiment(root: Path, *, policy: dict[str, Any] | None = None, ledger
             "spread_gross": spread_gross,
             "spread_net": spread_net,
             "cost_mean": cost_mean,
+            "net_2x_cost": net_2x,
             "turnover": turnover,
             "capacity_multiple": capacity_multiple,
-            "max_rho": None,
+            "max_rho": max_rho,
         },
         "created_at": config.now_iso(),
     }

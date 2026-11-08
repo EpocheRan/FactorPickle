@@ -171,6 +171,7 @@ def _load_experiments() -> list[dict[str, Any]]:
                     "report_html": str(root / "report.html"),
                     "report_json": str(root / "report.json"),
                     "audit_json": str(root / "audit.json"),
+                    "orthogonality_json": str(root / "orthogonality.json"),
                     "brief_json": str(root / "decision_brief.json"),
                     "decision_json": str(root / "decision.json"),
                 },
@@ -185,20 +186,26 @@ def _attention(experiments: list[dict[str, Any]], ledger_verification: dict[str,
     items: list[dict[str, Any]] = []
     for exp in experiments:
         if exp["status"] == "failed":
-            items.append({"level": "red", "title": f"{exp['id']} run failed", "detail": "inspect manifest error", "exp_id": exp["id"]})
+            items.append({"level": "red", "title": f"{exp['id']} 运行失败", "detail": "检查 manifest 里的 error", "exp_id": exp["id"]})
         if exp["verdict"] == "fail":
             fails = [c.get("check_id") for c in exp["detail"]["audit_checks"] if c.get("status") == "fail"]
-            items.append({"level": "red", "title": f"{exp['id']} audit fail", "detail": ", ".join(str(x) for x in fails[:4]), "exp_id": exp["id"]})
+            items.append({"level": "red", "title": f"{exp['id']} 审计失败", "detail": "、".join(str(x) for x in fails[:4]), "exp_id": exp["id"]})
         if exp["g3"] == "fail":
-            items.append({"level": "red", "title": f"{exp['id']} G3 fail", "detail": "turnover/capacity not tradeable", "exp_id": exp["id"]})
+            items.append({"level": "red", "title": f"{exp['id']} G3 失败", "detail": "换手/容量不满足交易性", "exp_id": exp["id"]})
         elif exp["g3"] == "warn":
-            items.append({"level": "yellow", "title": f"{exp['id']} G3 boundary", "detail": "turnover/capacity missing or above cap", "exp_id": exp["id"]})
+            items.append({"level": "yellow", "title": f"{exp['id']} G3 边界", "detail": "换手/容量缺失或超过上限", "exp_id": exp["id"]})
+        if exp.get("max_rho") is not None:
+            rho = abs(float(exp["max_rho"]))
+            if rho >= 0.9:
+                items.append({"level": "red", "title": f"{exp['id']} 相关性硬失败", "detail": f"max|rho|={rho:.2f}；与存量因子重复", "exp_id": exp["id"]})
+            elif rho >= 0.7:
+                items.append({"level": "yellow", "title": f"{exp['id']} 相关性待复核", "detail": f"max|rho|={rho:.2f}；需要书面理由", "exp_id": exp["id"]})
         if exp["age_days"] is not None and exp["age_days"] > 5 and exp["decision"] in (None, "promote"):
-            items.append({"level": "yellow", "title": f"{exp['id']} stale", "detail": f"{exp['age_days']:.1f} days without a final decision", "exp_id": exp["id"]})
+            items.append({"level": "yellow", "title": f"{exp['id']} 停滞", "detail": f"{exp['age_days']:.1f} 天没有最终决策", "exp_id": exp["id"]})
     if not ledger_verification.get("ok"):
-        items.append({"level": "red", "title": "ledger chain has unrepaired gaps", "detail": str(ledger_verification.get("unrepaired")), "exp_id": None})
+        items.append({"level": "red", "title": "账本存在未修复断点", "detail": str(ledger_verification.get("unrepaired")), "exp_id": None})
     if not experiments:
-        items.append({"level": "yellow", "title": "No experiments yet", "detail": "run the pilot or seed artifacts", "exp_id": None})
+        items.append({"level": "yellow", "title": "还没有实验", "detail": "先跑 pilot，或放入已有产物", "exp_id": None})
     order = {"red": 0, "yellow": 1, "green": 2}
     items.sort(key=lambda item: order.get(item["level"], 9))
     return items[:12]
@@ -252,15 +259,15 @@ def build_dashboard_data() -> dict[str, Any]:
 
     reasons = []
     if not verification.get("ok"):
-        reasons.append("ledger chain has unrepaired gaps")
+        reasons.append("账本存在未修复断点")
     if not experiments:
-        reasons.append("no experiments yet")
+        reasons.append("还没有实验")
     if any(exp["verdict"] == "fail" for exp in experiments):
-        reasons.append("at least one audit hard fail")
+        reasons.append("至少一个审计硬失败")
     if any(exp["g3"] in ("warn", "fail") for exp in experiments):
-        reasons.append("G3 tradeability is not fully proven")
+        reasons.append("G3 交易性尚未完全证明")
     if health_level == "green":
-        reasons.append("integrity checks pass; output metrics are in the dashboard")
+        reasons.append("完整性检查通过；产出指标见下方")
 
     seen_trials: set[str] = set()
     points = []
@@ -277,16 +284,16 @@ def build_dashboard_data() -> dict[str, Any]:
     g3_pass = sum(1 for exp in experiments if exp["verdict"] != "fail" and exp["g3"] == "pass")
     g4_pass = sum(1 for exp in experiments if exp["decision"] == "promote")
     funnel = [
-        {"gate": "G0", "count": len(experiments), "note": "registered / run"},
-        {"gate": "G0.5", "count": len(experiments), "note": "P0 manual rho"},
-        {"gate": "G2", "count": g2_pass, "note": "audit not hard-fail"},
-        {"gate": "G3", "count": g3_pass, "note": "tradeability pass"},
-        {"gate": "G4", "count": g4_pass, "note": "decision promote"},
+        {"gate": "G0", "count": len(experiments), "note": "注册 / 运行"},
+        {"gate": "G0.5", "count": len(experiments), "note": "P0 手工 ρ 占位"},
+        {"gate": "G2", "count": g2_pass, "note": "审计无硬失败"},
+        {"gate": "G3", "count": g3_pass, "note": "交易性通过"},
+        {"gate": "G4", "count": g4_pass, "note": "决策 promote"},
     ]
 
     bets: dict[str, dict[str, Any]] = {}
     for exp in experiments:
-        bet = str(exp.get("bet") or "unassigned")
+        bet = str(exp.get("bet") or "未分配")
         item = bets.setdefault(bet, {"bet": bet, "experiments": 0, "trials": 0, "g3": 0, "status": "explore"})
         item["experiments"] += 1
         item["trials"] += int(exp.get("n_trials") or 0)
@@ -330,12 +337,12 @@ def build_dashboard_data() -> dict[str, Any]:
         },
         "health": {"level": health_level, "reasons": reasons},
         "kpis": [
-            {"label": "Weekly hypotheses", "value": weekly_hypotheses, "sub": "target: >= 3", "tone": "ok" if weekly_hypotheses >= 3 else "warn"},
-            {"label": "Monthly G3 candidates", "value": monthly_g3, "sub": "target: >= 1", "tone": "ok" if monthly_g3 >= 1 else "warn"},
-            {"label": "Hypothesis -> G3", "value": f"{time_to_g3:.1f}d" if time_to_g3 is not None else "n/a", "sub": "target: <= 5 working days", "tone": "ok" if time_to_g3 is not None and time_to_g3 <= 5 else "warn"},
-            {"label": "Distinct trials", "value": summary.get("distinct_trials"), "sub": "ledger trial = hypothesis x outcome", "tone": "ok"},
-            {"label": "Orphan runs", "value": orphan_count, "sub": "must be 0", "tone": "bad" if orphan_count else "ok"},
-            {"label": "Audit fail rate", "value": f"{audit_fail_rate:.0%}", "sub": f"{fail_count}/{len(experiments) or 0} experiments", "tone": "bad" if fail_count else "ok"},
+            {"label": "本周新增假设", "value": weekly_hypotheses, "sub": "目标：≥ 3", "tone": "ok" if weekly_hypotheses >= 3 else "warn"},
+            {"label": "本月进入 G3", "value": monthly_g3, "sub": "目标：≥ 1", "tone": "ok" if monthly_g3 >= 1 else "warn"},
+            {"label": "假设 → G3", "value": f"{time_to_g3:.1f} 天" if time_to_g3 is not None else "—", "sub": "目标：≤ 5 个工作日", "tone": "ok" if time_to_g3 is not None and time_to_g3 <= 5 else "warn"},
+            {"label": "去重 trial", "value": summary.get("distinct_trials"), "sub": "trial = 假设 × 预注册口径", "tone": "ok"},
+            {"label": "孤儿 run", "value": orphan_count, "sub": "必须为 0", "tone": "bad" if orphan_count else "ok"},
+            {"label": "审计失败率", "value": f"{audit_fail_rate:.0%}", "sub": f"{fail_count}/{len(experiments) or 0} 个实验", "tone": "bad" if fail_count else "ok"},
         ],
         "funnel": funnel,
         "experiments": experiments,

@@ -13,7 +13,8 @@ or QuestDB during P0.
    ledger linkage.
 4. `report.json`, `decision_brief.json`, and an in-process staging runner.
 5. A self-contained HTML dashboard for human review.
-6. Non-destructive output inventory / cleanup planning.
+6. `orthogonality.json`: P1 exposure correlation against a small library snapshot.
+7. Non-destructive output inventory / cleanup planning.
 
 ## Commands
 
@@ -40,6 +41,7 @@ Audit / rebuild the brief for one experiment:
 ```powershell
 python -m factor_lab audit --experiment E-20261108-001
 python -m factor_lab brief --experiment E-20261108-001
+python -m factor_lab orthogonality --experiment E-20261108-001
 ```
 
 ## Artifacts
@@ -58,6 +60,7 @@ output/factor_lab/
     report.json
     report.html
     audit.json
+    orthogonality.json
     decision_brief.json
     decision.json
   dashboard/lab_dashboard.html
@@ -79,12 +82,12 @@ panels and the peer residual matrix are intentionally excluded.
   in the gap are `degraded`.
 - `control` is human-owned; a paused lab refuses to start new runs.
 
-## Known P0 limits
+## Known P0/P1 limits
 
-- `orthogonality.py` is not part of P0; G0.5 uses a manual rho placeholder until
-  the registry has at least three factors.
-- `q_value` is not computed yet; `n_trials` is recorded for the handoff.
-- `capacity` and 2x-cost sensitivity are warnings when the quick profile omits
-  them.
+- `orthogonality.py` computes exposure correlation only; `rho_return` is still
+  pending. The G0.5 verdict is labeled exposure-only.
+- `q_value` is a single-trial raw p for now; multi-trial BH is a batch step.
+- `capacity` and 2x-cost sensitivity: 2x cost is computed from the report's
+  `cost_mean`; capacity remains a warning when the quick profile omits it.
 - The first pilot (`liquidity.amount_bias_21_252`) is a D-grade factor; P0
   demonstrates the flow and the guardrails, not alpha.
