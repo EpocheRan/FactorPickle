@@ -16,6 +16,7 @@ It is still one-shot; the 24/7 scheduler and LLM agent layer are Phase 1.
 python -m factor_lab init
 python -m factor_lab pilot
 python -m factor_lab cycle --limit 4 --heartbeat-interval 2   # Phase 0 smoke
+python -m factor_lab phase1 --cycles 4 --limit 4 --heartbeat-interval 2
 python -m factor_lab mine --limit 23
 python -m factor_lab dashboard
 python -m factor_lab directive show
@@ -51,6 +52,27 @@ First Phase 0 cycle:
 - HLC orphan checks: pass
 - R4: no breach
 
+## Phase 1: multi-cycle discovery
+
+```powershell
+python -m factor_lab phase1 --cycles 4 --limit 4 --heartbeat-interval 2
+```
+
+Phase 1 adds a fresh-factor catalog (22 price/volume factors), a Scout that
+selects 4 fresh names per cycle with bet round-robin, a Director memo per cycle,
+and a discovery report at `phase1/phase1_report.md`.
+
+Four cycles with 16 new factors produced:
+
+- decisions: **15 park / 1 iterate / 0 promote**
+- G0.5: 9 pass / 4 warn / 3 fail
+- G3: 12 fail / 4 warn / 0 pass
+- q < 0.1: 3; high-signal-but-negative-spread: 3
+- verdict: **transmission_gap** (signals exist, no deployable spread)
+
+The Scout and Director are deterministic Phase 1 adapters that record the exact
+hand-off; the DSH LLM agent binding is the next step, not claimed as done.
+
 ## Artifacts
 
 ```text
@@ -70,6 +92,12 @@ output/factor_lab/
   storage_report.json
   batch_progress.json
   progress/<cycle>/worker-<n>.json
+  phase1/scout_c*.json
+  phase1/director_c*.json
+  phase1/phase1_cycles.json
+  phase1/phase1_report.json
+  phase1/phase1_report.md
+  research_queue.json
   experiments/E-YYYYMMDD-NNN/
     hypothesis.json
     factor_spec.json

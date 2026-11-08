@@ -21,6 +21,7 @@ CONTROL_DIR = LAB_ROOT / "control"
 DASHBOARD_DIR = LAB_ROOT / "dashboard"
 PROGRESS_DIR = LAB_ROOT / "progress"
 CLOCK_DIR = LAB_ROOT / "clock"
+PHASE1_DIR = LAB_ROOT / "phase1"
 ARCHIVE_DIR = PROJECT_ROOT / "output" / "_archive"
 TRASH_DIR = PROJECT_ROOT / "output" / "_trash"
 
@@ -56,6 +57,7 @@ def ensure_dirs() -> None:
         DASHBOARD_DIR,
         PROGRESS_DIR,
         CLOCK_DIR,
+        PHASE1_DIR,
     ):
         path.mkdir(parents=True, exist_ok=True)
 

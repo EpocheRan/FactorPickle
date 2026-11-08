@@ -5,6 +5,8 @@ from pathlib import Path
 
 from factor_lab import schemas
 from factor_lab.clock import next_token, parse_hlc
+from factor_lab.cycle import _select_specs
+from factor_lab.cycle_ideas import CYCLE_SPECS
 from factor_lab.ledger import Ledger
 from factor_lab.schemas import Hypothesis, OutcomeSpec, reserve_experiment_id, trial_id
 
@@ -76,3 +78,13 @@ def test_reserve_experiment_ids_are_atomic(tmp_path: Path, monkeypatch) -> None:
         ids = list(pool.map(lambda _: reserve_experiment_id(), range(4)))
     assert len(ids) == len(set(ids))
     assert all((tmp_path / "experiments" / exp_id).is_dir() for exp_id in ids)
+
+
+def test_cycle_catalog_and_scout_selection() -> None:
+    ids = [spec.factor_id for spec in CYCLE_SPECS]
+    assert len(ids) == len(set(ids))
+    assert len(ids) >= 20
+    selected = _select_specs(list(CYCLE_SPECS), 4)
+    assert len(selected) == 4
+    assert len({spec.factor_id for spec in selected}) == 4
+    assert len({spec.bet for spec in selected}) >= 2

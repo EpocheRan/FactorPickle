@@ -30,6 +30,20 @@ from .supervisor import Heartbeat, lease, write_cycle
 WORKERS = 2
 
 
+def _select_specs(specs: list[IdeaSpec], limit: int) -> list[IdeaSpec]:
+    """Round-robin by bet so one cycle does not repeat the same family shape."""
+    groups: dict[str, list[IdeaSpec]] = {}
+    for spec in specs:
+        groups.setdefault(spec.bet, []).append(spec)
+    selected: list[IdeaSpec] = []
+    keys = sorted(groups)
+    while len(selected) < limit and any(groups.values()):
+        for key in keys:
+            if groups[key] and len(selected) < limit:
+                selected.append(groups[key].pop(0))
+    return selected
+
+
 def _existing_factors() -> set[str]:
     factors: set[str] = set()
     if not config.EXPERIMENTS_DIR.exists():
@@ -115,6 +129,8 @@ def run_cycle(
     profile: str = "quick",
     heartbeat_interval: int = 2,
     orthogonality: bool = True,
+    family_id: str | None = None,
+    factor_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     config.ensure_dirs()
     init_policy()
@@ -135,10 +151,15 @@ def run_cycle(
         write_cycle(cycle_id="blocked-r4", status="blocked", error=f"R4: {r4['breaches']}")
         return {"status": "blocked", "reason": "R4", "storage": storage}
 
-    specs = [spec for spec in CYCLE_SPECS if spec.factor_id not in _existing_factors()]
-    specs = specs[: max(1, int(limit))]
+    existing = _existing_factors()
+    if factor_ids:
+        by_id = {spec.factor_id: spec for spec in CYCLE_SPECS}
+        specs = [by_id[item] for item in factor_ids if item in by_id and item not in existing]
+    else:
+        specs = [spec for spec in CYCLE_SPECS if spec.factor_id not in existing]
+        specs = _select_specs(specs, max(1, int(limit)))
     directive = ensure_directive()
-    family_id = str(directive.get("family_id") or "F-phase0-cycle")
+    family_id = str(family_id or directive.get("family_id") or "F-phase0-cycle")
     hypotheses = [_hypothesis_for(spec, directive, family_id) for spec in specs]
     if not hypotheses:
         return {"status": "empty", "reason": "no fresh cycle factors"}
@@ -308,12 +329,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profile", default="quick")
     parser.add_argument("--heartbeat-interval", type=int, default=2)
     parser.add_argument("--no-orthogonality", action="store_true")
+    parser.add_argument("--family", default=None)
     args = parser.parse_args(argv)
     result = run_cycle(
         limit=args.limit,
         profile=args.profile,
         heartbeat_interval=args.heartbeat_interval,
         orthogonality=not args.no_orthogonality,
+        family_id=args.family,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     return 0

@@ -59,6 +59,13 @@ def main(argv: list[str] | None = None) -> int:
     cycle_parser.add_argument("--profile", default="quick")
     cycle_parser.add_argument("--heartbeat-interval", type=int, default=2)
     cycle_parser.add_argument("--no-orthogonality", action="store_true")
+    cycle_parser.add_argument("--family", default=None)
+
+    phase1_parser = sub.add_parser("phase1", help="run multiple Phase 1 cycles with Scout/Director records")
+    phase1_parser.add_argument("--cycles", type=int, default=4)
+    phase1_parser.add_argument("--limit", type=int, default=4)
+    phase1_parser.add_argument("--profile", default="quick")
+    phase1_parser.add_argument("--heartbeat-interval", type=int, default=2)
 
     directive_parser = sub.add_parser("directive", help="show or initialize research direction")
     directive_parser.add_argument("action", choices=["show", "init"], nargs="?", default="show")
@@ -138,6 +145,20 @@ def main(argv: list[str] | None = None) -> int:
                 profile=args.profile,
                 heartbeat_interval=args.heartbeat_interval,
                 orthogonality=not args.no_orthogonality,
+                family_id=args.family,
+            )
+        )
+        return 0
+
+    if args.command == "phase1":
+        from .phase1 import run_phase1
+
+        _print(
+            run_phase1(
+                cycles=args.cycles,
+                limit=args.limit,
+                profile=args.profile,
+                heartbeat_interval=args.heartbeat_interval,
             )
         )
         return 0

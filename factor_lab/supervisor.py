@@ -59,11 +59,11 @@ def write_cycle(*, cycle_id: str, status: str, **extra: Any) -> dict[str, Any]:
         "schema_version": "factor_lab.cycle.v1",
         "cycle_id": cycle_id,
         "status": status,
-        "updated_at": config.now_iso(),
         **previous,
         **extra,
         "cycle_id": cycle_id,
         "status": status,
+        "updated_at": config.now_iso(),
     }
     write_json_atomic(config.CYCLE_PATH, payload)
     return payload
