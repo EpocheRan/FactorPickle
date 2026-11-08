@@ -61,7 +61,8 @@ sig = factor * direction   # direction ∈ {+1, -1}
 「42_252 评估 2020–2026、21_504 评估 2021–2026」，同族价差自然差 4 倍。
 现在：
 
-- `load_panel(..., warmup_days=2000)` 多取约 5.5 年行情；
+- `load_panel(..., warmup_days=800)` 多取 800 个自然日（约 2.2 年 / 约 550 个交易日）行情；
+  v2 初版为 2000 天≈5.5 年，同日 eval v3 收窄为 800 天，仍覆盖 504 日窗口；
 - `price_factor_panel` 用预热数据算因子，再裁到 `eval_start`；
 - `build_report` 把 close/open 裁到因子日期，成本/可成交/容量分母不再混入预热期。
 
