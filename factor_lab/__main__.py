@@ -67,6 +67,14 @@ def main(argv: list[str] | None = None) -> int:
     phase1_parser.add_argument("--profile", default="quick")
     phase1_parser.add_argument("--heartbeat-interval", type=int, default=2)
 
+    agent_parser = sub.add_parser("phase1-agent", help="run a Phase 1 cycle from a DSH Scout plan")
+    agent_parser.add_argument("--plan", default=str(config.PHASE1_DIR / "agent_plan.json"))
+    agent_parser.add_argument("--profile", default="quick")
+    agent_parser.add_argument("--heartbeat-interval", type=int, default=2)
+
+    director_parser = sub.add_parser("phase1-director", help="apply a DSH Director memo to the research queue")
+    director_parser.add_argument("--memo", default=str(config.PHASE1_DIR / "agent_memo.json"))
+
     directive_parser = sub.add_parser("directive", help="show or initialize research direction")
     directive_parser.add_argument("action", choices=["show", "init"], nargs="?", default="show")
 
@@ -161,6 +169,24 @@ def main(argv: list[str] | None = None) -> int:
                 heartbeat_interval=args.heartbeat_interval,
             )
         )
+        return 0
+
+    if args.command == "phase1-agent":
+        from .phase1_agent import run_agent_plan
+
+        _print(
+            run_agent_plan(
+                Path(args.plan),
+                profile=args.profile,
+                heartbeat_interval=args.heartbeat_interval,
+            )
+        )
+        return 0
+
+    if args.command == "phase1-director":
+        from .phase1_agent import apply_director_memo
+
+        _print(apply_director_memo(Path(args.memo)))
         return 0
 
     if args.command == "directive":

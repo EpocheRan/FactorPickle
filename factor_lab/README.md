@@ -17,6 +17,8 @@ python -m factor_lab init
 python -m factor_lab pilot
 python -m factor_lab cycle --limit 4 --heartbeat-interval 2   # Phase 0 smoke
 python -m factor_lab phase1 --cycles 4 --limit 4 --heartbeat-interval 2
+python -m factor_lab phase1-agent --plan output/factor_lab/phase1/agent_plan.json
+python -m factor_lab phase1-director --memo output/factor_lab/phase1/agent_memo.json
 python -m factor_lab mine --limit 23
 python -m factor_lab dashboard
 python -m factor_lab directive show
@@ -70,8 +72,25 @@ Four cycles with 16 new factors produced:
 - q < 0.1: 3; high-signal-but-negative-spread: 3
 - verdict: **transmission_gap** (signals exist, no deployable spread)
 
-The Scout and Director are deterministic Phase 1 adapters that record the exact
-hand-off; the DSH LLM agent binding is the next step, not claimed as done.
+A fifth agent-plan cycle added `risk.vol_of_vol_120d` and
+`risk.high_low_ratio_60d` (both high IC, negative net). Final Phase 1:
+
+- **18 factors / 5 cycles**
+- **17 park / 1 iterate / 0 promote**
+- G0.5: 10 pass / 5 warn / 3 fail
+- G3: 14 fail / 4 warn / 0 pass
+- q < 0.1: 5; high-signal-but-negative-spread: 5
+- verdict: **transmission_gap**
+
+The first agent-plan run was correctly blocked by **R4**: panel cache reached
+3.11GB > 3GB. After `maintenance clean --apply` archived one old panel file it
+completed with 2 successes. This is the intended R4 behavior.
+
+The Scout and Director are deterministic Phase 1 adapters. The DSH workflow
+bridge is implemented in `factor_lab/workflows/phase1_scout_director.js` plus
+`phase1-agent` / `phase1-director`; the live Scout/Director agent run timed out
+in this session, so the fifth cycle used a fallback plan/memo and is labeled as
+such. The DSH workflow path itself is not yet proven end-to-end.
 
 ## Artifacts
 
@@ -94,9 +113,13 @@ output/factor_lab/
   progress/<cycle>/worker-<n>.json
   phase1/scout_c*.json
   phase1/director_c*.json
+  phase1/agent_plan.json
+  phase1/agent_cycle.json
+  phase1/agent_memo.json
   phase1/phase1_cycles.json
   phase1/phase1_report.json
   phase1/phase1_report.md
+  phase1/phase1_factors.csv
   research_queue.json
   experiments/E-YYYYMMDD-NNN/
     hypothesis.json

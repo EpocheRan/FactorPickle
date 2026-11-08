@@ -8,6 +8,7 @@ from factor_lab.clock import next_token, parse_hlc
 from factor_lab.cycle import _select_specs
 from factor_lab.cycle_ideas import CYCLE_SPECS
 from factor_lab.ledger import Ledger
+from factor_lab.phase1_agent import _safe_plan
 from factor_lab.schemas import Hypothesis, OutcomeSpec, reserve_experiment_id, trial_id
 
 
@@ -88,3 +89,18 @@ def test_cycle_catalog_and_scout_selection() -> None:
     assert len(selected) == 4
     assert len({spec.factor_id for spec in selected}) == 4
     assert len({spec.bet for spec in selected}) >= 2
+
+
+def test_agent_plan_filters_to_fresh_known_factors(monkeypatch) -> None:
+    monkeypatch.setattr("factor_lab.phase1_agent._existing_factors", lambda: set())
+    plan = _safe_plan(
+        {
+            "selected": ["risk.vol_of_vol_120d", "not.a.factor", "risk.high_low_ratio_60d"],
+            "family_id": "F-test-agent",
+            "rationale": "test",
+            "next_bet": "test",
+            "discovery_verdict": "transmission_gap",
+        }
+    )
+    assert plan["selected"] == ["risk.vol_of_vol_120d", "risk.high_low_ratio_60d"]
+    assert plan["family_id"] == "F-test-agent"

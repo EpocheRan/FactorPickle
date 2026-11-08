@@ -257,7 +257,7 @@ def build_phase1_report() -> dict[str, Any]:
         "",
         "- 每个 cycle 使用新的 family，N=4；确认 family 不计入开发 N。",
         "- G3 失败主要是 2× 成本后为负；G0.5 失败主要是与存量因子重复。",
-        "- Scout/Director 是 Phase 1 确定性适配器，尚未替换为 DSH LLM agent。",
+        "- Scout/Director 是 Phase 1 确定性适配器；DSH workflow bridge 由 `phase1-agent` / `phase1-director` 消费，但本次 live Scout 超时，第 5 个 cycle 使用 fallback plan/memo，并已标注。",
     ]
     (config.PHASE1_DIR / "phase1_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report
