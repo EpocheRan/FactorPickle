@@ -60,7 +60,7 @@ First Phase 0 cycle:
 python -m factor_lab phase1 --cycles 4 --limit 4 --heartbeat-interval 2
 ```
 
-Phase 1 adds a fresh-factor catalog (26 price/volume factors), a Scout that
+Phase 1 adds a fresh-factor catalog (29 price/volume factors), a Scout that
 selects 4 fresh names per cycle with bet round-robin, a Director memo per cycle,
 and a discovery report at `phase1/phase1_report.md`.
 
@@ -74,14 +74,14 @@ Four deterministic cycles with 16 new factors produced:
 
 A fifth fallback agent-plan cycle added `risk.vol_of_vol_120d` and
 `risk.high_low_ratio_60d` (both high IC, negative net). A sixth cycle used a
-**real DSH Scout/Director** no-tool workflow and added three factors. Final
-Phase 1:
+**real DSH Scout/Director** no-tool workflow and added three factors. A seventh
+full-flow test added three more. Final Phase 1:
 
-- **21 factors / 6 cycles**
-- **18 park / 3 iterate / 0 promote**
-- G0.5: 13 pass / 5 warn / 3 fail
-- G3: 16 fail / 5 warn / 0 pass
-- q < 0.1: 6; high-signal-but-negative-spread: 5
+- **24 factors / 7 cycles**
+- **20 park / 4 iterate / 0 promote**
+- G0.5: 16 pass / 5 warn / 3 fail
+- G3: 19 fail / 5 warn / 0 pass
+- q < 0.1: 7; high-signal-but-negative-spread: 6
 - verdict: **transmission_gap**
 
 The first agent-plan run was correctly blocked by **R4**: panel cache reached
@@ -92,7 +92,9 @@ Root cause of the earlier Scout timeout: the LLM subagent hung when asked to
 read files or execute tools. The working pattern is a **no-tool, self-contained**
 Scout/Director prompt (`workflows/phase1_scout.js` and
 `workflows/phase1_director.js`) with the Python `phase1-agent` Runner between
-them. The sixth cycle used this path and produced real agent plan/memo files.
+them. The sixth and seventh cycles used this path and produced real agent
+plan/memo files. Child sessions are archived after each task with
+`workflows/reclaim_dsh_children.ps1`.
 
 ## Artifacts
 
