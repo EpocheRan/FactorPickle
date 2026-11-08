@@ -16,6 +16,9 @@ python -m factor_lab phase1-director --memo phase1/agent_memo.json
 - The Python Runner is a separate CLI; this avoids the subagent tool-call hang
   observed when an agent tried to read files or run commands.
 - Both agents use a JSON schema and explicitly say “不要使用任何工具”.
+- Agent budget: at most 2 children per cycle; no ping/probe agents in
+  production. Run the reclaim script after the task, not while a workflow is
+  active.
 
 The bridge commands:
 
@@ -30,3 +33,17 @@ the cycle, writes `agent_cycle.json`, and rebuilds `phase1_report`.
 
 Note: the Scout/Director prompts must be self-contained. Do not ask them to read
 files or execute commands; that path was observed to hang for >10 minutes.
+
+## Reclaim child sessions
+
+DSH has no public “close subagent” tool. Workflow child sessions are stored as
+non-`session-*` directories. After a task is complete:
+
+```powershell
+powershell -File factor_lab/workflows/reclaim_dsh_children.ps1          # dry run
+powershell -File factor_lab/workflows/reclaim_dsh_children.ps1 -Apply   # archive
+```
+
+The script moves inactive child sessions to
+`%USERPROFILE%\.dsh\reclaimed_sessions\...`; it does not delete them. Refresh the
+DSH page afterwards. Do not run this while a workflow is still active.
