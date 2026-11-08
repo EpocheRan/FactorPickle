@@ -60,11 +60,11 @@ First Phase 0 cycle:
 python -m factor_lab phase1 --cycles 4 --limit 4 --heartbeat-interval 2
 ```
 
-Phase 1 adds a fresh-factor catalog (22 price/volume factors), a Scout that
+Phase 1 adds a fresh-factor catalog (26 price/volume factors), a Scout that
 selects 4 fresh names per cycle with bet round-robin, a Director memo per cycle,
 and a discovery report at `phase1/phase1_report.md`.
 
-Four cycles with 16 new factors produced:
+Four deterministic cycles with 16 new factors produced:
 
 - decisions: **15 park / 1 iterate / 0 promote**
 - G0.5: 9 pass / 4 warn / 3 fail
@@ -72,25 +72,27 @@ Four cycles with 16 new factors produced:
 - q < 0.1: 3; high-signal-but-negative-spread: 3
 - verdict: **transmission_gap** (signals exist, no deployable spread)
 
-A fifth agent-plan cycle added `risk.vol_of_vol_120d` and
-`risk.high_low_ratio_60d` (both high IC, negative net). Final Phase 1:
+A fifth fallback agent-plan cycle added `risk.vol_of_vol_120d` and
+`risk.high_low_ratio_60d` (both high IC, negative net). A sixth cycle used a
+**real DSH Scout/Director** no-tool workflow and added three factors. Final
+Phase 1:
 
-- **18 factors / 5 cycles**
-- **17 park / 1 iterate / 0 promote**
-- G0.5: 10 pass / 5 warn / 3 fail
-- G3: 14 fail / 4 warn / 0 pass
-- q < 0.1: 5; high-signal-but-negative-spread: 5
+- **21 factors / 6 cycles**
+- **18 park / 3 iterate / 0 promote**
+- G0.5: 13 pass / 5 warn / 3 fail
+- G3: 16 fail / 5 warn / 0 pass
+- q < 0.1: 6; high-signal-but-negative-spread: 5
 - verdict: **transmission_gap**
 
 The first agent-plan run was correctly blocked by **R4**: panel cache reached
 3.11GB > 3GB. After `maintenance clean --apply` archived one old panel file it
 completed with 2 successes. This is the intended R4 behavior.
 
-The Scout and Director are deterministic Phase 1 adapters. The DSH workflow
-bridge is implemented in `factor_lab/workflows/phase1_scout_director.js` plus
-`phase1-agent` / `phase1-director`; the live Scout/Director agent run timed out
-in this session, so the fifth cycle used a fallback plan/memo and is labeled as
-such. The DSH workflow path itself is not yet proven end-to-end.
+Root cause of the earlier Scout timeout: the LLM subagent hung when asked to
+read files or execute tools. The working pattern is a **no-tool, self-contained**
+Scout/Director prompt (`workflows/phase1_scout.js` and
+`workflows/phase1_director.js`) with the Python `phase1-agent` Runner between
+them. The sixth cycle used this path and produced real agent plan/memo files.
 
 ## Artifacts
 

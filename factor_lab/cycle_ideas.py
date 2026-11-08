@@ -180,3 +180,23 @@ CYCLE_SPECS: tuple[IdeaSpec, ...] = (
     IdeaSpec("high_low_ratio_60d", "risk.high_low_ratio_60d", _high_low_ratio_60, 60, "ratio", -1, "高低价比 60 日", "中期区间宽度代表不确定性与彩票偏好。", "risk-shape"),
     IdeaSpec("amount_vol_ratio_5_20", "liquidity.amount_vol_ratio_5_20", _amount_vol_ratio_5_20, 20, "ratio", -1, "成交额波动比 5/20", "短期成交额波动相对抬升，不稳定关注。", "liquidity-bias"),
 )
+
+def _upside_vol_120(frame: pd.DataFrame) -> pd.Series:
+    return _upside_vol(frame, 120)
+
+
+def _ret_5_126(frame: pd.DataFrame) -> pd.Series:
+    return _ret_diff(frame, 5, 126)
+
+
+def _amount_trend_10_60(frame: pd.DataFrame) -> pd.Series:
+    amount = _amount(frame)
+    return _clean(_ma(amount, 10) / _ma(amount, 60).replace(0, np.nan) - 1)
+
+
+CYCLE_SPECS = CYCLE_SPECS + (
+    IdeaSpec("upside_vol_120d", "risk.upside_vol_120d", _upside_vol_120, 120, "ratio", -1, "上行波动 120 日", "长期上行波动过高代表拥挤与回撤风险。", "risk-shape"),
+    IdeaSpec("ret_5_126", "momentum.ret_5_126", _ret_5_126, 126, "ratio", -1, "短长收益差 5/126", "短期相对半年收益偏离，反转候选。", "momentum-composite"),
+    IdeaSpec("amount_trend_10_60", "liquidity.amount_trend_10_60", _amount_trend_10_60, 60, "ratio", 1, "成交额趋势 10/60", "短期成交额相对中期抬升，关注度上行。", "liquidity-bias"),
+    IdeaSpec("max_drawdown_252d", "risk.max_drawdown_252d", lambda f: _rolling_drawdown(f, 252), 252, "ratio", -1, "最大回撤 252 日", "年度回撤代表长期趋势与风险预算破坏。", "risk-shape"),
+)
