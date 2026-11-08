@@ -60,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     cycle_parser.add_argument("--heartbeat-interval", type=int, default=2)
     cycle_parser.add_argument("--no-orthogonality", action="store_true")
     cycle_parser.add_argument("--family", default=None)
+    cycle_parser.add_argument("--factors", default="", help="comma-separated explicit factor ids")
 
     phase1_parser = sub.add_parser("phase1", help="run multiple Phase 1 cycles with Scout/Director records")
     phase1_parser.add_argument("--cycles", type=int, default=4)
@@ -149,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "cycle":
         from .cycle import run_cycle
 
+        factor_ids = [item.strip() for item in args.factors.split(",") if item.strip()] or None
         _print(
             run_cycle(
                 limit=args.limit,
@@ -156,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
                 heartbeat_interval=args.heartbeat_interval,
                 orthogonality=not args.no_orthogonality,
                 family_id=args.family,
+                factor_ids=factor_ids,
             )
         )
         return 0

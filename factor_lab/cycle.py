@@ -330,13 +330,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--heartbeat-interval", type=int, default=2)
     parser.add_argument("--no-orthogonality", action="store_true")
     parser.add_argument("--family", default=None)
+    parser.add_argument("--factors", default="", help="comma-separated explicit factor ids")
     args = parser.parse_args(argv)
+    factor_ids = [item.strip() for item in args.factors.split(",") if item.strip()] or None
     result = run_cycle(
         limit=args.limit,
         profile=args.profile,
         heartbeat_interval=args.heartbeat_interval,
         orthogonality=not args.no_orthogonality,
         family_id=args.family,
+        factor_ids=factor_ids,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     return 0

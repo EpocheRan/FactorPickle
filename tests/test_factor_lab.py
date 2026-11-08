@@ -183,3 +183,6 @@ def test_dashboard_renders_embedded_data(tmp_path: Path, monkeypatch: pytest.Mon
     assert "Factor Lab" in html
     assert "liquidity.amount_bias_21_252" in html
     assert "控制台" in html
+    for pager_id in ("table-pager", "attention-pager", "bets-pager", "findings-pager"):
+        assert f'id="{pager_id}"' in html
+    assert "data-page-key" in html

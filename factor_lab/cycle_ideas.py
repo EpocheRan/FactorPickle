@@ -232,3 +232,73 @@ CYCLE_SPECS = CYCLE_SPECS + (
     IdeaSpec("upside_vol_252d", "risk.upside_vol_252d", _upside_vol_252, 252, "ratio", -1, "上行波动 252 日", "年度上行波动代表长期拥挤与回撤风险。", "risk-shape"),
     IdeaSpec("ret_21_252", "momentum.ret_21_252", _ret_21_252, 252, "ratio", -1, "短长收益差 21/252", "月度相对年度收益偏离，反转候选。", "momentum-composite"),
 )
+
+def _parkinson_vol_20(frame: pd.DataFrame) -> pd.Series:
+    high, low = price_factors._col(frame, "high"), price_factors._col(frame, "low")
+    variance = (np.log(high / low.replace(0, np.nan)) ** 2).rolling(20, min_periods=8).mean()
+    return _clean(np.sqrt(variance / (4.0 * np.log(2.0))))
+
+
+def _cvar_60(frame: pd.DataFrame) -> pd.Series:
+    ret = _ret(frame)
+    def tail_loss(values):
+        arr = np.asarray(values, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        if len(arr) < 20:
+            return np.nan
+        k = max(1, int(len(arr) * 0.05))
+        return float(-np.sort(arr)[:k].mean())
+    return _clean(ret.rolling(60, min_periods=30).apply(tail_loss, raw=True))
+
+
+def _vol_of_vol_60(frame: pd.DataFrame) -> pd.Series:
+    return _clean(_ret(frame).rolling(20, min_periods=10).std().rolling(60, min_periods=20).std())
+
+
+def _ret_3_21(frame: pd.DataFrame) -> pd.Series:
+    return _ret_diff(frame, 3, 21)
+
+
+def _ret_63_252(frame: pd.DataFrame) -> pd.Series:
+    return _ret_diff(frame, 63, 252)
+
+
+def _amount_trend_3_10(frame: pd.DataFrame) -> pd.Series:
+    amount = _amount(frame)
+    return _clean(_ma(amount, 3) / _ma(amount, 10).replace(0, np.nan) - 1)
+
+
+def _turnover_trend_10_60(frame: pd.DataFrame) -> pd.Series:
+    turnover = _turnover(frame)
+    return _clean(_ma(turnover, 10) / _ma(turnover, 60).replace(0, np.nan) - 1)
+
+
+def _overnight_gap_sum_5(frame: pd.DataFrame) -> pd.Series:
+    close, open_ = _close(frame), price_factors._col(frame, "open")
+    gap = open_ / close.shift(1).replace(0, np.nan) - 1
+    return _clean(gap.rolling(5, min_periods=3).sum())
+
+
+def _close_location_10(frame: pd.DataFrame) -> pd.Series:
+    close, high, low = _close(frame), price_factors._col(frame, "high"), price_factors._col(frame, "low")
+    location = (close - low) / (high - low).replace(0, np.nan)
+    return _clean(location.rolling(10, min_periods=5).mean())
+
+
+def _amihud_10(frame: pd.DataFrame) -> pd.Series:
+    amount = _amount(frame).replace(0, np.nan)
+    return _clean((_ret(frame).abs() / (amount / 1e8)).rolling(10, min_periods=5).mean())
+
+
+CYCLE_SPECS = CYCLE_SPECS + (
+    IdeaSpec("parkinson_vol_20d", "risk.parkinson_vol_20d", _parkinson_vol_20, 20, "ratio", -1, "Parkinson 波动 20 日", "高低价区间估计的波动率，低波动候选。", "risk-shape"),
+    IdeaSpec("cvar_60d", "risk.cvar_60d", _cvar_60, 60, "ratio", -1, "CVaR 60 日", "5% 尾部损失，尾部风险候选。", "risk-shape"),
+    IdeaSpec("vol_of_vol_60d", "risk.vol_of_vol_60d", _vol_of_vol_60, 60, "ratio", -1, "波动率的波动 60 日", "短期波动状态不稳定，风险溢价候选。", "risk-shape"),
+    IdeaSpec("ret_3_21", "momentum.ret_3_21", _ret_3_21, 21, "ratio", -1, "短长收益差 3/21", "极短期相对月度收益偏离，反转候选。", "momentum-composite"),
+    IdeaSpec("ret_63_252", "momentum.ret_63_252", _ret_63_252, 252, "ratio", -1, "短长收益差 63/252", "季度相对年度收益偏离，反转候选。", "momentum-composite"),
+    IdeaSpec("amount_trend_3_10", "liquidity.amount_trend_3_10", _amount_trend_3_10, 10, "ratio", 1, "成交额趋势 3/10", "极短期成交额抬升，关注度上行。", "liquidity-bias"),
+    IdeaSpec("turnover_trend_10_60", "liquidity.turnover_trend_10_60", _turnover_trend_10_60, 60, "ratio", -1, "换手趋势 10/60", "短期换手相对中期抬升，拥挤候选。", "liquidity-bias"),
+    IdeaSpec("overnight_gap_sum_5d", "momentum.overnight_gap_sum_5d", _overnight_gap_sum_5, 5, "ratio", -1, "隔夜跳空累计 5 日", "短期隔夜情绪冲击，反转候选。", "momentum-shape"),
+    IdeaSpec("close_location_10d", "momentum.close_location_10d", _close_location_10, 10, "ratio", 1, "收盘位置 10 日", "短期收盘位置强势，买盘承接。", "momentum-shape"),
+    IdeaSpec("amihud_10d", "liquidity.amihud_10d", _amihud_10, 10, "ratio", 1, "Amihud 非流动性 10 日", "短期价格冲击，流动性溢价候选。", "liquidity-amihud"),
+)

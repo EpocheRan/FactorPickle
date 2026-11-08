@@ -61,6 +61,10 @@
   .panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
   .panel h2{font-family:var(--serif);font-size:18px;letter-spacing:-.01em;margin:0}
   .panel-head .sub{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.04em}
+  .pager{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:10px;font-family:var(--mono);font-size:9px;color:var(--muted)}
+  .pager .page-info{margin-right:auto}
+  .pager button{border:1px solid var(--line);background:var(--paper2);color:var(--ink);border-radius:5px;padding:3px 7px;cursor:pointer;font:inherit}
+  .pager button:disabled{opacity:.35;cursor:default}
   .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
   .filters input,.filters select{
     font-family:var(--sans);font-size:11px;padding:6px 8px;border:1px solid var(--line);
@@ -175,10 +179,12 @@
           <tbody id="tbody"></tbody>
         </table>
       </div>
+      <div class="pager" id="table-pager"></div>
     </div>
     <aside class="panel">
       <div class="panel-head"><h2>待处理</h2><span class="sub">人工队列</span></div>
       <div class="stack" id="attention"></div>
+      <div class="pager" id="attention-pager"></div>
     </aside>
   </section>
 
@@ -194,6 +200,7 @@
     <div class="panel">
       <div class="panel-head"><h2>研究押注</h2><span class="sub">组合</span></div>
       <div class="bets" id="bets"></div>
+      <div class="pager" id="bets-pager"></div>
     </div>
   </section>
 
@@ -201,6 +208,7 @@
     <div class="panel">
       <div class="panel-head"><h2>审计发现</h2><span class="sub" id="finding-count">—</span></div>
       <div id="findings"></div>
+      <div class="pager" id="findings-pager"></div>
     </div>
     <div class="panel">
       <div class="panel-head"><h2>数据覆盖</h2><span class="sub">P0 手工表</span></div>
@@ -270,6 +278,25 @@
     .replace(/\bn\/a\b/gi, '—');
   const bytes = (n) => { if (!n) return '0 B'; const u=['B','KB','MB','GB','TB']; let i=0; let x=Number(n); while(x>=1024&&i<u.length-1){x/=1024;i++;} return x.toFixed(1)+' '+u[i]; };
   const badge = (v, cls) => `<span class="badge ${esc(cls || v || 'muted')}">${esc(t(v) || '—')}</span>`;
+  const PAGE_SIZE = { table: 10, attention: 5, bets: 4, findings: 8 };
+  const PAGE = { table: 1, attention: 1, bets: 1, findings: 1 };
+  function pageSlice(items, key) {
+    const size = PAGE_SIZE[key];
+    const pages = Math.max(1, Math.ceil(items.length / size));
+    PAGE[key] = Math.min(Math.max(1, PAGE[key]), pages);
+    const start = (PAGE[key] - 1) * size;
+    return items.slice(start, start + size);
+  }
+  function renderPager(id, key, total) {
+    const el = $(id);
+    if (!el) return;
+    if (!total) { el.innerHTML = ''; return; }
+    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE[key]));
+    const page = PAGE[key];
+    el.innerHTML = `<span class="page-info">第 ${page} / ${pages} 页 · ${total} 条</span>
+      <button data-page-key="${key}" data-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>上一页</button>
+      <button data-page-key="${key}" data-page="${page + 1}" ${page >= pages ? 'disabled' : ''}>下一页</button>`;
+  }
 
   function statusClass(level){ return level === 'green' ? 'green' : level === 'red' ? 'red' : 'yellow'; }
   function renderHeader(){
@@ -307,8 +334,13 @@
       return (!q || hay.includes(q)) && (!status || e.verdict === status) && (!g3 || e.g3 === g3) && (!bet || e.bet === bet);
     });
     $('table-count').textContent = `${rows.length} / ${(DATA.experiments || []).length}`;
-    if (!rows.length) { $('tbody').innerHTML = `<tr><td colspan="12"><div class="empty">没有匹配当前筛选的实验</div></td></tr>`; return; }
-    $('tbody').innerHTML = rows.map(e => `
+    if (!rows.length) {
+      $('tbody').innerHTML = `<tr><td colspan="12"><div class="empty">没有匹配当前筛选的实验</div></td></tr>`;
+      renderPager('table-pager', 'table', 0);
+      return;
+    }
+    const pageRows = pageSlice(rows, 'table');
+    $('tbody').innerHTML = pageRows.map(e => `
       <tr data-id="${esc(e.id)}">
         <td class="mono">${esc(e.id)}</td>
         <td>${esc(e.factor)}<div class="muted mono">${esc(e.horizon)} 天 · ${esc(e.universe)}</div></td>
@@ -323,12 +355,15 @@
         <td>${badge(e.recommend || e.decision || 'pending', e.decision === 'promote' ? 'pass' : e.recommend === 'iterate' ? 'warn' : e.recommend === 'repair' ? 'fail' : 'muted')}</td>
         <td class="mono">${e.age_days == null ? '—' : e.age_days.toFixed(1) + ' 天'}</td>
       </tr>`).join('');
+    renderPager('table-pager', 'table', rows.length);
     document.querySelectorAll('#tbody tr[data-id]').forEach(tr => tr.addEventListener('click', () => openDetail(tr.dataset.id)));
   }
 
   function renderAttention(){
     const items = DATA.attention || [];
-    $('attention').innerHTML = items.length ? items.map(a => `<div class="att ${a.level}" ${a.exp_id ? `data-id="${esc(a.exp_id)}"` : ''}><div class="h">${badge(a.level, a.level)} ${esc(a.title)}</div><div class="d">${esc(a.detail)}</div></div>`).join('') : `<div class="empty">当前没有待处理项</div>`;
+    const pageItems = pageSlice(items, 'attention');
+    $('attention').innerHTML = pageItems.length ? pageItems.map(a => `<div class="att ${a.level}" ${a.exp_id ? `data-id="${esc(a.exp_id)}"` : ''}><div class="h">${badge(a.level, a.level)} ${esc(a.title)}</div><div class="d">${esc(a.detail)}</div></div>`).join('') : `<div class="empty">当前没有待处理项</div>`;
+    renderPager('attention-pager', 'attention', items.length);
     document.querySelectorAll('.att[data-id]').forEach(el => el.addEventListener('click', () => openDetail(el.dataset.id)));
   }
 
@@ -353,13 +388,17 @@
 
   function renderBets(){
     const bets = DATA.bets || [];
-    $('bets').innerHTML = bets.length ? bets.map(b => `<div class="bet"><div class="t"><b>${esc(b.bet)}</b><span>${badge(b.status, b.status === 'confirmed' ? 'pass' : 'gold')}</span></div><div class="m"><div>实验<b>${b.experiments}</b></div><div>试验<b>${b.trials}</b></div><div>G3<b>${b.g3}</b></div></div></div>`).join('') : `<div class="empty">还没有押注</div>`;
+    const pageBets = pageSlice(bets, 'bets');
+    $('bets').innerHTML = pageBets.length ? pageBets.map(b => `<div class="bet"><div class="t"><b>${esc(b.bet)}</b><span>${badge(b.status, b.status === 'confirmed' ? 'pass' : 'gold')}</span></div><div class="m"><div>实验<b>${b.experiments}</b></div><div>试验<b>${b.trials}</b></div><div>G3<b>${b.g3}</b></div></div></div>`).join('') : `<div class="empty">还没有押注</div>`;
+    renderPager('bets-pager', 'bets', bets.length);
   }
 
   function renderFindings(){
     const items = DATA.audit_findings || [];
+    const pageItems = pageSlice(items, 'findings');
     $('finding-count').textContent = `${items.length} findings`;
-    $('findings').innerHTML = items.length ? items.map(f => `<div class="finding"><span class="id">${esc(f.exp_id)}</span><span>${badge(f.status, f.status === 'fail' ? 'fail' : 'warn')}</span><span><b>${esc(checkTitle(f))}</b><div class="d">${esc(zhText(f.actual))} · 期望 ${esc(zhText(f.expected))}</div></span></div>`).join('') : `<div class="empty">没有审计警告</div>`;
+    $('findings').innerHTML = pageItems.length ? pageItems.map(f => `<div class="finding"><span class="id">${esc(f.exp_id)}</span><span>${badge(f.status, f.status === 'fail' ? 'fail' : 'warn')}</span><span><b>${esc(checkTitle(f))}</b><div class="d">${esc(zhText(f.actual))} · 期望 ${esc(zhText(f.expected))}</div></span></div>`).join('') : `<div class="empty">没有审计警告</div>`;
+    renderPager('findings-pager', 'findings', items.length);
   }
 
   function renderCoverage(){
@@ -414,8 +453,20 @@
   $('d-close').addEventListener('click', closeDetail);
   $('overlay').addEventListener('click', closeDetail);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
-  ['q','f-status','f-g3','f-bet'].forEach(id => $(id).addEventListener('input', renderTable));
-  ['f-status','f-g3','f-bet'].forEach(id => $(id).addEventListener('change', renderTable));
+  function resetTablePage(){ PAGE.table = 1; renderTable(); }
+  ['q','f-status','f-g3','f-bet'].forEach(id => $(id).addEventListener('input', resetTablePage));
+  ['f-status','f-g3','f-bet'].forEach(id => $(id).addEventListener('change', resetTablePage));
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-page-key]');
+    if (!btn || btn.disabled) return;
+    const key = btn.dataset.pageKey;
+    if (!(key in PAGE)) return;
+    PAGE[key] = Number(btn.dataset.page) || 1;
+    if (key === 'table') renderTable();
+    else if (key === 'attention') renderAttention();
+    else if (key === 'bets') renderBets();
+    else if (key === 'findings') renderFindings();
+  });
 
   renderHeader(); renderKpis(); initBets(); renderTable(); renderAttention(); renderFunnel(); renderTrials(); renderBets(); renderFindings(); renderCoverage(); renderStorage();
 })();
