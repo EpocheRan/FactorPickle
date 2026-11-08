@@ -442,6 +442,11 @@ def audit_experiment(root: Path, *, policy: dict[str, Any] | None = None, ledger
         else:
             q_value = min(1.0, p_value * n_trials)
             q_method = "Bonferroni fallback (P0); BH batch to follow"
+    q_note = (
+        "single-trial raw p"
+        if n_trials <= 1
+        else "Bonferroni fallback across distinct trials; BH batch to follow"
+    )
     net_2x = spread_gross - 2.0 * cost_mean if math.isfinite(cost_mean) and math.isfinite(spread_gross) else None
     audit = {
         "schema_version": config.SCHEMA_VERSION,
@@ -459,7 +464,7 @@ def audit_experiment(root: Path, *, policy: dict[str, Any] | None = None, ledger
         "q_value": q_value,
         "q_method": q_method,
         "p_value": p_value,
-        "q_note": "P0 records a single-trial raw p; multi-trial BH is a batch step.",
+        "q_note": q_note,
         "metrics": {
             "ic": ic_mean,
             "ic_t": ic_t,

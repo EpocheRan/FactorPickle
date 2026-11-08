@@ -5,22 +5,24 @@ existing research pipeline and writes structured artifacts under
 `output/factor_lab/`; it does not edit production modules, the factor registry,
 or QuestDB during P0.
 
-## P0 scope
+## P0/P1 scope
 
 1. `gate_policy.json` v1.0 with gate types and one adjusted-p policy.
 2. `trial_ledger.jsonl`: hash chain, `ledger_repair`, orphan-run check.
 3. `audit.json`: deterministic IC / spread / cost checks plus policy and
    ledger linkage.
 4. `report.json`, `decision_brief.json`, and an in-process staging runner.
-5. A self-contained HTML dashboard for human review.
+5. A self-contained Chinese HTML dashboard for human review.
 6. `orthogonality.json`: P1 exposure correlation against a small library snapshot.
-7. Non-destructive output inventory / cleanup planning.
+7. `ideas.py`: 24 price/volume hypotheses for the first mining batch.
+8. Non-destructive output inventory / cleanup planning.
 
 ## Commands
 
 ```powershell
 python -m factor_lab init
 python -m factor_lab pilot
+python -m factor_lab mine --limit 23
 python -m factor_lab dashboard
 python -m factor_lab control show
 python -m factor_lab control pause --reason "review"
@@ -86,7 +88,8 @@ panels and the peer residual matrix are intentionally excluded.
 
 - `orthogonality.py` computes exposure correlation only; `rho_return` is still
   pending. The G0.5 verdict is labeled exposure-only.
-- `q_value` is a single-trial raw p for now; multi-trial BH is a batch step.
+- `q_value`: single-trial raw p; multi-trial uses Bonferroni fallback for now;
+  BH is the next batch step.
 - `capacity` and 2x-cost sensitivity: 2x cost is computed from the report's
   `cost_mean`; capacity remains a warning when the quick profile omits it.
 - The first pilot (`liquidity.amount_bias_21_252`) is a D-grade factor; P0

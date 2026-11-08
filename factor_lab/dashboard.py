@@ -126,8 +126,9 @@ def _load_experiments() -> list[dict[str, Any]]:
         exp = {
             "id": root.name,
             "factor": manifest.get("factor_id"),
-            "bet": hypothesis.get("bet") or "unassigned",
+            "bet": hypothesis.get("bet") or "未分配",
             "hypothesis_id": manifest.get("hypothesis_id"),
+            "trial_id": manifest.get("trial_id"),
             "status": status,
             "run_id": manifest.get("run_id"),
             "started_at": manifest.get("started_at"),
@@ -141,6 +142,7 @@ def _load_experiments() -> list[dict[str, Any]]:
             "turnover": _float(metrics.get("turnover", report.get("turnover"))),
             "capacity": metrics.get("capacity_multiple"),
             "max_rho": metrics.get("max_rho"),
+            "g0_5": audit.get("g0_5"),
             "n_trials": audit.get("n_trials"),
             "q_value": audit.get("q_value"),
             "grade": grade,
@@ -281,11 +283,12 @@ def build_dashboard_data() -> dict[str, Any]:
             points.append({"ts": record.get("ts"), "n": len(seen_trials), "trial_id": trial})
 
     g2_pass = sum(1 for exp in experiments if exp["verdict"] != "fail")
+    g05_pass = sum(1 for exp in experiments if exp.get("g0_5") == "pass")
     g3_pass = sum(1 for exp in experiments if exp["verdict"] != "fail" and exp["g3"] == "pass")
     g4_pass = sum(1 for exp in experiments if exp["decision"] == "promote")
     funnel = [
         {"gate": "G0", "count": len(experiments), "note": "注册 / 运行"},
-        {"gate": "G0.5", "count": len(experiments), "note": "P0 手工 ρ 占位"},
+        {"gate": "G0.5", "count": g05_pass, "note": "暴露相关通过"},
         {"gate": "G2", "count": g2_pass, "note": "审计无硬失败"},
         {"gate": "G3", "count": g3_pass, "note": "交易性通过"},
         {"gate": "G4", "count": g4_pass, "note": "决策 promote"},
@@ -294,15 +297,18 @@ def build_dashboard_data() -> dict[str, Any]:
     bets: dict[str, dict[str, Any]] = {}
     for exp in experiments:
         bet = str(exp.get("bet") or "未分配")
-        item = bets.setdefault(bet, {"bet": bet, "experiments": 0, "trials": 0, "g3": 0, "status": "explore"})
+        item = bets.setdefault(bet, {"bet": bet, "experiments": 0, "trial_ids": set(), "g3": 0, "status": "explore"})
         item["experiments"] += 1
-        item["trials"] += int(exp.get("n_trials") or 0)
+        if exp.get("trial_id"):
+            item["trial_ids"].add(str(exp["trial_id"]))
         if exp["verdict"] != "fail" and exp["g3"] == "pass":
             item["g3"] += 1
         if exp.get("decision") == "promote":
             item["status"] = "confirmed"
-        elif exp.get("g3") in ("pass", "warn") and item["status"] != "confirmed":
+        elif exp["verdict"] != "fail" and exp.get("g3") in ("pass", "warn") and item["status"] != "confirmed":
             item["status"] = "exploit"
+    for item in bets.values():
+        item["trials"] = len(item.pop("trial_ids"))
 
     findings = []
     for exp in experiments:

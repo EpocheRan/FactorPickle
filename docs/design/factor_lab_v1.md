@@ -56,13 +56,14 @@ Factor Lab 写入：
 - G0.5：`orthogonality.json` 的 exposure CI（下界 > 0.9 fail，上界 < 0.7 pass，跨区间 warn）；
 - turnover / capacity / 2× cost 的 G3 子检查；
 - rating 字段存在；
-- `q_value`：单 trial 先记 raw p，多 trial BH 留到 batch。
+- `q_value`：单 trial 记 raw p；多 trial 先记 Bonferroni fallback，BH 留到 batch。
 
 `audit.verdict` 是 G2 完整性；`audit.g3` 是交易性。两者分开，避免把“报告算错”和“因子不可交易”混为一谈。
 
 ## 5. Dashboard
 
 ```powershell
+python -m factor_lab mine --limit 23
 python -m factor_lab dashboard
 ```
 
@@ -106,6 +107,6 @@ python -m factor_lab maintenance clean --apply  # 移到 output/_archive 或 _tr
 ## 8. 已知限制
 
 - `orthogonality.py` 目前只算 exposure 相关；`rho_return` 仍待补，G0.5 结论标注为 exposure-only。
-- `q_value` 单 trial 先记 raw p；多 trial BH 是 batch 步骤。
+- `q_value` 单 trial 先记 raw p；多 trial 目前是 Bonferroni fallback，BH 是 batch 步骤。
 - 2× cost 已由 `cost_mean` 重算；`capacity` 在 quick profile 下仍可能缺失，audit 记 warn。
 - 首个 pilot 是 D 级因子；P0/P1 验收的是链路与门禁，不是 alpha。

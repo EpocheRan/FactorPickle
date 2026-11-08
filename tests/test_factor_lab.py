@@ -119,6 +119,20 @@ def test_staging_injects_in_process() -> None:
         unstage("liquidity.amount_bias_21_252")
 
 
+def test_idea_specs_are_unique_and_well_formed() -> None:
+    from factor_lab.ideas import IDEA_SPECS
+
+    ids = [spec.factor_id for spec in IDEA_SPECS]
+    assert len(ids) == len(set(ids))
+    assert len(ids) >= 20
+    for spec in IDEA_SPECS:
+        assert spec.direction in (-1, 1)
+        assert spec.window > 0
+        hypothesis = spec.hypothesis()
+        assert hypothesis.outcome_policy == "single"
+        assert len(hypothesis.outcomes) == 1
+
+
 def test_dashboard_renders_embedded_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     data = {
         "meta": {

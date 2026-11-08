@@ -70,7 +70,10 @@ def _risk_list(report: dict[str, Any], audit: dict[str, Any]) -> list[str]:
             pass
     for check in audit.get("checks") or []:
         if isinstance(check, dict) and check.get("status") == "fail":
-            risks.append(f"审计失败：{check.get('check_id')}")
+            if check.get("check_id") == "orthogonality":
+                risks.append("G0.5 相关性硬失败")
+            else:
+                risks.append(f"审计失败：{check.get('check_id')}")
     if not risks:
         risks.append("P0 检查未标出重大风险")
     return risks[:3]
@@ -86,7 +89,14 @@ def build_brief(root: Path) -> dict[str, Any]:
 
     g3 = str(audit.get("g3") or "warn")
     verdict = str(audit.get("verdict") or "warn")
-    if verdict == "fail":
+    failed_checks = {
+        str(check.get("check_id"))
+        for check in (audit.get("checks") or [])
+        if isinstance(check, dict) and check.get("status") == "fail"
+    }
+    if "orthogonality" in failed_checks:
+        gate = "G0.5 fail"
+    elif verdict == "fail":
         gate = "G2 fail"
     elif g3 == "fail":
         gate = "G3 fail"
@@ -95,7 +105,9 @@ def build_brief(root: Path) -> dict[str, Any]:
     else:
         gate = "G3 pass"
 
-    if verdict == "fail":
+    if "orthogonality" in failed_checks:
+        recommend = "park"
+    elif verdict == "fail":
         recommend = "repair"
     elif str(rating.get("grade")) == "D":
         recommend = "park"

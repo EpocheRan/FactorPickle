@@ -54,6 +54,12 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("pilot", help="run the amount_bias P0 pilot and dashboard")
 
+    mine_parser = sub.add_parser("mine", help="run the P1 idea batch")
+    mine_parser.add_argument("--limit", type=int, default=23)
+    mine_parser.add_argument("--profile", default="quick")
+    mine_parser.add_argument("--no-orthogonality", action="store_true")
+    mine_parser.add_argument("--include-existing", action="store_true")
+
     audit_parser = sub.add_parser("audit", help="audit one experiment")
     audit_parser.add_argument("--experiment", required=True)
 
@@ -98,6 +104,19 @@ def main(argv: list[str] | None = None) -> int:
         dashboard = render_dashboard()
         result["dashboard"] = str(dashboard)
         _print(result)
+        return 0
+
+    if args.command == "mine":
+        from .batch import run_batch
+
+        _print(
+            run_batch(
+                limit=args.limit,
+                profile=args.profile,
+                orthogonality=not args.no_orthogonality,
+                include_existing=args.include_existing,
+            )
+        )
         return 0
 
     if args.command == "run":
