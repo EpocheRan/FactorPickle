@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from research.report.runner import generate
+from .research_adapter import RESEARCH
 
 from . import config
 from .audit import audit_experiment
@@ -96,13 +96,14 @@ def run_experiment(
         },
         "git_commit": config.git_commit(),
         "policy": {"version": policy["version"], "sha256": policy["sha256"]},
+        "evaluator": RESEARCH.source,
         "started_at": config.now_iso(),
         "status": "running",
     }
     write_json_atomic(root / "manifest.json", manifest)
 
     try:
-        result = generate(
+        result = RESEARCH.generate(
             hypothesis.factor_id,
             start=hypothesis.start,
             end=hypothesis.end,
@@ -118,7 +119,7 @@ def run_experiment(
             profile=profile,
             use_cache=use_cache,
         )
-        report_html = Path(result["html"])
+        report_html = result.html
         stable_html = root / "report.html"
         if report_html.exists():
             shutil.copy2(report_html, stable_html)
@@ -129,9 +130,9 @@ def run_experiment(
             "schema_version": config.REPORT_SCHEMA_VERSION,
             "exp_id": exp_id,
             "factor": hypothesis.factor_id,
-            "meta": result["meta"],
-            "report": report_to_dict(result["report"]),
-            "rating": result["rating"],
+            "meta": result.meta,
+            "report": report_to_dict(result.report),
+            "rating": result.rating,
             "html": str(stable_html),
         }
         write_json_atomic(root / "report.json", report_payload)
@@ -141,8 +142,8 @@ def run_experiment(
                 "status": "success",
                 "finished_at": config.now_iso(),
                 "duration_sec": round(time.time() - started, 3),
-                "data_version": (result["meta"] or {}).get("data_version"),
-                "report_meta": result["meta"],
+                "data_version": (result.meta or {}).get("data_version"),
+                "report_meta": result.meta,
                 "paths": artifact_paths(exp_id),
             }
         )
@@ -180,7 +181,8 @@ def run_experiment(
         "manifest": str(root / "manifest.json"),
         "report": str(root / "report.json"),
         "report_html": str(root / "report.html"),
-        "rating": result["rating"],
+        "rating": result.rating,
+        "evaluator": RESEARCH.source,
     }
     if auto_audit:
         audit = audit_experiment(root)

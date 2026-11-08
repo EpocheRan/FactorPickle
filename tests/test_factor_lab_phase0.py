@@ -9,6 +9,7 @@ from factor_lab.cycle import _select_specs
 from factor_lab.cycle_ideas import CYCLE_SPECS
 from factor_lab.ledger import Ledger
 from factor_lab.phase1_agent import _safe_plan
+from factor_lab.research_adapter import RESEARCH
 from factor_lab.schemas import Hypothesis, OutcomeSpec, reserve_experiment_id, trial_id
 
 
@@ -104,3 +105,8 @@ def test_agent_plan_filters_to_fresh_known_factors(monkeypatch) -> None:
     )
     assert plan["selected"] == ["risk.vol_of_vol_120d", "risk.high_low_ratio_60d"]
     assert plan["family_id"] == "F-test-agent"
+
+
+def test_research_adapter_points_to_production_evaluator() -> None:
+    assert RESEARCH.source == "research.report.runner.generate"
+    assert hasattr(RESEARCH, "generate")

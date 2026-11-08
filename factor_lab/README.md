@@ -21,6 +21,7 @@ python -m factor_lab phase1-agent --plan output/factor_lab/phase1/agent_plan.jso
 python -m factor_lab phase1-director --memo output/factor_lab/phase1/agent_memo.json
 python -m factor_lab mine --limit 23
 python -m factor_lab dashboard
+python -m factor_lab eval-adapter
 python -m factor_lab directive show
 python -m factor_lab supervisor status
 python -m factor_lab control show
@@ -95,6 +96,26 @@ Scout/Director prompt (`workflows/phase1_scout.js` and
 them. The sixth and seventh cycles used this path and produced real agent
 plan/memo files. Child sessions are archived after each task with
 `workflows/reclaim_dsh_children.ps1`.
+
+## Evaluation adapter
+
+`factor_lab/run.py` does not import the research runner directly. It goes
+through `factor_lab/research_adapter.py`:
+
+```text
+ResearchReportAdapter.generate
+  -> research.report.runner.generate
+     -> research.report.metrics.build_report
+     -> research.report.sensitivity.compute
+     -> research.report.rating.rate
+```
+
+`factor_engine` is not in the evaluation path; `research.report.definitions`
+uses its registry specs only for factor metadata. Check the active adapter with:
+
+```powershell
+python -m factor_lab eval-adapter
+```
 
 ## Artifacts
 

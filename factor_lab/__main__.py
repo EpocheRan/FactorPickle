@@ -98,6 +98,8 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("dashboard", help="render the dashboard from artifacts")
 
+    sub.add_parser("eval-adapter", help="show the active research evaluation adapter")
+
     ledger_parser = sub.add_parser("ledger", help="ledger utilities")
     ledger_parser.add_argument("action", choices=["verify", "summary"])
     ledger_parser.add_argument("--path", default=None)
@@ -260,6 +262,19 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "dashboard":
         _print({"dashboard": str(render_dashboard())})
+        return 0
+
+    if args.command == "eval-adapter":
+        from .research_adapter import RESEARCH
+
+        _print(
+            {
+                "source": RESEARCH.source,
+                "module": "research.report.runner.generate",
+                "downstream": "research.report.metrics / sensitivity / rating",
+                "note": "Factor Lab wraps the production research evaluator; factor_engine is not in this path.",
+            }
+        )
         return 0
 
     if args.command == "ledger":
