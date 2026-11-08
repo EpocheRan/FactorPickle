@@ -87,6 +87,19 @@ def ensure_staged(factor_id: str) -> StagedFactor | None:
                 source="factor_lab.cycle_ideas",
             )
     if spec is None:
+        # Generated Lab factors are versioned outside the production registry.
+        from .factor_library import factor_library_lookup
+
+        generated = factor_library_lookup(factor_id)
+        if generated is not None and generated.fn is not None:
+            return stage_price_factor(
+                factor_id,
+                generated.fn,
+                window=generated.window or 252,
+                unit=generated.unit,
+                source=f"factor_lab.factor_library:{generated.family}/{generated.version}",
+            )
+    if spec is None:
         raise KeyError(
             f"factor {factor_id!r} is neither registered nor known to the lab stager; "
             f"known lab factors: {sorted(PILOT_STAGERS)} + {len(_idea_factor_ids())} ideas"

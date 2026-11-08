@@ -42,6 +42,54 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("init", help="create the P0 gate policy and control file")
 
+    bootstrap_parser = sub.add_parser("bootstrap", help="portable workspace bootstrap")
+    bootstrap_parser.add_argument("--research", action="store_true")
+
+    doctor_parser = sub.add_parser("doctor", help="environment preflight")
+    doctor_parser.add_argument("--probe-data", action="store_true")
+
+    budget_parser = sub.add_parser("budget", help="LLM/disk budget status")
+    budget_parser.add_argument("action", choices=["status"], nargs="?", default="status")
+
+    agents_parser = sub.add_parser("agents", help="agent registry / safe reclaim")
+    agents_parser.add_argument("action", choices=["status", "register", "reclaim"], nargs="?", default="status")
+    agents_parser.add_argument("--id", default="")
+    agents_parser.add_argument("--role", default="")
+    agents_parser.add_argument("--session-dir", default="")
+    agents_parser.add_argument("--apply", action="store_true")
+
+    library_parser = sub.add_parser("library", help="versioned Lab factor library")
+    library_parser.add_argument("action", choices=["list", "verify"], nargs="?", default="list")
+    library_parser.add_argument("--factor", default="")
+
+    build_parser = sub.add_parser("factor-build", help="write a generated factor into the Lab library")
+    build_parser.add_argument("--family", required=True)
+    build_parser.add_argument("--factor-id", required=True)
+    build_parser.add_argument("--code", required=True)
+    build_parser.add_argument("--spec", required=True)
+    build_parser.add_argument("--tests", default=None)
+    build_parser.add_argument("--version", default="v1")
+    build_parser.add_argument("--run-tests", action="store_true")
+
+    ml_parser = sub.add_parser("ml", help="non-DL ML engine")
+    ml_parser.add_argument("action", choices=["run"], nargs="?", default="run")
+    ml_parser.add_argument("--dataset", required=True)
+    ml_parser.add_argument("--spec", required=True)
+    ml_parser.add_argument("--out", default="output/factor_lab/ml")
+
+    campaign_parser = sub.add_parser("campaign", help="multi-round campaign")
+    campaign_parser.add_argument("action", choices=["start", "status", "run"], nargs="?", default="start")
+    campaign_parser.add_argument("--objective", default="研究因子")
+    campaign_parser.add_argument("--id", default="")
+    campaign_parser.add_argument("--dataset", default="")
+    campaign_parser.add_argument("--plan", default="")
+
+    runner_parser = sub.add_parser("runner", help="Runner preflight + experiment with data_interface manifest")
+    runner_parser.add_argument("--hypothesis", required=True)
+    runner_parser.add_argument("--profile", default="quick")
+    runner_parser.add_argument("--robustness", action="store_true")
+    runner_parser.add_argument("--no-audit", action="store_true")
+
     control_parser = sub.add_parser("control", help="show / pause / resume the lab")
     control_parser.add_argument("action", choices=["show", "pause", "resume", "stop"])
     control_parser.add_argument("--reason", default="")
@@ -79,8 +127,10 @@ def main(argv: list[str] | None = None) -> int:
     directive_parser = sub.add_parser("directive", help="show or initialize research direction")
     directive_parser.add_argument("action", choices=["show", "init"], nargs="?", default="show")
 
-    supervisor_parser = sub.add_parser("supervisor", help="show supervisor state")
-    supervisor_parser.add_argument("action", choices=["status"], nargs="?", default="status")
+    supervisor_parser = sub.add_parser("supervisor", help="show supervisor state / reclaim agents")
+    supervisor_parser.add_argument("action", choices=["status", "reclaim", "reclaim-all"], nargs="?", default="status")
+    supervisor_parser.add_argument("--id", default="")
+    supervisor_parser.add_argument("--apply", action="store_true")
 
     mine_parser = sub.add_parser("mine", help="run the P1 idea batch")
     mine_parser.add_argument("--limit", type=int, default=23)
@@ -116,8 +166,10 @@ def main(argv: list[str] | None = None) -> int:
         from .directive import ensure_directive
         from .retention import ensure_policy
         from .supervisor import write_heartbeat
+        from .budget import ensure_policy as ensure_budget
 
         policy = init_policy()
+        ensure_budget()
         control = ensure_control()
         directive = ensure_directive()
         retention = ensure_policy()
@@ -130,6 +182,183 @@ def main(argv: list[str] | None = None) -> int:
         if not config.DATA_COVERAGE_PATH.exists():
             write_json_atomic(config.DATA_COVERAGE_PATH, pilot_coverage())
         _print({"policy": policy, "control": control, "directive": directive, "retention": retention})
+        return 0
+
+    if args.command == "bootstrap":
+        from .bootstrap import bootstrap
+
+        _print(bootstrap(research=args.research))
+        return 0
+
+    if args.command == "doctor":
+        from .bootstrap import doctor
+
+        _print(doctor(probe_data=args.probe_data))
+        return 0
+
+    if args.command == "budget":
+        from . import budget
+
+        _print(budget.status())
+        return 0
+
+    if args.command == "agents":
+        from . import agents
+
+        if args.action == "register":
+            if not args.id:
+                raise SystemExit("agents register requires --id")
+            _print(agents.register(args.id, args.role or "worker", session_dir=args.session_dir or None).to_dict())
+        elif args.action == "reclaim":
+            if not args.id:
+                raise SystemExit("agents reclaim requires --id")
+            _print(agents.reclaim(args.id, apply=args.apply))
+        else:
+            _print({"agents": [item.to_dict() for item in agents.list_agents()]})
+        return 0
+
+    if args.command == "library":
+        from .factor_library import LIBRARY
+
+        if args.action == "verify":
+            if not args.factor:
+                raise SystemExit("library verify requires --factor")
+            versions = LIBRARY.list_versions(args.factor)
+            _print(
+                {
+                    "factor": args.factor,
+                    "versions": [
+                        {
+                            "version": item.version,
+                            "family": item.family,
+                            "code_hash": item.code_hash,
+                            "window": item.window,
+                            "path": str(item.root),
+                        }
+                        for item in versions
+                    ],
+                }
+            )
+        else:
+            rows = []
+            for family_dir in sorted(LIBRARY.root.glob("*")):
+                if not family_dir.is_dir():
+                    continue
+                for factor_dir in sorted(family_dir.glob("*")):
+                    if not factor_dir.is_dir():
+                        continue
+                    for version_dir in sorted(factor_dir.glob("v*")):
+                        rows.append({"factor_id": factor_dir.name, "family": family_dir.name, "version": version_dir.name})
+            _print({"root": str(LIBRARY.root), "factors": rows})
+        return 0
+
+    if args.command == "factor-build":
+        from .factor_builder import build_from_files
+
+        factor = build_from_files(
+            family=args.family,
+            factor_id=args.factor_id,
+            code_path=args.code,
+            spec_path=args.spec,
+            tests_path=args.tests,
+            version=args.version,
+        )
+        if args.run_tests:
+            from .factor_library import LIBRARY
+
+            test_result = LIBRARY.run_tests(args.family, args.factor_id, args.version)
+        else:
+            test_result = {"status": "not-run"}
+        _print(
+            {
+                "factor_id": factor.factor_id,
+                "family": factor.family,
+                "version": factor.version,
+                "code_hash": factor.code_hash,
+                "path": str(factor.root),
+                "tests": test_result,
+            }
+        )
+        return 0
+
+    if args.command == "ml":
+        from .ml_engine import MLExperimentSpec, run_experiment
+
+        import pandas as pd
+
+        dataset = pd.read_csv(args.dataset)
+        spec_payload = read_json(Path(args.spec))
+        if not isinstance(spec_payload, dict):
+            raise SystemExit(f"invalid ML spec: {args.spec}")
+        if "spec" in spec_payload and isinstance(spec_payload["spec"], dict):
+            spec_payload = spec_payload["spec"]
+        spec = MLExperimentSpec(**spec_payload)
+        result = run_experiment(dataset, spec)
+        out_dir = Path(args.out)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        write_json_atomic(out_dir / "ml_result.json", result.to_dict(include_predictions=True))
+        write_json_atomic(out_dir / "model_card.json", {
+            "schema_version": "factor_lab.model_card.v1",
+            "model": spec.model,
+            "features": spec.features,
+            "target": spec.target,
+            "splits": spec.n_splits,
+            "embargo": spec.embargo,
+            "cost_bps": spec.cost_bps,
+        })
+        _print({"out": str(out_dir), "metrics": result.metrics, "candidate": result.candidate, "reject_reasons": result.reject_reasons})
+        return 0
+
+    if args.command == "campaign":
+        from .campaign import create_campaign, load_campaign, run_ml_plan_campaign
+
+        if args.action == "status":
+            if not args.id:
+                raise SystemExit("campaign status requires --id")
+            _print(load_campaign(args.id) or {"error": "not found", "campaign_id": args.id})
+        elif args.action == "run":
+            if not args.dataset or not args.plan:
+                raise SystemExit("campaign run requires --dataset and --plan")
+            import pandas as pd
+
+            plans = read_json(Path(args.plan))
+            if isinstance(plans, dict):
+                plans = plans.get("plans") or plans.get("plan") or []
+            if not isinstance(plans, list):
+                raise SystemExit("campaign plan must be a JSON list or {\"plans\": [...]}")
+            _print(
+                run_ml_plan_campaign(
+                    pd.read_csv(args.dataset),
+                    plans,
+                    objective=args.objective,
+                    campaign_id=args.id or None,
+                )
+            )
+        else:
+            from .bootstrap import doctor
+
+            preflight = doctor()
+            if not preflight.get("ok"):
+                _print({"status": "blocked", "reason": "doctor", "doctor": preflight})
+                return 1
+            _print(create_campaign(args.objective))
+        return 0
+
+    if args.command == "runner":
+        path = Path(args.hypothesis)
+        raw = read_json(path)
+        if not isinstance(raw, dict):
+            raise SystemExit(f"hypothesis not found or invalid: {path}")
+        from .runner import FactorRunner
+
+        _print(
+            FactorRunner().run(
+                Hypothesis.from_dict(raw),
+                profile=args.profile,
+                robustness=args.robustness,
+                auto_audit=not args.no_audit,
+            )
+        )
         return 0
 
     if args.command == "control":
@@ -205,13 +434,24 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "supervisor":
         from .supervisor import read_supervisor
+        from . import agents, budget
 
+        if args.action == "reclaim":
+            if not args.id:
+                raise SystemExit("supervisor reclaim requires --id")
+            _print(agents.reclaim(args.id, apply=args.apply))
+            return 0
+        if args.action == "reclaim-all":
+            _print(agents.reclaim_all(apply=args.apply))
+            return 0
         _print(
             {
                 "supervisor": read_supervisor(),
                 "control": load_control(),
                 "heartbeat": read_json(config.HEARTBEAT_PATH),
                 "cycle": read_json(config.CYCLE_PATH),
+                "agents": [item.to_dict() for item in agents.list_agents()],
+                "budget": budget.status(),
             }
         )
         return 0

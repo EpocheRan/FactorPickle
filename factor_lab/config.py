@@ -15,6 +15,7 @@ PROJECT_ROOT = _project_root()
 LAB_ROOT = Path(os.environ.get("FACTOR_LAB_ROOT", PROJECT_ROOT / "output" / "factor_lab"))
 EXPERIMENTS_DIR = LAB_ROOT / "experiments"
 HYPOTHESES_DIR = LAB_ROOT / "hypotheses"
+FACTOR_LIBRARY_DIR = LAB_ROOT / "factors" / "generated"
 POLICY_DIR = LAB_ROOT / "policy"
 LEDGER_DIR = LAB_ROOT / "ledger"
 CONTROL_DIR = LAB_ROOT / "control"
@@ -58,6 +59,10 @@ def ensure_dirs() -> None:
         PROGRESS_DIR,
         CLOCK_DIR,
         PHASE1_DIR,
+        FACTOR_LIBRARY_DIR,
+        LAB_ROOT / "campaigns",
+        LAB_ROOT / "discovery",
+        LAB_ROOT / "ml",
     ):
         path.mkdir(parents=True, exist_ok=True)
 

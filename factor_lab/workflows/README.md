@@ -1,4 +1,20 @@
-# DSH workflow: Phase 1 Scout / Director
+# DSH workflow: Factor Lab research roles
+
+Current role contracts:
+
+- `phase1_scout.js` / `phase1_director.js`: proven Phase 1 selection and memo.
+- `research_pathfinder.js`: proposes one bounded campaign round; Python
+  `campaign.py` enforces rounds, duplicates, budget and stop rules.
+- `ml_planner.js`: non-Deep-Learning ML experiment spec.
+- `factor_builder.js`: emits factor code + spec + tests; Python
+  `factor-build` writes it into the versioned Lab factor library.
+
+No-tool agents are deliberate: file/tool-using children have hung. The Python
+runtime owns data access, execution, gates, budget and reclamation.
+
+`phase1_scout.js` and `phase1_director.js` are still the working Phase 1 path;
+the newer contracts are additive and can be wired into the campaign runner.
+
 
 Working pattern:
 

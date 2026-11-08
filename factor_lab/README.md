@@ -198,12 +198,59 @@ panels and the peer residual matrix are intentionally excluded.
   at most the running workers finish.
 - R4 pauses on free disk < 50GB, output > 25GB, or panel cache > 3GB.
 
-## Known Phase 0 limits
+## Architecture v4.1 status
 
-- One-shot cycle only; no 24/7 scheduler yet.
-- No LLM agents yet; Scout / Director / Builder / Auditor-review are target-state.
+- Scout/Director no-tool workflows are the proven LLM decision path; PathFinder,
+  Web Gateway, ML Engine planner, Evaluator narrative and Supervisor triage are
+  implemented as contracts/runtime scaffolding (not yet wired into a 24/7 DSH
+  scheduler).
+- Runner data preflight goes through `data_interface`; the new `factor_lab/runner.py`
+  records a `data_manifest.json`. The legacy research report loader remains the
+  production evaluator behind the Research Adapter.
+- Vectorized factor evaluation still uses `research.report` / `research.report.metrics`.
 - `rho_return` is still pending; G0.5 is exposure-only.
 - Multi-trial BH is still a batch step; current q is Bonferroni fallback.
 - `capacity` remains a warning when quick profile omits it.
-- The first pilot is a D-grade factor; P0 demonstrates the flow and guardrails,
-  not alpha.
+- The first pilot is a D-grade factor; the runtime demonstrates the flow and
+  guardrails, not alpha.
+
+## Architecture v4.1 runtime scaffolding
+
+New additive modules implement the target research loop without changing the
+production research/factor-data packages:
+
+| Module | Purpose |
+|---|---|
+| `data_interface_adapter.py` | Runner's only data door: wraps `data_interface` services, never SQL/DB |
+| `factor_library.py` | Versioned `factor_lab/factors/generated/<family>/<factor_id>/vN/` |
+| `factor_builder.py` | FactorBuilder write path: generated Python + spec + tests + hash |
+| `runner.py` | Runner preflight + experiment + `data_manifest.json` |
+| `ml_engine.py` | Non-Deep-Learning walk-forward ML runtime + signal admission |
+| `campaign.py` | Bounded PathFinder ↔ ML campaign, rounds/traces/stop rules |
+| `discovery.py` | Gateway discovery brief/map contracts + offline fallback |
+| `history.py` | Append-only research memory, separate from ledger |
+| `budget.py` | ¥3,000/month, daily/cycle/campaign caps, 150GB Lab quota |
+| `agents.py` | Agent registry, safety-gated reclaim/archive |
+| `bootstrap.py` | Portable bootstrap, doctor, session brief |
+
+Commands:
+
+```powershell
+python -m factor_lab bootstrap --research
+python -m factor_lab doctor
+python -m factor_lab budget status
+python -m factor_lab agents status
+python -m factor_lab library list
+python -m factor_lab factor-build --family demo --factor-id demo.mom --code factor.py --spec spec.json --tests test_factor.py
+python -m factor_lab ml run --dataset data.csv --spec ml_spec.json --out output/factor_lab/ml/demo
+python -m factor_lab campaign start --objective "研究因子"
+python -m factor_lab campaign run --dataset data.csv --plan campaign_plan.json --objective "ml smoke"
+python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json
+```
+
+Portability:
+
+- `AGENTS.md` and `FACTOR_LAB.md` at repo root are the new-session contract.
+- `bootstrap` is idempotent; `doctor` refuses to pretend the environment is ready.
+- Runner data access is through `data_interface`, not QuestDB/SQL.
+- New evidence/state is under `output/factor_lab`.

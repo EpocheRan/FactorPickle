@@ -151,6 +151,13 @@ def run_cycle(
         write_cycle(cycle_id="blocked-r4", status="blocked", error=f"R4: {r4['breaches']}")
         return {"status": "blocked", "reason": "R4", "storage": storage}
 
+    from .budget import check_cycle
+
+    budget_check = check_cycle()
+    if not budget_check.get("ok"):
+        write_cycle(cycle_id="blocked-budget", status="blocked", error=f"budget: {budget_check['reasons']}")
+        return {"status": "blocked", "reason": "budget", "budget": budget_check}
+
     existing = _existing_factors()
     if factor_ids:
         by_id = {spec.factor_id: spec for spec in CYCLE_SPECS}
