@@ -231,6 +231,7 @@ production research/factor-data packages:
 | `history.py` | Append-only research memory, separate from ledger |
 | `budget.py` | ¥3,000/month, daily/cycle/campaign caps, 150GB Lab quota |
 | `agents.py` | Agent registry, safety-gated reclaim/archive |
+| `readiness.py` | Supervisor blocker feedback when data/environment is not ready |
 | `bootstrap.py` | Portable bootstrap, doctor, session brief |
 
 Commands:
