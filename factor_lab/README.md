@@ -117,6 +117,26 @@ uses its registry specs only for factor metadata. Check the active adapter with:
 python -m factor_lab eval-adapter
 ```
 
+## Aligned fixed pool
+
+The fixed pool `pool:2022-01-04:200` selects its 200 names using amount on
+2022-01-04. To avoid look-ahead selection, the default directive now uses:
+
+```text
+universe = pool:2022-01-04:200
+start    = 2022-01-04
+```
+
+The evaluation report starts a little later (first valid forward-return date),
+but never before the pool date. An aligned smoke cycle produced:
+
+- `E-20261108-054` `momentum.ret_21_252`: report start 2022-02-07, 1167 dates
+- `E-20261108-055` `risk.upside_vol_252d`: report start 2022-02-07, 1167 dates
+
+The older Phase 1 results used `start=2019-01-01` with the same fixed pool; they
+are historical fixed-pool replays and carry look-ahead selection bias. Do not mix
+them with the aligned results when judging discovery.
+
 ## Artifacts
 
 ```text

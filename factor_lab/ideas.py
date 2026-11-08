@@ -18,7 +18,7 @@ from factors.ops import price_factors
 from .schemas import Hypothesis, OutcomeSpec, new_hypothesis_id
 
 UNIVERSE = "pool:2022-01-04:200"
-START = "2019-01-01"
+START = "2022-01-04"
 END = "2026-11-01"
 
 

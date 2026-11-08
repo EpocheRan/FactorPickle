@@ -219,3 +219,16 @@ CYCLE_SPECS = CYCLE_SPECS + (
     IdeaSpec("ret_10_126", "momentum.ret_10_126", _ret_10_126, 126, "ratio", -1, "短长收益差 10/126", "短期相对半年收益偏离，反转候选。", "momentum-composite"),
     IdeaSpec("amount_trend_20_60", "liquidity.amount_trend_20_60", _amount_trend_20_60, 60, "ratio", 1, "成交额趋势 20/60", "中期成交额相对长期抬升，关注度上行。", "liquidity-bias"),
 )
+
+def _upside_vol_252(frame: pd.DataFrame) -> pd.Series:
+    return _upside_vol(frame, 252)
+
+
+def _ret_21_252(frame: pd.DataFrame) -> pd.Series:
+    return _ret_diff(frame, 21, 252)
+
+
+CYCLE_SPECS = CYCLE_SPECS + (
+    IdeaSpec("upside_vol_252d", "risk.upside_vol_252d", _upside_vol_252, 252, "ratio", -1, "上行波动 252 日", "年度上行波动代表长期拥挤与回撤风险。", "risk-shape"),
+    IdeaSpec("ret_21_252", "momentum.ret_21_252", _ret_21_252, 252, "ratio", -1, "短长收益差 21/252", "月度相对年度收益偏离，反转候选。", "momentum-composite"),
+)

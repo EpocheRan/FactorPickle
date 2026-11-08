@@ -11,18 +11,18 @@ from .store import read_json, sha256_json, write_json_atomic
 def default_directive() -> dict[str, Any]:
     return {
         "schema_version": "factor_lab.directive.v1",
-        "theme": "phase-0 smoke: price/volume",
+        "theme": "aligned fixed pool: price/volume",
         "universe": "pool:2022-01-04:200",
         "horizon": 5,
         "groups": 5,
         "cost_bps": 20.0,
-        "start": "2019-01-01",
+        "start": "2022-01-04",
         "end": "2026-11-01",
         "max_trials_per_cycle": 4,
         "max_trials_per_day": 12,
         "avoid_families": [],
-        "family_id": "F-phase0-cycle",
-        "notes": "Phase 0 smoke cycle; 4 factors, quick profile, no human in the loop.",
+        "family_id": "F-aligned-pool",
+        "notes": "Fixed pool selected on 2022-01-04; evaluation starts on the same date to avoid look-ahead pool selection.",
         "updated_at": now_iso(),
     }
 
