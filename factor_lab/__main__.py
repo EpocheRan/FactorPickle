@@ -90,6 +90,13 @@ def main(argv: list[str] | None = None) -> int:
     runner_parser.add_argument("--robustness", action="store_true")
     runner_parser.add_argument("--no-audit", action="store_true")
 
+    discovery_parser = sub.add_parser("discovery", help="DSH Web Gateway query/ingest")
+    discovery_parser.add_argument("action", choices=["queries", "ingest"], nargs="?", default="queries")
+    discovery_parser.add_argument("--question", default="研究因子")
+    discovery_parser.add_argument("--constraints", default="")
+    discovery_parser.add_argument("--result", default="")
+    discovery_parser.add_argument("--brief", default=str(config.LAB_ROOT / "discovery" / "discovery_brief.json"))
+
     control_parser = sub.add_parser("control", help="show / pause / resume the lab")
     control_parser.add_argument("action", choices=["show", "pause", "resume", "stop"])
     control_parser.add_argument("--reason", default="")
@@ -359,6 +366,26 @@ def main(argv: list[str] | None = None) -> int:
                 auto_audit=not args.no_audit,
             )
         )
+        return 0
+
+    if args.command == "discovery":
+        from .discovery import DiscoveryBrief
+        from .web_gateway import parse_gateway_output, read_brief, seed_queries
+
+        if args.action == "queries":
+            brief = DiscoveryBrief(
+                research_question=args.question,
+                constraints=[item.strip() for item in args.constraints.split(",") if item.strip()],
+            )
+            _print({"brief": brief.to_dict(), "queries": seed_queries(brief)})
+        else:
+            if not args.result:
+                raise SystemExit("discovery ingest requires --result")
+            payload = read_json(Path(args.result))
+            if not isinstance(payload, dict):
+                raise SystemExit(f"invalid gateway result: {args.result}")
+            brief = read_brief(Path(args.brief))
+            _print(parse_gateway_output(payload.get("gateway") if isinstance(payload.get("gateway"), dict) else payload, brief))
         return 0
 
     if args.command == "control":

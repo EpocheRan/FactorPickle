@@ -8,6 +8,9 @@ Current role contracts:
 - `ml_planner.js`: non-Deep-Learning ML experiment spec.
 - `factor_builder.js`: emits factor code + spec + tests; Python
   `factor-build` writes it into the versioned Lab factor library.
+- `web_gateway.js`: no-tool LLM summarizer for raw DSH `web_search` results;
+  the DSH main session performs the search and this agent returns a cited
+  digest. Python `discovery ingest` writes the map.
 
 No-tool agents are deliberate: file/tool-using children have hung. The Python
 runtime owns data access, execution, gates, budget and reclamation.

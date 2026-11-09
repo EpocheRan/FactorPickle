@@ -144,9 +144,13 @@ def doctor(*, probe_data: bool = False) -> dict[str, Any]:
         add("disk", False, f"{type(exc).__name__}: {exc}")
     try:
         pol = budget.load_policy()
-        add("budget", True, pol.to_dict(), required=False)
+        flash = (pol.pricing or {}).get("deepseek-flash") or {}
+        priced = float(flash.get("input_rmb_per_mtok", 0) or 0) > 0 and float(
+            flash.get("output_rmb_per_mtok", 0) or 0
+        ) > 0
+        add("budget", priced, pol.to_dict(), required=True)
     except Exception as exc:  # noqa: BLE001
-        add("budget", False, f"{type(exc).__name__}: {exc}", required=False)
+        add("budget", False, f"{type(exc).__name__}: {exc}", required=True)
     required_ok = all(item["ok"] for item in checks if item["required"])
     return {
         "schema_version": "factor_lab.doctor.v1",

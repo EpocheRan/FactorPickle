@@ -19,6 +19,16 @@ python -m factor_lab campaign start --objective "研究因子"
 - ML Engine is non-Deep-Learning only.
 - Supervisor controls rounds, budget, readiness feedback, and safe agent reclamation.
 - Hard limits: ≤5 campaign rounds; ¥3,000/month LLM; 150GB Lab quota; human G4 for promotion.
+- LLM pricing: input ¥0.04 / 1M tokens, output ¥8.00 / 1M tokens.
+
+## Discovery
+
+```powershell
+python -m factor_lab discovery queries --question "研究问题"
+# DSH main session: web_search over the returned queries
+# DSH LLM Gateway: factor_lab/workflows/web_gateway.js with raw search results
+python -m factor_lab discovery ingest --result gateway_result.json
+```
 
 ## State
 

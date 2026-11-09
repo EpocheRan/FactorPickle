@@ -228,6 +228,7 @@ production research/factor-data packages:
 | `ml_engine.py` | Non-Deep-Learning walk-forward ML runtime + signal admission |
 | `campaign.py` | Bounded PathFinder ↔ ML campaign, rounds/traces/stop rules |
 | `discovery.py` | Gateway discovery brief/map contracts + offline fallback |
+| `web_gateway.py` | DSH LLM Gateway query generation / digest ingestion |
 | `history.py` | Append-only research memory, separate from ledger |
 | `budget.py` | ¥3,000/month, daily/cycle/campaign caps, 150GB Lab quota |
 | `agents.py` | Agent registry, safety-gated reclaim/archive |
@@ -247,7 +248,13 @@ python -m factor_lab ml run --dataset data.csv --spec ml_spec.json --out output/
 python -m factor_lab campaign start --objective "研究因子"
 python -m factor_lab campaign run --dataset data.csv --plan campaign_plan.json --objective "ml smoke"
 python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json
+python -m factor_lab discovery queries --question "研究问题"
+python -m factor_lab discovery ingest --result gateway_result.json
 ```
+
+Budget price: input `¥0.04 / 1M tokens`, output `¥8.00 / 1M tokens`.
+DSH main session performs web search; the no-tool `workflows/web_gateway.js`
+summarizes raw results into citations, then `discovery ingest` writes the map.
 
 Portability:
 

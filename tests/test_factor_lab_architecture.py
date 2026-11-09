@@ -16,6 +16,7 @@ from factor_lab.history import HistoryEntry, append as append_history, recent, s
 from factor_lab.ml_engine import MLExperimentSpec, run_experiment, signal_to_factor_decision
 from factor_lab.readiness import ReadinessBlocked, require_data
 from factor_lab.schemas import Hypothesis, OutcomeSpec
+from factor_lab.web_gateway import build_context, parse_gateway_output, seed_queries
 
 
 class FakeMarket:
@@ -97,9 +98,14 @@ def test_budget_daily_and_cycle_caps(tmp_path: Path, monkeypatch: pytest.MonkeyP
     policy = budget.ensure_policy()
     assert policy["monthly_rmb"] == 3000
     assert budget.load_policy().daily_spend_limit == 80.0
+    flash = budget.load_policy().pricing["deepseek-flash"]
+    assert flash["input_rmb_per_mtok"] == 0.04
+    assert flash["output_rmb_per_mtok"] == 8.0
     ok = budget.check_cycle()
     assert ok["ok"] is True
-    budget.record_usage(agent="test", tokens_in=100, tokens_out=50, cost_rmb=80.0, cycle=True)
+    priced = budget.record_usage(agent="test", tokens_in=1_000_000, tokens_out=1_000_000)
+    assert priced["cost_rmb"] == pytest.approx(8.04)
+    budget.record_usage(agent="test", cost_rmb=80.0, cycle=True)
     assert budget.check_cycle()["ok"] is False
 
 
@@ -223,6 +229,43 @@ def test_ml_plan_campaign_runs_and_stops(tmp_path: Path, monkeypatch: pytest.Mon
     assert result["rounds"] == 1
     assert result["stop_reason"] == "max_rounds"
     assert (tmp_path / "campaigns" / result["campaign_id"] / "campaign_summary.json").exists()
+
+
+def test_web_gateway_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from factor_lab.discovery import DiscoveryBrief
+    import factor_lab.web_gateway as gateway
+
+    brief = DiscoveryBrief(
+        research_question="overnight gap reversal",
+        constraints=["A-share"],
+        known_dead_ends=["turnover trend"],
+        max_queries=4,
+    )
+    queries = seed_queries(brief)
+    assert len(queries) == 4
+    assert all("overnight gap reversal" in query for query in queries)
+    context = build_context(brief, [{"title": "paper", "url": "https://example.com/a", "snippet": "x"}])
+    assert "https://example.com/a" in context
+    monkeypatch.setattr(gateway, "DIGEST_PATH", tmp_path / "web_digest.json")
+    monkeypatch.setattr(gateway, "write_map", lambda *args, **kwargs: tmp_path / "map.json")
+    written = gateway.parse_gateway_output(
+        {
+            "summary": "one lead",
+            "gaps": ["no intraday data"],
+            "leads": [
+                {
+                    "title": "gap reversal",
+                    "mechanism": "overnight liquidity shock",
+                    "confidence": 0.6,
+                    "tags": ["reversal"],
+                    "sources": [{"title": "paper", "url": "https://example.com/a"}],
+                }
+            ],
+        },
+        brief,
+    )
+    assert written["leads"][0]["mechanism"] == "overnight liquidity shock"
+    assert (tmp_path / "web_digest.json").exists()
 
 
 def test_factor_builder_writes_direct_code_into_lab_library(tmp_path: Path):

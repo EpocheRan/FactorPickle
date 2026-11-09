@@ -29,6 +29,23 @@ class BudgetExceeded(RuntimeError):
     pass
 
 
+DEFAULT_INPUT_RMB_PER_MTOK = 0.04
+DEFAULT_OUTPUT_RMB_PER_MTOK = 8.0
+
+
+def _default_pricing() -> dict[str, dict[str, float]]:
+    return {
+        "deepseek-flash": {
+            "input_rmb_per_mtok": float(
+                os.environ.get("FACTOR_LAB_INPUT_RMB_PER_MTOK", DEFAULT_INPUT_RMB_PER_MTOK)
+            ),
+            "output_rmb_per_mtok": float(
+                os.environ.get("FACTOR_LAB_OUTPUT_RMB_PER_MTOK", DEFAULT_OUTPUT_RMB_PER_MTOK)
+            ),
+        }
+    }
+
+
 @dataclass
 class BudgetPolicy:
     schema_version: str = "factor_lab.budget.v1"
@@ -43,14 +60,7 @@ class BudgetPolicy:
     panel_cache_cap_gb: float = 20.0
     archive_cap_gb: float = 30.0
     free_disk_floor_gb: float = 50.0
-    pricing: dict[str, float] = field(
-        default_factory=lambda: {
-            "deepseek-flash": {
-                "input_rmb_per_mtok": float(os.environ.get("FACTOR_LAB_INPUT_RMB_PER_MTOK", "0")),
-                "output_rmb_per_mtok": float(os.environ.get("FACTOR_LAB_OUTPUT_RMB_PER_MTOK", "0")),
-            }
-        }
-    )
+    pricing: dict[str, dict[str, float]] = field(default_factory=_default_pricing)
 
     @property
     def daily_spend_limit(self) -> float:
@@ -83,9 +93,23 @@ class BudgetPolicy:
 def ensure_policy() -> dict[str, Any]:
     current = read_json(POLICY_PATH)
     if isinstance(current, dict) and current.get("monthly_rmb"):
+        # migrate the earlier unpriced placeholder without changing user caps
+        pricing = current.get("pricing") or {}
+        flash = pricing.get("deepseek-flash") or {}
+        if not float(flash.get("input_rmb_per_mtok", 0) or 0) and not float(
+            flash.get("output_rmb_per_mtok", 0) or 0
+        ):
+            current["pricing"] = _default_pricing()
+            current["daily_spend_limit"] = round(
+                float(current.get("daily_rmb", 100.0)) * (1 - float(current.get("reserve_ratio", 0.2))),
+                2,
+            )
+            write_json_atomic(POLICY_PATH, current)
+            write_json_atomic(PRICING_PATH, _default_pricing())
         return current
     payload = BudgetPolicy().to_dict()
     write_json_atomic(POLICY_PATH, payload)
+    write_json_atomic(PRICING_PATH, payload["pricing"])
     return payload
 
 

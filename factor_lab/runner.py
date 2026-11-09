@@ -14,7 +14,7 @@ from typing import Any
 from . import config
 from .data_interface_adapter import DataInterfaceGateway
 from .schemas import Hypothesis
-from .store import write_json_atomic
+from .store import read_json, write_json_atomic
 
 
 class RunnerError(RuntimeError):
@@ -52,6 +52,7 @@ class FactorRunner:
         experiment_dir = Path(str(result.get("experiment_dir") or ""))
         manifest_path = experiment_dir / "data_manifest.json"
         if experiment_dir.exists():
+            experiment_manifest = read_json(experiment_dir / "manifest.json") or {}
             write_json_atomic(
                 manifest_path,
                 {
@@ -65,7 +66,13 @@ class FactorRunner:
                     "universe": hypothesis.outcomes[0].universe if hypothesis.outcomes else "",
                     "experiment_id": result.get("exp_id"),
                     "run_id": result.get("run_id"),
-                    "note": "Runner preflight + research report path; no direct DB import in factor_lab.runner.",
+                    "data_version": experiment_manifest.get("data_version"),
+                    "report_meta": experiment_manifest.get("report_meta"),
+                    "note": (
+                        "Runner preflight is data_interface-only. The legacy research.report "
+                        "panel loader still executes behind ResearchReportAdapter; field-level "
+                        "lineage is in the experiment manifest/report_meta."
+                    ),
                 },
             )
         result["data_manifest"] = str(manifest_path)
