@@ -248,7 +248,6 @@
 
   /* ---------- sections ---------- */
   .section{padding:76px 0 10px}
-  .section#architecture{scroll-margin-top:96px}
   .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:24px}
   .sec-title{font-size:clamp(24px,2.6vw,32px);margin:0;letter-spacing:-.025em;font-weight:600}
   .sec-desc{color:var(--muted);font-size:13.5px;margin:7px 0 0;max-width:760px}
@@ -749,15 +748,79 @@
     </div>
 
     <div class="wrap">
-      <div class="section" id="architecture" style="padding-top:54px">
+
+
+            <div class="section" id="features">
         <div class="sec-head">
           <div>
-            <h2 class="sec-title">系统架构与数据流</h2>
-            <p class="sec-desc">自上而下：数据源 → 采集编排 → 数据访问 → 统一存储 → 计算/应用 → 工具出口。虚线表示事件、派生或无强耦合的读取。</p>
+            <h2 class="sec-title">为什么是 FactorPickle</h2>
+            <p class="sec-desc">不是又一个数据管道：把「研究结论可复现」写进模块边界、因子资产与报告口径。</p>
           </div>
-          <span class="sec-tag">ARCHITECTURE / SYSTEM MAP</span>
+          <span class="sec-tag">WHY FACTORPICKLE</span>
         </div>
 
+        <div class="why-grid">
+          <article class="why-card">
+            <div class="why-card-art" data-art="0"></div>
+            <div class="why-card-body">
+              <div class="why-card-meta">01 / PIPELINE</div>
+              <h3>一条链路，四层边界</h3>
+              <p>采集、数据访问、因子计算与应用分层；单向依赖让每层可以独立替换与测试。</p>
+            </div>
+          </article>
+          <article class="why-card">
+            <div class="why-card-art" data-art="1"></div>
+            <div class="why-card-body">
+              <div class="why-card-meta">02 / FACTOR</div>
+              <h3>因子是资产，不是脚本</h3>
+              <p>声明式 FactorDef → registry → 长表 / latest；方向、单位、版本与依赖全部可追溯。</p>
+            </div>
+          </article>
+          <article class="why-card">
+            <div class="why-card-art" data-art="2"></div>
+            <div class="why-card-body">
+              <div class="why-card-meta">03 / RESEARCH</div>
+              <h3>报告经得起复核</h3>
+              <p>profile 章节、分层 IC（流动性/市值/行业）、五维评分、ALL/EX_BSE/INVESTABLE/HIGH_LIQ 样本敏感性、分月 IC 与失效归因；HTML 报告与评分逻辑同源，Panel 缓存可复用。</p>
+            </div>
+          </article>
+          <article class="why-card">
+            <div class="why-card-art" data-art="3"></div>
+            <div class="why-card-body">
+              <div class="why-card-meta">04 / BACKTEST</div>
+              <h3>A 股规则内置</h3>
+              <p>T+1、整手、涨跌停、停牌、佣金与印花税；单标的与横截面共用一套账本。</p>
+            </div>
+          </article>
+          <article class="why-card">
+            <div class="why-card-art" data-art="4"></div>
+            <div class="why-card-body">
+              <div class="why-card-meta">05 / MCP</div>
+              <h3>MCP 原生</h3>
+              <p>行情、财务、因子、选股、持仓与同步统一暴露为工具，AI Agent 可直接调用。</p>
+            </div>
+          </article>
+          <article class="why-card">
+            <div class="why-card-art" data-art="5"></div>
+            <div class="why-card-body">
+              <div class="why-card-meta">06 / REPRODUCIBLE</div>
+              <h3>可复现的运行</h3>
+              <p>run_id 固化策略、参数、数据快照与执行规则；同输入可重跑，结论可对照。</p>
+            </div>
+          </article>
+        </div>
+      </div>
+</section>
+
+  <!-- ============ ARCHITECTURE ============ -->
+  <section class="view" id="view-architecture">
+    <div class="wrap">
+      <div class="hero" style="padding:46px 0 10px">
+        <div class="kicker">Architecture · System Map</div>
+        <h1 style="font-size:clamp(28px,3.4vw,40px)">系统架构与数据流</h1>
+        <p class="lede">自上而下：数据源 → 采集编排 → 数据访问 → 统一存储 → 计算/应用 → 工具出口。虚线表示事件、派生或无强耦合的读取。</p>
+      </div>
+      <div class="section" style="padding-top:16px">
         <div class="arch-shell">
           <svg viewBox="0 -16 1240 830" role="img" aria-label="FactorPickle 分层架构图">
             <defs>
@@ -925,68 +988,8 @@
           </div>
         </div>
       </div>
-
-            <div class="section" id="features">
-        <div class="sec-head">
-          <div>
-            <h2 class="sec-title">为什么是 FactorPickle</h2>
-            <p class="sec-desc">不是又一个数据管道：把「研究结论可复现」写进模块边界、因子资产与报告口径。</p>
-          </div>
-          <span class="sec-tag">WHY FACTORPICKLE</span>
-        </div>
-
-        <div class="why-grid">
-          <article class="why-card">
-            <div class="why-card-art" data-art="0"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">01 / PIPELINE</div>
-              <h3>一条链路，四层边界</h3>
-              <p>采集、数据访问、因子计算与应用分层；单向依赖让每层可以独立替换与测试。</p>
-            </div>
-          </article>
-          <article class="why-card">
-            <div class="why-card-art" data-art="1"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">02 / FACTOR</div>
-              <h3>因子是资产，不是脚本</h3>
-              <p>声明式 FactorDef → registry → 长表 / latest；方向、单位、版本与依赖全部可追溯。</p>
-            </div>
-          </article>
-          <article class="why-card">
-            <div class="why-card-art" data-art="2"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">03 / RESEARCH</div>
-              <h3>报告经得起复核</h3>
-              <p>profile 章节、分层 IC（流动性/市值/行业）、五维评分、ALL/EX_BSE/INVESTABLE/HIGH_LIQ 样本敏感性、分月 IC 与失效归因；HTML 报告与评分逻辑同源，Panel 缓存可复用。</p>
-            </div>
-          </article>
-          <article class="why-card">
-            <div class="why-card-art" data-art="3"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">04 / BACKTEST</div>
-              <h3>A 股规则内置</h3>
-              <p>T+1、整手、涨跌停、停牌、佣金与印花税；单标的与横截面共用一套账本。</p>
-            </div>
-          </article>
-          <article class="why-card">
-            <div class="why-card-art" data-art="4"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">05 / MCP</div>
-              <h3>MCP 原生</h3>
-              <p>行情、财务、因子、选股、持仓与同步统一暴露为工具，AI Agent 可直接调用。</p>
-            </div>
-          </article>
-          <article class="why-card">
-            <div class="why-card-art" data-art="5"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">06 / REPRODUCIBLE</div>
-              <h3>可复现的运行</h3>
-              <p>run_id 固化策略、参数、数据快照与执行规则；同输入可重跑，结论可对照。</p>
-            </div>
-          </article>
-        </div>
-      </div>
-</section>
+    </div>
+  </section>
 
   <!-- ============ MODULES ============ -->
   <section class="view" id="view-modules">
@@ -2439,9 +2442,9 @@ if (exploreNav) {
     const target = btn.dataset.subnav;
     closeExplore();
     if (target === 'architecture') {
-      switchView('overview');
       history.replaceState(null, '', '#architecture');
-      setTimeout(() => document.getElementById('architecture')?.scrollIntoView({behavior: 'smooth', block: 'start'}), 80);
+      switchView('architecture');
+      window.scrollTo({top: 0, behavior: 'smooth'});
     } else if (target === 'modules') {
       history.replaceState(null, '', '#modules');
       switchView('modules');
@@ -2479,12 +2482,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(
 function routeFromHash() {
   const raw = location.hash.replace(/^#\/?/, '');
   const [view, table] = raw.split('/');
-  if (view === 'architecture') {
-    switchView('overview');
-    setTimeout(() => document.getElementById('architecture')?.scrollIntoView({behavior: 'smooth', block: 'start'}), 160);
-    return;
-  }
-  if (['overview', 'modules', 'model'].includes(view)) switchView(view);
+  if (['overview', 'architecture', 'modules', 'model'].includes(view)) switchView(view);
   if (table) setTimeout(() => goTable(table), 160);
 }
 window.addEventListener('hashchange', routeFromHash);
