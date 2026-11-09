@@ -1088,10 +1088,10 @@
             <span class="start-term-title mono">factorpickle / deploy</span>
             <button class="start-copy mono" id="copyStart" type="button">复制</button>
           </div>
-          <pre class="start-code" id="startCode"><code><span class="prompt">$</span> git pull
+          <pre class="start-code" id="startCode"><code><span class="prompt">$</span> git pull https://github.com/EpocheRan/FactorPickle.git
 <span class="prompt">$</span> docker compose up -d</code></pre>
         </div>
-        <p class="start-note mono">首次运行前请先准备 config.json</p>
+        <p class="start-note mono">在仓库目录执行 · 首次运行前请先准备 config.json</p>
         <div class="start-links">
           <a href="https://github.com/EpocheRan/FactorPickle" target="_blank" rel="noopener">GitHub 仓库 <span>↗</span></a>
           <a href="https://github.com/EpocheRan/FactorPickle#readme" target="_blank" rel="noopener">部署文档 <span>↗</span></a>
@@ -3030,7 +3030,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(
 const copyStart = $('#copyStart');
 if (copyStart) {
   copyStart.addEventListener('click', async () => {
-    const text = 'git pull\ndocker compose up -d';
+    const text = 'git pull https://github.com/EpocheRan/FactorPickle.git\ndocker compose up -d';
     const done = () => {
       copyStart.textContent = '已复制';
       setTimeout(() => { copyStart.textContent = '复制'; }, 1600);
