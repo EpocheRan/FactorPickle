@@ -72,10 +72,13 @@ def main(argv: list[str] | None = None) -> int:
     build_parser.add_argument("--run-tests", action="store_true")
 
     ml_parser = sub.add_parser("ml", help="non-DL ML engine")
-    ml_parser.add_argument("action", choices=["run"], nargs="?", default="run")
-    ml_parser.add_argument("--dataset", required=True)
-    ml_parser.add_argument("--spec", required=True)
+    ml_parser.add_argument("action", choices=["run", "data"], nargs="?", default="run")
+    ml_parser.add_argument("--dataset", required=False)
+    ml_parser.add_argument("--spec", required=False)
     ml_parser.add_argument("--out", default="output/factor_lab/ml")
+    ml_parser.add_argument("--codes", default="")
+    ml_parser.add_argument("--start", default="2022-01-04")
+    ml_parser.add_argument("--end", default="2026-11-01")
 
     campaign_parser = sub.add_parser("campaign", help="multi-round campaign")
     campaign_parser.add_argument("action", choices=["start", "status", "run"], nargs="?", default="start")
@@ -89,8 +92,9 @@ def main(argv: list[str] | None = None) -> int:
     runner_parser.add_argument("--profile", default="quick")
     runner_parser.add_argument("--robustness", action="store_true")
     runner_parser.add_argument("--no-audit", action="store_true")
-    runner_parser.add_argument("--data-bundle", action="store_true", help="Runner builds a Panel from data_interface")
-    runner_parser.add_argument("--codes", default="", help="comma-separated codes for --data-bundle")
+    runner_parser.add_argument("--data-bundle", action="store_true", help="(compatibility) use Runner-owned panel")
+    runner_parser.add_argument("--legacy-panel", action="store_true", help="use legacy research panel path")
+    runner_parser.add_argument("--codes", default="", help="comma-separated codes for Runner data bundle")
 
     discovery_parser = sub.add_parser("discovery", help="DSH Web Gateway query/ingest")
     discovery_parser.add_argument("action", choices=["queries", "ingest"], nargs="?", default="queries")
@@ -291,10 +295,26 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "ml":
-        from .ml_engine import MLExperimentSpec, run_experiment
+        from .ml_engine import MLExperimentSpec, load_dataset, run_experiment
 
         import pandas as pd
 
+        if args.action == "data":
+            codes = [item.strip() for item in args.codes.split(",") if item.strip()]
+            if not codes:
+                raise SystemExit("ml data requires --codes")
+            from .data_interface_adapter import DataInterfaceGateway
+
+            frame, manifest = load_dataset(DataInterfaceGateway(), codes, args.start, args.end)
+            out_dir = Path(args.out)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            frame.to_csv(out_dir / "ml_dataset.csv", index=False)
+            write_json_atomic(out_dir / "ml_data_manifest.json", manifest)
+            _print({"out": str(out_dir), "rows": len(frame), "columns": list(frame.columns)})
+            return 0
+
+        if not args.dataset or not args.spec:
+            raise SystemExit("ml run requires --dataset and --spec")
         dataset = pd.read_csv(args.dataset)
         spec_payload = read_json(Path(args.spec))
         if not isinstance(spec_payload, dict):
@@ -362,18 +382,18 @@ def main(argv: list[str] | None = None) -> int:
 
         hypothesis = Hypothesis.from_dict(raw)
         runner = FactorRunner()
-        built = None
         codes = [item.strip() for item in args.codes.split(",") if item.strip()]
-        if args.data_bundle and codes:
-            built = runner.build_panel(codes, hypothesis.start, hypothesis.end or "2026-11-01")
+        use_data_bundle = not args.legacy_panel
+        if use_data_bundle and not codes:
+            raise SystemExit("runner data path requires --codes (or use --legacy-panel)")
         _print(
             runner.run(
                 hypothesis,
                 profile=args.profile,
                 robustness=args.robustness,
                 auto_audit=not args.no_audit,
-                built_panel=built,
-                use_data_bundle=bool(args.data_bundle and built is None),
+                use_data_bundle=use_data_bundle,
+                codes=codes or None,
             )
         )
         return 0

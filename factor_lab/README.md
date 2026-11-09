@@ -209,16 +209,17 @@ panels and the peer residual matrix are intentionally excluded.
 - Scout/Director/PathFinder/Gateway/ML Planner/FactorBuilder are tool-capable
   DSH subagents (tools inherited from preset/parent composition); the Python
   runtime still owns data access, execution, gates and budget.
-- Runner data preflight goes through `data_interface`; `panel_builder.py` can
-  build a Runner-owned price panel or copy the data-construction part of
-  research's `_resolve_panel`, then pass `panel=` into the Research Adapter.
-  The legacy `research.report` loader remains the default path for ordinary
-  factor tests, so existing tests are unchanged.
-- `panel_builder.build_panel_like_research` copies data acquisition/extras/peer
-  assembly only; factor calculation remains in the Research Module.
-- FactorBuilder artifacts **must carry `factor_id`** (plus version/code hash);
-  Runner validates it matches the hypothesis and records it in
-  `data_manifest.json` as `factor_artifact`.
+- Runner data preflight goes through `data_interface`; `panel_builder.py`
+  builds Runner-owned Panels from `DataInterfaceGateway` bundles and passes
+  `panel=` into the Research Adapter.
+- `panel_builder.build_factor_panel` routes by factor category:
+  - price → market bundle
+  - sentiment → market + flow bundle
+  - quality/value → explicit DataGap until a materialized financial bundle exists
+- `--legacy-panel` keeps the research `_resolve_panel` path for parity/debugging.
+- FactorBuilder artifacts **must carry `factor_id`** (plus category/version/
+  data_contract/code hash); Runner validates it matches the hypothesis and
+  records it in `data_manifest.json` as `factor_artifact`.
 - Vectorized factor evaluation still uses `research.report` / `research.report.metrics`.
 - `rho_return` is still pending; G0.5 is exposure-only.
 - Multi-trial BH is still a batch step; current q is Bonferroni fallback.
@@ -258,11 +259,11 @@ python -m factor_lab agents status
 python -m factor_lab library list
 python -m factor_lab factor-build --family demo --factor-id demo.mom --code factor.py --spec spec.json --tests test_factor.py
 python -m factor_lab ml run --dataset data.csv --spec ml_spec.json --out output/factor_lab/ml/demo
+python -m factor_lab ml data --codes 600000,000001 --start 2022-01-04 --end 2026-11-01 --out output/factor_lab/ml/data
 python -m factor_lab campaign start --objective "研究因子"
 python -m factor_lab campaign run --dataset data.csv --plan campaign_plan.json --objective "ml smoke"
-python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json
-python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json --data-bundle
-python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json --data-bundle --codes 600000,000001
+python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json --codes 600000,000001
+python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json --legacy-panel
 python -m factor_lab discovery queries --question "研究问题"
 python -m factor_lab discovery ingest --result gateway_result.json
 ```

@@ -63,6 +63,26 @@ def _frame_hash(frames: dict[str, pd.DataFrame]) -> str:
     return digest.hexdigest()
 
 
+@dataclass
+class DataBundle:
+    """Typed data payload shared by PanelBuilder and ML Engine."""
+
+    kind: str
+    frames: dict[str, pd.DataFrame] = field(default_factory=dict)
+    frame: pd.DataFrame | None = None
+    fields: list[str] = field(default_factory=list)
+    manifest: DataManifest = field(default_factory=DataManifest)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "frames": sorted(self.frames),
+            "rows": int(len(self.frame)) if self.frame is not None else 0,
+            "fields": list(self.fields),
+            "manifest": self.manifest.to_dict(),
+        }
+
+
 class DataInterfaceGateway:
     """Thin, testable gateway over data_interface's public runtime services."""
 
@@ -185,6 +205,130 @@ class DataInterfaceGateway:
             data_hash=_frame_hash(frames),
         )
         return frames, manifest
+
+    def market_bundle(
+        self,
+        codes: str | list[str],
+        start: str,
+        end: str,
+        *,
+        warmup_days: int = 800,
+        adjust: str = "hfq",
+    ) -> DataBundle:
+        fetch_start = (
+            pd.Timestamp(start) - pd.Timedelta(days=int(warmup_days))
+        ).date().isoformat()
+        frames, manifest = self.ohlc(codes, fetch_start, end, adjust=adjust)
+        return DataBundle(
+            kind="market",
+            frames=frames,
+            fields=list(manifest.fields),
+            manifest=manifest,
+        )
+
+    def flow_bundle(
+        self,
+        codes: list[str],
+        start: str,
+        end: str,
+    ) -> DataBundle:
+        """Best-effort moneyflow bundle through data_interface.
+
+        Margin data is not exposed by this service in the current environment;
+        callers get only columns that exist. Missing required columns become a
+        DataGap in PanelBuilder rather than a silent fallback.
+        """
+
+        service = self._get("moneyflow")
+        if not hasattr(service, "get_by_code"):
+            raise DataGap("moneyflow service does not expose get_by_code")
+        by_column: dict[str, dict[str, pd.Series]] = {}
+        rows = 0
+        for code in codes:
+            try:
+                raw = service.get_by_code(str(code), start, end)
+            except Exception as exc:  # noqa: BLE001
+                raise DataInterfaceUnavailable(
+                    f"moneyflow.get_by_code({code}) failed: {type(exc).__name__}: {exc}"
+                ) from exc
+            if not isinstance(raw, pd.DataFrame) or raw.empty:
+                continue
+            frame = raw.copy()
+            ts_col = "ts" if "ts" in frame.columns else ("date" if "date" in frame.columns else None)
+            if ts_col:
+                frame[ts_col] = pd.to_datetime(frame[ts_col], errors="coerce").dt.tz_localize(None)
+                frame = frame.set_index(ts_col)
+            frame.index = pd.to_datetime(frame.index, errors="coerce").tz_localize(None)
+            frame = frame[~frame.index.isna()]
+            for column in frame.columns:
+                name = str(column).lower()
+                if name in {"code", "symbol"}:
+                    continue
+                values = pd.to_numeric(frame[column], errors="coerce")
+                if values.notna().any():
+                    by_column.setdefault(name, {})[str(code)] = values
+                    rows += int(values.notna().sum())
+        if not by_column:
+            raise DataGap(f"moneyflow returned no usable fields for {codes} {start}..{end}")
+        extras = {
+            name: pd.DataFrame(series).sort_index()
+            for name, series in by_column.items()
+        }
+        manifest = DataManifest(
+            services=["moneyflow"],
+            fields=sorted(extras),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=rows,
+            data_hash=_frame_hash(extras),
+        )
+        return DataBundle(kind="flow", frames=extras, fields=sorted(extras), manifest=manifest)
+
+    def ml_frame(
+        self,
+        codes: list[str],
+        start: str,
+        end: str,
+        *,
+        fields: list[str] | None = None,
+        warmup_days: int = 800,
+    ) -> DataBundle:
+        """Long-form market frame for non-DL ML Engine experiments."""
+
+        bundle = self.market_bundle(codes, start, end, warmup_days=warmup_days)
+        wanted = fields or ["open", "high", "low", "close", "volume", "amount"]
+        rows: list[pd.DataFrame] = []
+        for code, raw in bundle.frames.items():
+            frame = raw.copy()
+            ts_col = "ts" if "ts" in frame.columns else ("date" if "date" in frame.columns else None)
+            if ts_col:
+                frame[ts_col] = pd.to_datetime(frame[ts_col], errors="coerce").dt.tz_localize(None)
+                frame = frame.set_index(ts_col)
+            frame.index = pd.to_datetime(frame.index, errors="coerce").tz_localize(None)
+            frame = frame[~frame.index.isna()]
+            frame.columns = [str(column).lower() for column in frame.columns]
+            keep = [field for field in wanted if field in frame.columns]
+            if not keep:
+                continue
+            item = frame[keep].copy()
+            item["date"] = item.index
+            item["asset"] = str(code)
+            rows.append(item.reset_index(drop=True))
+        if not rows:
+            raise DataGap(f"market bundle has none of the requested ML fields: {wanted}")
+        long = pd.concat(rows, ignore_index=True)
+        manifest = DataManifest(
+            services=["market"],
+            fields=list(wanted),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=int(len(long)),
+            data_hash=_frame_hash({"ml": long.set_index("date") if "date" in long else long}),
+        )
+        return DataBundle(kind="ml", frame=long, fields=list(wanted), manifest=manifest)
+
 
     def financial(self, code: str, *args: Any, **kwargs: Any) -> Any:
         """Delegate to FinancialDataService; no SQL in Factor Lab."""

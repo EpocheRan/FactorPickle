@@ -14,7 +14,7 @@ from factor_lab.factor_library import FactorLibrary, FactorLibraryError
 from factor_lab.factor_builder import build as build_factor
 from factor_lab.history import HistoryEntry, append as append_history, recent, search
 from factor_lab.ml_engine import MLExperimentSpec, run_experiment, signal_to_factor_decision
-from factor_lab.panel_builder import build_panel_like_research, build_price_panel
+from factor_lab.panel_builder import build_factor_panel
 from factor_lab.readiness import ReadinessBlocked, require_data
 from factor_lab.schemas import Hypothesis, OutcomeSpec
 from factor_lab.web_gateway import build_context, parse_gateway_output, seed_queries
@@ -85,6 +85,9 @@ def test_factor_library_immutable_versions(tmp_path: Path):
     spec = {"window": 1, "unit": "ratio", "data_contract": {"fields": ["close"]}}
     version = lib.write_version(family="test", factor_id="test.simple", version="v1", code=code, spec=spec)
     assert version.code_hash
+    assert version.category == "test"
+    assert version.artifact()["factor_id"] == "test.simple"
+    assert version.artifact()["category"] == "test"
     loaded = lib.load("test.simple", "v1")
     assert loaded.fn is not None
     assert loaded.window == 1
@@ -121,6 +124,16 @@ def _ml_dataset(periods: int = 90, assets: int = 18) -> pd.DataFrame:
         for idx in range(assets):
             rows.append({"date": date, "asset": f"S{idx:02d}", "x": x[idx], "z": rng.normal(), "y": y[idx]})
     return pd.DataFrame(rows)
+
+
+def test_ml_engine_loads_data_only_through_gateway():
+    from factor_lab.ml_engine import load_dataset
+
+    gateway = DataInterfaceGateway(market_loader_factory=FakeMarket)
+    frame, manifest = load_dataset(gateway, ["600000", "000001"], "2024-01-02", "2024-01-05", fields=["close", "amount"])
+    assert {"date", "asset", "close", "amount"}.issubset(frame.columns)
+    assert len(frame) == 6
+    assert manifest["source"] == "data_interface"
 
 
 def test_ml_engine_walk_forward_and_non_dl():
@@ -241,52 +254,79 @@ def test_workflows_do_not_forbid_inherited_tools():
         assert "Do not use tools" not in text, path.name
 
 
-def test_panel_builder_matches_research_data_construction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    import factor_lab.panel_builder as pb
-    import research.report.panel_adapter as panel_adapter
-    import research.report.panel as panel_mod
+def test_panel_builder_routes_factor_categories():
+    class FlowService:
+        def get_by_code(self, code, start, end):
+            dates = pd.bdate_range("2024-01-01", periods=3)
+            return pd.DataFrame({"ts": dates, "code": code, "net_mf_amount": [1.0, 2.0, 3.0]})
 
-    dates = pd.bdate_range("2022-01-03", periods=30)
-    close = pd.DataFrame({"A": np.arange(30.0) + 10, "B": np.arange(30.0) + 20}, index=dates)
-    panel = Panel(
-        close=close,
-        open=close,
-        market_cap=None,
-        industry=None,
-        regime=None,
-        symbols=["A", "B"],
-        freshness={"data_version": "test-v1"},
-        eval_start=pd.Timestamp("2022-01-03"),
+    gateway = DataInterfaceGateway(
+        market_loader_factory=FakeMarket,
+        moneyflow_factory=FlowService,
     )
-    seen = {}
-
-    def fake_load_panel(pool_date, pool_size, start, end, **kwargs):
-        seen["kwargs"] = kwargs
-        return panel
-
-    monkeypatch.setattr(panel_adapter, "load_panel", fake_load_panel)
-    monkeypatch.setattr(panel_mod, "peer_panels", lambda *args, **kwargs: None)
-    built = pb.build_panel_like_research(
-        "sentiment.test",
-        pool_date="2022-01-03",
-        pool_size=50,
-        start="2022-01-03",
-        end="2022-02-01",
-        universe="pool:2022-01-03:50",
+    price = build_factor_panel(
+        gateway,
+        {"factor_id": "momentum.test", "category": "price"},
+        ["600000", "000001"],
+        "2024-01-02",
+        "2024-01-05",
+        warmup_days=10,
     )
-    assert seen["kwargs"]["extras"] == ("margin_detail", "moneyflow_daily", "fin_valuation_daily")
-    assert built.panel is panel
-    assert built.manifest.data_hash
-    assert built.manifest.source.startswith("research.report.panel_adapter")
+    assert price.category == "price"
+    assert price.panel.extras is None
+    sentiment = build_factor_panel(
+        gateway,
+        {"factor_id": "sentiment.test", "category": "sentiment"},
+        ["600000"],
+        "2024-01-02",
+        "2024-01-05",
+        warmup_days=10,
+    )
+    assert sentiment.category == "sentiment"
+    assert "net_mf_amount" in (sentiment.panel.extras or {})
+    with pytest.raises(Exception):
+        build_factor_panel(
+            gateway,
+            {"factor_id": "quality.test", "category": "quality"},
+            ["600000"],
+            "2024-01-02",
+            "2024-01-05",
+        )
+
+
+def test_panel_builder_price_matches_raw_data_interface_frames():
+    gateway = DataInterfaceGateway(market_loader_factory=FakeMarket)
+    built = build_factor_panel(
+        gateway,
+        {"factor_id": "price.test", "category": "price"},
+        ["600000", "000001"],
+        "2024-01-02",
+        "2024-01-05",
+        warmup_days=10,
+    )
+    raw = FakeMarket().ohlc(["600000", "000001"], "2023-12-23", "2024-01-05")
+    for code in ("600000", "000001"):
+        for field in ("close", "open", "high", "amount"):
+            expected = raw[code][field]
+            actual = getattr(built.panel, field).loc[expected.index, code]
+            assert list(actual.index) == list(expected.index)
+            np.testing.assert_allclose(actual.to_numpy(), expected.to_numpy())
 
 
 def test_panel_builder_from_data_interface():
     gateway = DataInterfaceGateway(market_loader_factory=FakeMarket)
-    built = build_price_panel(gateway, ["600000", "000001"], "2024-01-02", "2024-01-05", warmup_days=10)
+    built = build_factor_panel(
+        gateway,
+        {"factor_id": "price.test", "category": "price"},
+        ["600000", "000001"],
+        "2024-01-02",
+        "2024-01-05",
+        warmup_days=10,
+    )
     assert built.panel.close.shape[1] == 2
     assert list(built.panel.symbols) == ["600000", "000001"]
     assert built.panel.eval_start is not None
-    assert built.manifest.source == "data_interface"
+    assert built.manifest.source == "DataInterfaceGateway"
     assert built.manifest.data_hash
 
 
@@ -353,6 +393,40 @@ def test_readiness_writes_blocker_when_data_interface_missing(tmp_path: Path, mo
     assert payload["blocked_by"] == "data_interface"
 
 
+def test_runner_default_data_bundle_uses_gateway(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from factor_lab import runner as runner_mod
+
+    class Gateway(DataInterfaceGateway):
+        def status(self):
+            return {"available": True, "services": ["market"]}
+
+    experiment_dir = tmp_path / "E-2"
+    experiment_dir.mkdir()
+
+    def fake_run_experiment(hypothesis, **kwargs):
+        assert kwargs["panel"] is not None
+        return {"exp_id": "E-2", "run_id": "R-2", "experiment_dir": str(experiment_dir)}
+
+    monkeypatch.setattr("factor_lab.run.run_experiment", fake_run_experiment)
+    hypothesis = Hypothesis(
+        hypothesis_id="H-2",
+        factor_id="momentum.ret_21d",
+        title="test",
+        mechanism="test",
+        expected_sign=1,
+        outcomes=[OutcomeSpec(universe="all_a")],
+    )
+    result = runner_mod.FactorRunner(gateway=Gateway(market_loader_factory=FakeMarket)).run(
+        hypothesis,
+        codes=["600000", "000001"],
+        use_data_bundle=True,
+    )
+    manifest = json.loads((experiment_dir / "data_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["data_path"] == "runner_panel"
+    assert manifest["factor_id"] == "momentum.ret_21d"
+    assert result["data_manifest"].endswith("data_manifest.json")
+
+
 def test_runner_writes_data_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from factor_lab import runner
 
@@ -378,6 +452,7 @@ def test_runner_writes_data_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyP
     result = runner.FactorRunner(gateway=Gateway()).run(
         hypothesis,
         factor_artifact={"factor_id": "test.factor", "version": "v1", "code_hash": "abc"},
+        use_data_bundle=False,
     )
     manifest = json.loads((experiment_dir / "data_manifest.json").read_text(encoding="utf-8"))
     assert result["data_manifest"].endswith("data_manifest.json")
@@ -388,4 +463,5 @@ def test_runner_writes_data_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyP
         runner.FactorRunner(gateway=Gateway()).run(
             hypothesis,
             factor_artifact={"factor_id": "other.factor", "version": "v1"},
+            use_data_bundle=False,
         )

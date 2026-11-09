@@ -30,15 +30,20 @@ def build(
     run_tests: bool = False,
 ) -> FactorVersion:
     lib = library or FactorLibrary()
+    spec_payload = dict(spec)
+    spec_payload.setdefault("factor_id", factor_id)
+    spec_payload.setdefault("family", family)
+    spec_payload.setdefault("category", factor_id.split(".", 1)[0] if "." in factor_id else "price")
+    spec_payload.setdefault("data_contract", {})
     try:
         result = lib.write_version(
             family=family,
             factor_id=factor_id,
             version=version,
             code=code,
-            spec=spec,
+            spec=spec_payload,
             tests=tests,
-            data_contract=dict(spec.get("data_contract") or {}),
+            data_contract=dict(spec_payload.get("data_contract") or {}),
             parent_version=parent_version,
         )
     except FactorLibraryError as exc:

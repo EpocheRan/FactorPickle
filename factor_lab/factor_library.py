@@ -52,6 +52,23 @@ class FactorVersion:
     def unit(self) -> str:
         return str(self.spec.get("unit", "ratio"))
 
+    @property
+    def category(self) -> str:
+        return str(self.spec.get("category") or self.factor_id.split(".", 1)[0])
+
+    def artifact(self) -> dict[str, Any]:
+        """Minimal artifact contract consumed by Runner/PanelBuilder."""
+
+        return {
+            "factor_id": self.factor_id,
+            "family": self.family,
+            "version": self.version,
+            "code_hash": self.code_hash,
+            "category": self.category,
+            "spec": dict(self.spec),
+            "data_contract": dict(self.spec.get("data_contract") or {}),
+        }
+
 
 def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -111,8 +128,11 @@ class FactorLibrary:
         spec_payload.setdefault("factor_id", factor_id)
         spec_payload.setdefault("family", family)
         spec_payload.setdefault("version", version)
+        spec_payload.setdefault("category", factor_id.split(".", 1)[0] if "." in factor_id else "price")
         if data_contract:
             spec_payload["data_contract"] = dict(data_contract)
+        elif not isinstance(spec_payload.get("data_contract"), dict):
+            spec_payload["data_contract"] = {}
         code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
         manifest = {
             "schema_version": "factor_lab.factor_manifest.v1",

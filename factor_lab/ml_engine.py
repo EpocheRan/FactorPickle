@@ -132,6 +132,40 @@ def _make_model(spec: MLExperimentSpec) -> Any:
     raise MLExperimentError(f"model not implemented: {spec.model}")
 
 
+def load_dataset(
+    gateway: Any,
+    codes: list[str],
+    start: str,
+    end: str,
+    *,
+    fields: list[str] | None = None,
+    warmup_days: int = 800,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Load a long-form ML frame through DataInterfaceGateway.
+
+    The returned frame has ``date`` and ``asset`` columns plus market fields.
+    The ML planner/runtime adds labels/features; this function never opens a DB.
+    """
+
+    bundle = gateway.ml_frame(codes, start, end, fields=fields, warmup_days=warmup_days)
+    frame = bundle.frame
+    if frame is None or frame.empty:
+        raise MLExperimentError("DataInterfaceGateway.ml_frame returned no rows")
+    return frame, bundle.manifest.to_dict()
+
+    values = None
+    if hasattr(model, "feature_importances_"):
+        values = np.asarray(model.feature_importances_, dtype=float)
+    elif hasattr(model, "coef_"):
+        values = np.abs(np.asarray(model.coef_, dtype=float)).ravel()
+    if values is None or len(values) != len(features):
+        return {}
+    total = float(np.nansum(values))
+    if total <= 0:
+        return {name: 0.0 for name in features}
+    return {name: round(float(value / total), 6) for name, value in zip(features, values)}
+
+
 def _feature_importance(model: Any, features: list[str]) -> dict[str, float]:
     values = None
     if hasattr(model, "feature_importances_"):
