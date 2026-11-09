@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
+import hashlib
 
 import pandas as pd
 
@@ -58,6 +59,78 @@ def _wide(frames: dict[str, pd.DataFrame], field: str) -> pd.DataFrame | None:
     if not series:
         return None
     return pd.DataFrame(series).sort_index()
+
+
+def build_panel_like_research(
+    factor_id: str,
+    *,
+    pool_date: str | None = None,
+    pool_size: int = 200,
+    start: str,
+    end: str | None,
+    universe: str | None = None,
+    use_cache: bool = True,
+) -> BuiltPanel:
+    """Copy the *data construction* part of research's ``_resolve_panel``.
+
+    We intentionally do not copy the factor-computation part:
+    ``_resolve_panel`` also calls ``price_factor_panel`` /
+    ``flow_factor_panel`` / ``financial_factor_panel``.  Runner must not compute
+    a factor matrix; Research Module owns that.
+
+    The underlying loader is still the same research panel loader that sits on
+    top of data_interface.  When the Runner's dataset diverges from research's
+    dataset, replace this function with a direct data_interface builder.
+    """
+
+    from research.report.panel_adapter import load_panel
+
+    extras = (
+        (("margin_detail", "moneyflow_daily") if factor_id.startswith("sentiment.") else ())
+        + ("fin_valuation_daily",)
+    )
+    panel = load_panel(
+        pool_date,
+        pool_size,
+        start,
+        end,
+        extras=extras,
+        universe=universe,
+        use_cache=use_cache,
+    )
+    peers = None
+    try:
+        from research.report.panel import peer_panels
+
+        peers = peer_panels(factor_id, panel)
+    except Exception:  # noqa: BLE001 - peers must not block data construction
+        peers = None
+    if peers is not None:
+        try:
+            panel._peers = peers
+        except Exception:  # noqa: BLE001
+            pass
+    freshness = dict(getattr(panel, "freshness", {}) or {})
+    data_version = str(freshness.get("data_version") or "")
+    data_hash = hashlib.sha256(
+        f"{factor_id}|{data_version}|{start}|{end}|{universe}".encode("utf-8")
+    ).hexdigest()
+    manifest = DataManifest(
+        services=["data_interface"],
+        fields=list(getattr(panel, "symbols", []) or []),
+        codes=list(getattr(panel, "symbols", []) or []),
+        start=str(start),
+        end=str(end or ""),
+        rows=int(len(panel.close)) if getattr(panel, "close", None) is not None else 0,
+        data_hash=data_hash,
+    )
+    manifest.source = "research.report.panel_adapter.load_panel (data_interface-backed)"
+    return BuiltPanel(
+        panel=panel,
+        manifest=manifest,
+        fetch_start=str(panel.close.index.min().date()) if len(panel.close) else str(start),
+        eval_start=str(pd.Timestamp(start).date()),
+    )
 
 
 def build_price_panel(

@@ -14,10 +14,11 @@ from factor_lab.factor_library import FactorLibrary, FactorLibraryError
 from factor_lab.factor_builder import build as build_factor
 from factor_lab.history import HistoryEntry, append as append_history, recent, search
 from factor_lab.ml_engine import MLExperimentSpec, run_experiment, signal_to_factor_decision
-from factor_lab.panel_builder import build_price_panel
+from factor_lab.panel_builder import build_panel_like_research, build_price_panel
 from factor_lab.readiness import ReadinessBlocked, require_data
 from factor_lab.schemas import Hypothesis, OutcomeSpec
 from factor_lab.web_gateway import build_context, parse_gateway_output, seed_queries
+from research.report.panel import Panel
 
 
 class FakeMarket:
@@ -238,6 +239,45 @@ def test_workflows_do_not_forbid_inherited_tools():
         text = path.read_text(encoding="utf-8")
         assert "不要使用任何工具" not in text, path.name
         assert "Do not use tools" not in text, path.name
+
+
+def test_panel_builder_matches_research_data_construction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import factor_lab.panel_builder as pb
+    import research.report.panel_adapter as panel_adapter
+    import research.report.panel as panel_mod
+
+    dates = pd.bdate_range("2022-01-03", periods=30)
+    close = pd.DataFrame({"A": np.arange(30.0) + 10, "B": np.arange(30.0) + 20}, index=dates)
+    panel = Panel(
+        close=close,
+        open=close,
+        market_cap=None,
+        industry=None,
+        regime=None,
+        symbols=["A", "B"],
+        freshness={"data_version": "test-v1"},
+        eval_start=pd.Timestamp("2022-01-03"),
+    )
+    seen = {}
+
+    def fake_load_panel(pool_date, pool_size, start, end, **kwargs):
+        seen["kwargs"] = kwargs
+        return panel
+
+    monkeypatch.setattr(panel_adapter, "load_panel", fake_load_panel)
+    monkeypatch.setattr(panel_mod, "peer_panels", lambda *args, **kwargs: None)
+    built = pb.build_panel_like_research(
+        "sentiment.test",
+        pool_date="2022-01-03",
+        pool_size=50,
+        start="2022-01-03",
+        end="2022-02-01",
+        universe="pool:2022-01-03:50",
+    )
+    assert seen["kwargs"]["extras"] == ("margin_detail", "moneyflow_daily", "fin_valuation_daily")
+    assert built.panel is panel
+    assert built.manifest.data_hash
+    assert built.manifest.source.startswith("research.report.panel_adapter")
 
 
 def test_panel_builder_from_data_interface():

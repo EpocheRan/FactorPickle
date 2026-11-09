@@ -19,7 +19,7 @@ from typing import Any
 
 from . import config
 from .data_interface_adapter import DataInterfaceGateway
-from .panel_builder import BuiltPanel, build_price_panel
+from .panel_builder import BuiltPanel, build_panel_like_research, build_price_panel
 from .schemas import Hypothesis
 from .store import read_json, write_json_atomic
 
@@ -39,15 +39,52 @@ class FactorRunner:
         require_data(status)
         return status
 
-    def build_panel(self, codes: list[str], start: str, end: str) -> BuiltPanel:
-        """Build a Runner-owned price panel via data_interface.
+    def build_panel(
+        self,
+        codes: list[str] | None,
+        start: str,
+        end: str,
+        *,
+        factor_id: str | None = None,
+        pool_date: str | None = None,
+        pool_size: int = 200,
+        universe: str | None = None,
+    ) -> BuiltPanel:
+        """Build a Runner-owned panel.
 
-        Callers remain responsible for choosing codes from the factor data
-        contract; no automatic fallback to the legacy research loader.
+        ``codes`` selects the direct data_interface OHLC builder; without
+        codes we copy the data-construction part of research._resolve_panel
+        (the same loader for now, so regular factor tests remain untouched).
         """
 
         self.preflight()
-        return build_price_panel(self.gateway, codes, start, end)
+        if codes:
+            return build_price_panel(self.gateway, codes, start, end)
+        if not factor_id:
+            raise RunnerError("factor_id or codes is required to build a panel")
+        return build_panel_like_research(
+            factor_id,
+            pool_date=pool_date,
+            pool_size=pool_size,
+            start=start,
+            end=end,
+            universe=universe,
+        )
+
+    def _build_panel_for_hypothesis(self, hypothesis: Hypothesis) -> BuiltPanel:
+        outcome = hypothesis.outcomes[0] if hypothesis.outcomes else None
+        from .directive import load_directive
+
+        directive = load_directive()
+        return self.build_panel(
+            None,
+            hypothesis.start,
+            hypothesis.end or str(directive.get("end") or "2026-11-01"),
+            factor_id=hypothesis.factor_id,
+            pool_date=directive.get("pool_date"),
+            pool_size=int(directive.get("pool_size", 200) or 200),
+            universe=outcome.universe if outcome else directive.get("universe"),
+        )
 
     def run(
         self,
@@ -58,8 +95,11 @@ class FactorRunner:
         auto_audit: bool = True,
         panel: Any | None = None,
         built_panel: BuiltPanel | None = None,
+        use_data_bundle: bool = False,
     ) -> dict[str, Any]:
         status = self.preflight()
+        if built_panel is None and use_data_bundle:
+            built_panel = self._build_panel_for_hypothesis(hypothesis)
         if built_panel is not None:
             panel = built_panel.panel
         from .run import run_experiment

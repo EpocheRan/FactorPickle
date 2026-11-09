@@ -363,10 +363,8 @@ def main(argv: list[str] | None = None) -> int:
         hypothesis = Hypothesis.from_dict(raw)
         runner = FactorRunner()
         built = None
-        if args.data_bundle:
-            codes = [item.strip() for item in args.codes.split(",") if item.strip()]
-            if not codes:
-                raise SystemExit("runner --data-bundle requires --codes")
+        codes = [item.strip() for item in args.codes.split(",") if item.strip()]
+        if args.data_bundle and codes:
             built = runner.build_panel(codes, hypothesis.start, hypothesis.end or "2026-11-01")
         _print(
             runner.run(
@@ -375,6 +373,7 @@ def main(argv: list[str] | None = None) -> int:
                 robustness=args.robustness,
                 auto_audit=not args.no_audit,
                 built_panel=built,
+                use_data_bundle=bool(args.data_bundle and built is None),
             )
         )
         return 0

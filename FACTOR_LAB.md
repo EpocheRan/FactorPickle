@@ -15,7 +15,8 @@ python -m factor_lab campaign start --objective "研究因子"
 
 - PathFinder → FactorBuilder / ML Engine → Runner → Evaluator
 - Runner is an LLM execution role; it fetches data **only through `data_interface`** and loads the Research Adapter.
-  - `python -m factor_lab runner --data-bundle --codes ...` builds a Runner-owned Panel from data_interface and passes `panel=` into the adapter; ordinary factor tests keep the legacy panel loader.
+  - `python -m factor_lab runner --data-bundle` copies the data-construction part of research `_resolve_panel` (same loader for now) and passes `panel=` into the adapter; ordinary factor tests keep the legacy path.
+  - `python -m factor_lab runner --data-bundle --codes ...` uses the direct data_interface OHLC panel builder.
 - FactorBuilder writes versioned generated factors under `factor_lab/factors/generated/`.
 - ML Engine is non-Deep-Learning only.
 - Supervisor controls rounds, budget, readiness feedback, and safe agent reclamation.
