@@ -20,6 +20,9 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+perf = [
+    "polars>=1.0",
+]
 # 分钟线补充源（zzshare / zzquant）：`uv sync --extra zzshare`
 zzshare = [
     "zzshare>=0.4.13",
