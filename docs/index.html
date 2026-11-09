@@ -916,6 +916,8 @@
       radial-gradient(720px 360px at 50% 15%,rgba(185,255,63,.08),transparent 70%),
       linear-gradient(180deg,#04070d,#04070d);
   }
+  .start-cta.is-arriving{animation:startArrive .42s ease-out both}
+  @keyframes startArrive{from{opacity:.5;transform:translateY(8px)}to{opacity:1;transform:none}}
   .start-cta .wrap{position:relative;z-index:1;text-align:center}
   .start-kicker{font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:#c9ff5a;text-transform:uppercase}
   .start-kicker span{color:#5f7288;padding:0 5px}
@@ -3429,7 +3431,20 @@ if (navStart) {
     closeAllNavDrops();
     switchView('overview');
     history.replaceState(null, '', '#start');
-    setTimeout(() => document.getElementById('start')?.scrollIntoView({behavior: 'smooth', block: 'start'}), 50);
+    requestAnimationFrame(() => {
+      const section = document.getElementById('start');
+      if (!section) return;
+      const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 66;
+      const root = document.documentElement;
+      const previousScrollBehavior = root.style.scrollBehavior;
+      root.style.scrollBehavior = 'auto';
+      window.scrollTo({top: Math.max(0, section.getBoundingClientRect().top + window.scrollY - headerH - 10), behavior: 'auto'});
+      root.style.scrollBehavior = previousScrollBehavior;
+      section.classList.remove('is-arriving');
+      void section.offsetWidth;
+      section.classList.add('is-arriving');
+      setTimeout(() => section.classList.remove('is-arriving'), 500);
+    });
   });
 }
 
