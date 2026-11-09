@@ -29,10 +29,10 @@
     docker-compose.yml 所在目录，默认脚本所在目录的上一级。
 
 .PARAMETER QuestDbVolume
-    QuestDB 数据卷名，默认沿用现有卷 finbridge_questdb_data。
+    QuestDB 数据卷名，默认 factorpickle_questdb_data。
 
 .PARAMETER VenvVolume
-    mcp-app 的 Python 虚拟环境卷，默认沿用现有卷 finbridge_mcp_venv。
+    mcp-app 的 Python 虚拟环境卷，默认 factorpickle_mcp_venv。
     备份它可让容器启动时跳过 uv sync（省 5–15 分钟）。
 
 .PARAMETER DryRun
@@ -53,8 +53,8 @@ param(
     [string]$Vhdx = "D:\DockerData\docker_data.vhdx",
     [string]$BackupDir = "D:\docker-backup",
     [string]$ComposeDir = "",
-    [string]$QuestDbVolume = "finbridge_questdb_data",
-    [string]$VenvVolume = "finbridge_mcp_venv",
+    [string]$QuestDbVolume = "factorpickle_questdb_data",
+    [string]$VenvVolume = "factorpickle_mcp_venv",
     [string]$QuestDbRest = "http://127.0.0.1:9000",
     [switch]$DryRun,
     [switch]$Force

@@ -78,7 +78,4 @@ services:
 
 volumes:
   questdb_data:
-    # 保留现有数据卷名，避免项目改名后 QuestDB 挂到空库
-    name: finbridge_questdb_data
   mcp_venv:
-    name: finbridge_mcp_venv
