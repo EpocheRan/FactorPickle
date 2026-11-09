@@ -910,18 +910,25 @@
     .why-art{max-width:260px}
   }
   @media (max-width:860px){
-    .topbar{padding:10px 10px 0}
-    .topbar-in{width:calc(100vw - 20px);max-width:none;height:auto;flex-wrap:wrap;gap:6px;padding:8px 10px;border-radius:22px;overflow:visible}
+    .topbar{padding:8px 10px 0}
+    .topbar-in{width:calc(100vw - 20px);max-width:none;height:48px;flex-wrap:nowrap;gap:8px;padding:5px 8px;border-radius:999px;overflow:visible}
     .nav-menu{width:min(272px,calc(100vw - 28px));left:50%}
-    .brand{flex:1 1 0;min-width:0;overflow:hidden}
-    .brand .logo{width:36px;height:36px}
+    .brand{flex:0 0 auto;min-width:0;overflow:visible}
+    .brand .logo{width:32px;height:32px}
     .brand > div{height:34px;min-width:0;overflow:hidden}
     .brand-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .brand-sub{display:none}
-    .nav-links{order:4;width:100%;margin:4px 0 0;padding:7px 0 2px;justify-content:center;gap:2px;border-top:1px solid rgba(185,255,63,.12)}
-    .nav-item{padding:7px 12px}
-    .nav-github{width:32px;height:32px;margin-left:auto}
-    .nav-cta{height:32px;padding:0 12px;font-size:11px;flex:0 0 auto}
+    .nav-links{order:0;width:auto;flex:1 1 auto;min-width:0;margin:0;padding:0;justify-content:center;gap:1px;border-top:0}
+    .nav-item{padding:7px 8px;font-size:11px}
+    .nav-github{width:30px;height:30px;margin-left:0}
+    .nav-cta{height:30px;padding:0 10px;font-size:10.5px;flex:0 0 auto}
+  }
+  @media (max-width:380px){
+    .topbar-in{gap:6px;padding:5px 7px}
+    .brand .logo{width:30px;height:30px}
+    .nav-item{padding:6px 6px;font-size:10.5px}
+    .nav-github{width:28px;height:28px}
+    .nav-cta{height:28px;padding:0 8px;font-size:10px}
   }
   @media (prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important}
