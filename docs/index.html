@@ -101,7 +101,7 @@
     position:absolute;top:calc(100% + 13px);left:50%;z-index:2;width:272px;padding:6px;
     transform:translate(-50%,-4px);opacity:0;visibility:hidden;pointer-events:none;
     border:1px solid rgba(255,255,255,.13);border-radius:15px;
-    background:linear-gradient(180deg,rgba(26,27,27,.86),rgba(9,10,10,.92));
+    background:linear-gradient(180deg,rgba(24,26,26,.98),rgba(8,9,9,.985));
     backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);
     box-shadow:0 24px 60px -24px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.08);
     transition:opacity .18s ease,transform .18s ease,visibility .18s;
@@ -3351,6 +3351,14 @@ $$('.tab').forEach(b => b.addEventListener('click', () => {
 }));
 $$('[data-goto-view]').forEach(b => b.addEventListener('click', () => switchView(b.dataset.gotoView)));
 
+const closeAllNavDrops = (except = null) => {
+  $$('.nav-drop.open').forEach(drop => {
+    if (drop === except) return;
+    drop.classList.remove('open');
+    drop.querySelector('.nav-trigger')?.setAttribute('aria-expanded', 'false');
+  });
+};
+
 const exploreNav = $('#exploreNav');
 if (exploreNav) {
   const trigger = exploreNav.querySelector('.nav-trigger');
@@ -3364,6 +3372,7 @@ if (exploreNav) {
   };
   trigger.addEventListener('click', e => {
     e.stopPropagation();
+    closeAllNavDrops(exploreNav);
     exploreNav.classList.contains('open') ? closeExplore() : openExplore();
   });
   document.addEventListener('click', e => {
@@ -3400,6 +3409,7 @@ if (featureNav) {
   };
   trigger.addEventListener('click', e => {
     e.stopPropagation();
+    closeAllNavDrops(featureNav);
     const open = featureNav.classList.toggle('open');
     trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
