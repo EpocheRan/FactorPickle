@@ -141,9 +141,9 @@
   }
   .hero-inner{
     position:relative;z-index:2;width:100%;max-width:1460px;margin:0 auto;
-    padding:26px 30px 46px;display:flex;flex-direction:column;justify-content:center;
+    padding:26px 30px 130px;display:flex;flex-direction:column;justify-content:center;
   }
-  .hero-top{position:absolute;top:24px;left:30px;right:30px;display:flex;justify-content:space-between;gap:20px;font-size:9px;letter-spacing:.18em;color:#5f7288}
+  .hero-top{position:absolute;top:24px;left:30px;right:30px;display:flex;justify-content:flex-end;gap:20px;font-size:9px;letter-spacing:.18em;color:#5f7288}
   .hero-home h1{
     margin:0;
     font-family:'JetBrains Mono',var(--mono);
@@ -155,7 +155,7 @@
     color:#c9ff5a;font-style:italic;font-size:1.45em;line-height:.9;
     letter-spacing:-.035em;display:inline-block;margin-top:6px;
   }
-  .hero-bottom{display:flex;justify-content:flex-start;align-items:flex-end;gap:40px;margin-top:40px}
+  .hero-bottom{position:relative;display:flex;justify-content:flex-start;align-items:flex-end;gap:40px;margin-top:40px}
   .hero-copy{max-width:430px}
   .hero-copy p{margin:0;font-size:14px;line-height:1.7;color:#b2c2d4}
   .hero-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
@@ -171,7 +171,7 @@
     display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:18px;
     margin:16px 0 0;font-size:8.5px;letter-spacing:.15em;color:#5f7288;text-align:left;
   }
-  .hero-scroll{position:absolute;left:50%;right:auto;bottom:22px;transform:translateX(-50%);font-size:8px;letter-spacing:.18em;color:#46576d}
+  .hero-scroll{position:absolute;left:50%;bottom:0;transform:translateX(-50%);pointer-events:none;font-size:8px;letter-spacing:.18em;color:#46576d;white-space:nowrap}
   .hero-scroll span{display:inline-block;margin-left:6px;animation:scrollHint 2.4s infinite}
   @keyframes scrollHint{0%,100%{transform:translateY(0);opacity:.5}50%{transform:translateY(4px);opacity:1}}
   .cable-flow{stroke-dasharray:2 12;animation:cableFlow 7s linear infinite}
@@ -626,7 +626,6 @@
       <div class="hero-veil"></div>
       <div class="hero-inner wrap">
         <div class="hero-top mono">
-          <span>FACTORPICKLE / 01</span>
           <span>PICK THE FACTOR. KEEP THE ALPHA.</span>
         </div>
         <h1>The infrastructure<br>behind A-share<br><span class="accent">alpha.</span></h1>
@@ -643,8 +642,8 @@
               <span>MCP NATIVE</span>
             </div>
           </div>
+          <div class="hero-scroll mono">SCROLL TO EXPLORE <span>↓</span></div>
         </div>
-        <div class="hero-scroll mono">SCROLL TO EXPLORE <span>↓</span></div>
       </div>
     </div>
 
