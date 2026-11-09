@@ -394,8 +394,6 @@
     text-shadow:0 18px 60px rgba(0,0,0,.5);
   }
   .why-intro p{max-width:640px;margin:0 auto;font-size:14px;line-height:1.8;color:#8b9eae}
-  .why-intro-cue{margin-top:34px;font-size:8px;letter-spacing:.2em;color:#5f7288}
-  .why-intro-cue span{color:#c9ff5a;padding-left:4px}
   .pin-scene{
     position:relative;height:620vh;background:#04070d;border-top:1px solid var(--line);
     isolation:isolate;
@@ -457,20 +455,30 @@
   .pickle-axis b{font-weight:500;color:#c9ff5a;letter-spacing:.1em}
   .pin-cards{position:absolute;inset:0;z-index:3;pointer-events:none}
   .pin-card{
-    position:absolute;top:50%;right:max(5vw,calc(50% - 560px));width:min(450px,37vw);padding:25px 27px 27px;pointer-events:none;
-    border:1px solid rgba(255,255,255,.11);border-radius:16px;
-    background:linear-gradient(180deg,rgba(19,23,22,.84),rgba(7,10,10,.9));
-    backdrop-filter:blur(18px) saturate(130%);-webkit-backdrop-filter:blur(18px) saturate(130%);
-    box-shadow:0 30px 80px -30px rgba(0,0,0,.92),inset 0 1px 0 rgba(255,255,255,.08);
+    position:absolute;top:50%;right:max(4.5vw,calc(50% - 570px));width:min(480px,39vw);min-height:clamp(290px,36vh,350px);
+    padding:27px 29px 29px;pointer-events:none;display:flex;flex-direction:column;
+    border:1px solid rgba(255,255,255,.48);border-radius:18px;
+    background:linear-gradient(145deg,#efffd9 0%,#d2ff97 34%,#aef266 68%,#88da45 100%);
+    box-shadow:0 30px 80px -28px rgba(0,0,0,.92),0 0 0 1px rgba(24,56,10,.05),inset 0 1px 0 rgba(255,255,255,.7);
     opacity:0;transform:translate(120px,-50%) scale(.95);
     transition:opacity .5s ease,transform .75s cubic-bezier(.22,.61,.36,1);
     will-change:opacity,transform;
   }
-  .pin-card::before{content:"";position:absolute;left:26px;top:0;width:44px;height:1px;background:#c9ff5a;opacity:.85}
+  .pin-card::before{content:"";position:absolute;left:29px;top:0;width:52px;height:2px;background:#315d19;opacity:.6}
+  .pin-card::after{
+    content:"";position:absolute;left:29px;right:29px;bottom:22px;height:1px;
+    background:linear-gradient(90deg,rgba(31,67,15,.24),rgba(31,67,15,.06) 60%,transparent);
+  }
   .pin-card.is-active{opacity:1;transform:translate(0,-50%) scale(1)}
-  .pin-card-num{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:#c9ff5a;margin-bottom:13px}
-  .pin-card h3{margin:0 0 11px;font-size:clamp(21px,2vw,28px);line-height:1.2;letter-spacing:-.03em;font-weight:550;color:#eef5fb}
-  .pin-card p{margin:0;font-size:14px;line-height:1.75;color:#a3b4c3}
+  .pin-card-top{display:flex;align-items:center;gap:13px;margin-bottom:20px}
+  .pin-card-icon{
+    width:48px;height:48px;border-radius:12px;flex:none;display:grid;place-items:center;
+    background:rgba(26,58,12,.09);border:1px solid rgba(26,58,12,.16);color:#274915;
+  }
+  .pin-card-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round}
+  .pin-card-num{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:#3c651f;margin-bottom:0}
+  .pin-card h3{margin:0 0 12px;font-size:clamp(23px,2.2vw,30px);line-height:1.18;letter-spacing:-.035em;font-weight:600;color:#12270a}
+  .pin-card p{margin:0;font-size:14.5px;line-height:1.75;color:#2f4c20}
   .pin-foot{
     position:absolute;z-index:4;left:max(4vw,calc(50% - 610px));right:max(4vw,calc(50% - 610px));bottom:26px;
     display:flex;justify-content:space-between;align-items:center;pointer-events:none;
@@ -486,7 +494,6 @@
     .why-intro{min-height:0;padding:calc(var(--header-h,80px) + 38px) 0 58px}
     .why-intro h2{font-size:clamp(32px,8vw,44px)}
     .why-intro p{font-size:13px;padding:0 6vw}
-    .why-intro-cue{margin-top:24px}
     .pin-scene{height:auto}
     .pin-sticky{position:relative;top:auto;height:auto;min-height:0;padding:calc(var(--header-h,80px) + 20px) 0 44px;overflow:hidden}
     .pin-frame{position:relative;inset:auto;width:min(470px,92vw);height:min(56vh,460px);margin:0 auto;border:0}
@@ -499,12 +506,14 @@
     }
     .pin-cards::-webkit-scrollbar{display:none}
     .pin-card,.pin-card.left,.pin-card.right{
-      position:relative;top:auto;left:auto;right:auto;flex:0 0 84vw;width:84vw;max-width:410px;
+      position:relative;top:auto;left:auto;right:auto;flex:0 0 84vw;width:84vw;max-width:410px;min-height:270px;
       transform:none!important;opacity:1!important;pointer-events:auto;scroll-snap-align:center;
-      padding:19px 20px 21px;border-radius:14px;
+      padding:21px 21px 23px;border-radius:16px;
     }
-    .pin-card h3{font-size:20px}
-    .pin-card p{font-size:12.5px}
+    .pin-card-top{margin-bottom:16px}
+    .pin-card-icon{width:44px;height:44px}
+    .pin-card h3{font-size:21px}
+    .pin-card p{font-size:13px}
     .pin-foot{position:relative;left:auto;right:auto;bottom:auto;width:min(440px,90vw);margin:18px auto 0}
     .pin-hint{display:none}
   }
@@ -898,7 +907,6 @@
         <div class="pin-kicker mono">WHY FACTORPICKLE <span>/</span> 08 PRINCIPLES</div>
         <h2>为什么是 FactorPickle</h2>
         <p>不是又一个数据管道：把「研究结论可复现」写进模块边界、因子资产与报告口径。</p>
-        <div class="why-intro-cue mono">SCROLL INTO THE STORY <span>↓</span></div>
       </div>
     </section>
 
@@ -916,42 +924,66 @@
         </div>
         <div class="pin-cards" id="pinCards">
         <article class="pin-card is-active" data-stage="0" aria-hidden="false">
-          <div class="pin-card-num mono">01 / PIPELINE</div>
+          <div class="pin-card-top">
+            <span class="pin-card-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h3l2-4 3 8 2-4h3"/></svg></span>
+            <span class="pin-card-num mono">01 / PIPELINE</span>
+          </div>
           <h3>一条链路，四层边界</h3>
           <p>采集、数据访问、因子计算与应用分层；单向依赖让每层可以独立替换与测试。</p>
         </article>
         <article class="pin-card" data-stage="1" aria-hidden="true">
-          <div class="pin-card-num mono">02 / FACTOR</div>
+          <div class="pin-card-top">
+            <span class="pin-card-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4M7 2v4l-3 5a2 2 0 0 0 1.7 3h4.6A2 2 0 0 0 12 11L9 6V2"/></svg></span>
+            <span class="pin-card-num mono">02 / FACTOR</span>
+          </div>
           <h3>因子是资产，不是脚本</h3>
           <p>声明式 FactorDef → registry → 长表 / latest；方向、单位、版本与依赖全部可追溯。</p>
         </article>
         <article class="pin-card" data-stage="2" aria-hidden="true">
-          <div class="pin-card-num mono">03 / RESEARCH</div>
+          <div class="pin-card-top">
+            <span class="pin-card-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h6l3 3v9H4z"/><path d="M7 11V8m3 3V6m3 5V9"/></svg></span>
+            <span class="pin-card-num mono">03 / RESEARCH</span>
+          </div>
           <h3>报告经得起复核</h3>
           <p>profile 章节、分层 IC、五维评分、样本敏感性与分月 IC；HTML 报告与评分逻辑同源。</p>
         </article>
         <article class="pin-card" data-stage="3" aria-hidden="true">
-          <div class="pin-card-num mono">04 / BACKTEST</div>
+          <div class="pin-card-top">
+            <span class="pin-card-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 3 4v4c0 3 2.2 5.2 5 6 2.8-.8 5-3 5-6V4Z"/><path d="m5.8 8 1.5 1.5L10.7 6"/></svg></span>
+            <span class="pin-card-num mono">04 / BACKTEST</span>
+          </div>
           <h3>A 股规则内置</h3>
           <p>T+1、整手、涨跌停、停牌、佣金与印花税；单标的与横截面共用一套账本。</p>
         </article>
         <article class="pin-card" data-stage="4" aria-hidden="true">
-          <div class="pin-card-num mono">05 / MCP</div>
+          <div class="pin-card-top">
+            <span class="pin-card-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2v4m4-4v4M4 6h8v2a4 4 0 0 1-4 4 4 4 0 0 1-4-4Z"/><path d="M8 12v2"/></svg></span>
+            <span class="pin-card-num mono">05 / MCP</span>
+          </div>
           <h3>MCP 原生</h3>
           <p>行情、财务、因子、选股、持仓与同步统一暴露为工具，AI Agent 可直接调用。</p>
         </article>
         <article class="pin-card" data-stage="5" aria-hidden="true">
-          <div class="pin-card-num mono">06 / REPRODUCIBLE</div>
+          <div class="pin-card-top">
+            <span class="pin-card-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 0 1-8.5 3.5L3 10m0 0V6m0 4h4M3 8a5 5 0 0 1 8.5-3.5L13 6m0 0V2m0 4H9"/></svg></span>
+            <span class="pin-card-num mono">06 / REPRODUCIBLE</span>
+          </div>
           <h3>可复现的运行</h3>
           <p>run_id 固化策略、参数、数据快照与执行规则；同输入可重跑，结论可对照。</p>
         </article>
         <article class="pin-card" data-stage="6" aria-hidden="true">
-          <div class="pin-card-num mono">07 / DATA</div>
+          <div class="pin-card-top">
+            <span class="pin-card-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="3.6" rx="4.8" ry="1.9"/><path d="M3.2 3.6v4.1c0 1.05 2.15 1.9 4.8 1.9s4.8-.85 4.8-1.9V3.6"/><path d="M3.2 7.7v4.1c0 1.05 2.15 1.9 4.8 1.9s4.8-.85 4.8-1.9V7.7"/></svg></span>
+            <span class="pin-card-num mono">07 / DATA</span>
+          </div>
           <h3>单一数据边界</h3>
           <p>所有行情、财务、因子与持仓读写只经过 data_interface；Runner 不直连数据库。</p>
         </article>
         <article class="pin-card" data-stage="7" aria-hidden="true">
-          <div class="pin-card-num mono">08 / DISCOVERY</div>
+          <div class="pin-card-top">
+            <span class="pin-card-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m8 2 1.2 3.8L13 7l-3.8 1.2L8 12l-1.2-3.8L3 7l3.8-1.2Z"/><path d="M3 13l1-2m9 2-1-2"/></svg></span>
+            <span class="pin-card-num mono">08 / DISCOVERY</span>
+          </div>
           <h3>Agent 自动发现</h3>
           <p>PathFinder 生成假设，Runner 批量验证，Evaluator 评分；失败实验也进入可追溯账本。</p>
         </article>
@@ -2571,7 +2603,7 @@ function initPickle3D() {
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = .98;
+  renderer.toneMappingExposure = .94;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(33, 1, .1, 100);
@@ -2583,85 +2615,140 @@ function initPickle3D() {
   scene.add(group);
 
   const bodyMat = new THREE.MeshPhysicalMaterial({
-    color: 0x8bdd38, roughness: .46, metalness: .02,
-    clearcoat: .65, clearcoatRoughness: .3
+    color: 0xffffff, roughness: .52, metalness: 0,
+    clearcoat: .38, clearcoatRoughness: .42
   });
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(1.65, 3.2, 32, 64), bodyMat);
-  body.scale.set(.96, 1, .96);
+
+  const makePickleTexture = () => {
+    const c = document.createElement('canvas');
+    c.width = 1024;
+    c.height = 1024;
+    const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 1024, 1024);
+    g.addColorStop(0, '#1d3c0e');
+    g.addColorStop(.22, '#315b16');
+    g.addColorStop(.52, '#527f20');
+    g.addColorStop(.76, '#3b6616');
+    g.addColorStop(1, '#17300a');
+    x.fillStyle = g;
+    x.fillRect(0, 0, 1024, 1024);
+
+    // wet vertical streaks
+    for (let i = 0; i < 150; i++) {
+      const sx = Math.random() * 1024;
+      const sy = Math.random() * 1024;
+      const len = 40 + Math.random() * 260;
+      x.strokeStyle = `rgba(218,244,169,${.025 + Math.random() * .07})`;
+      x.lineWidth = .5 + Math.random() * 2;
+      x.beginPath();
+      x.moveTo(sx, sy);
+      x.quadraticCurveTo(sx + 3, sy + len * .55, sx + (Math.random() - .5) * 8, sy + len);
+      x.stroke();
+    }
+    // mottled skin
+    for (let i = 0; i < 600; i++) {
+      const sx = Math.random() * 1024, sy = Math.random() * 1024;
+      const r = 2 + Math.random() * 10;
+      x.fillStyle = Math.random() > .45
+        ? `rgba(194,224,137,${.03 + Math.random() * .1})`
+        : `rgba(10,32,5,${.04 + Math.random() * .12})`;
+      x.beginPath(); x.ellipse(sx, sy, r, r * (1 + Math.random()), Math.random() * 3, 0, Math.PI * 2); x.fill();
+    }
+    // pale warts and pores
+    for (let i = 0; i < 520; i++) {
+      const sx = Math.random() * 1024, sy = Math.random() * 1024;
+      const r = .8 + Math.random() * 3.2;
+      x.fillStyle = Math.random() > .5 ? 'rgba(236,248,205,.38)' : 'rgba(215,243,177,.24)';
+      x.beginPath(); x.arc(sx, sy, r, 0, Math.PI * 2); x.fill();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return tex;
+  };
+
+  const makeBumpTexture = () => {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 512;
+    const x = c.getContext('2d');
+    x.fillStyle = '#7d7d7d'; x.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 1400; i++) {
+      const sx = Math.random() * 512, sy = Math.random() * 512;
+      const r = .6 + Math.random() * 2.6;
+      x.fillStyle = `rgba(255,255,255,${.08 + Math.random() * .2})`;
+      x.beginPath(); x.arc(sx, sy, r, 0, Math.PI * 2); x.fill();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    return tex;
+  };
+
+  bodyMat.map = makePickleTexture();
+  bodyMat.bumpMap = makeBumpTexture();
+  bodyMat.bumpScale = .07;
+
+  const bodyGeo = new THREE.CapsuleGeometry(1.36, 4.25, 48, 96);
+  const pos = bodyGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const vx = pos.getX(i), vy = pos.getY(i), vz = pos.getZ(i);
+    const taper = 1 - .07 * Math.pow(Math.max(0, Math.abs(vy) - 1.6) / 1.6, 2);
+    const bend = .2 * Math.sin(vy * .52 + .25);
+    pos.setX(i, vx * taper + bend);
+    pos.setZ(i, vz * taper);
+  }
+  bodyGeo.computeVertexNormals();
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
   group.add(body);
 
   const stemCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, 3.2, 0),
-    new THREE.Vector3(.04, 3.55, .03),
-    new THREE.Vector3(.25, 3.92, 0),
-    new THREE.Vector3(.56, 4.02, 0)
+    new THREE.Vector3(0, 3.15, 0),
+    new THREE.Vector3(.03, 3.5, .03),
+    new THREE.Vector3(.2, 3.78, 0),
+    new THREE.Vector3(.43, 3.92, 0)
   ]);
   const stem = new THREE.Mesh(
-    new THREE.TubeGeometry(stemCurve, 28, .115, 10, false),
-    new THREE.MeshStandardMaterial({color: 0x5b8138, roughness: .7, metalness: .02})
+    new THREE.TubeGeometry(stemCurve, 28, .12, 10, false),
+    new THREE.MeshStandardMaterial({color: 0x4d6c26, roughness: .82, metalness: 0})
   );
   group.add(stem);
-
-  const bumpMat = new THREE.MeshStandardMaterial({color: 0x447622, roughness: .92, metalness: 0});
-  const bumpGeo = new THREE.SphereGeometry(1, 24, 16);
-  const bumpRows = [-1.48, -1.05, -.6, -.15, 1.12, 1.55];
-  bumpRows.forEach((y, i) => {
-    const theta = i % 2 ? .38 : -.42;
-    const bump = new THREE.Mesh(bumpGeo, bumpMat);
-    bump.position.set(Math.sin(theta) * 1.55, y, Math.cos(theta) * 1.55);
-    bump.rotation.y = theta;
-    bump.scale.set(.21, .3, .08);
-    group.add(bump);
-  });
-  [-1.3, -.86, -.4, .06, .52, 1.0, 1.45].forEach((y, i) => {
-    const theta = Math.PI + (i % 2 ? .34 : -.38);
-    const bump = new THREE.Mesh(bumpGeo, bumpMat);
-    bump.position.set(Math.sin(theta) * 1.55, y, Math.cos(theta) * 1.55);
-    bump.rotation.y = theta;
-    bump.scale.set(.19, .27, .075);
-    group.add(bump);
-  });
-
-  // cartoon face
-  const eyeWhiteMat = new THREE.MeshPhysicalMaterial({color: 0xf7ffe8, roughness: .28, clearcoat: .5});
-  const pupilMat = new THREE.MeshStandardMaterial({color: 0x14210f, roughness: .18, metalness: .02});
-  const eyeWhiteGeo = new THREE.SphereGeometry(.23, 28, 20);
-  const pupilGeo = new THREE.SphereGeometry(.12, 20, 14);
-  const shineMat = new THREE.MeshBasicMaterial({color: 0xffffff});
-  const shineGeo = new THREE.SphereGeometry(.04, 12, 8);
-  [-1, 1].forEach((sign) => {
-    const white = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
-    white.position.set(sign * .5, .64, 1.5);
-    white.scale.set(.9, 1.1, .45);
-    group.add(white);
-    const pupil = new THREE.Mesh(pupilGeo, pupilMat);
-    pupil.position.set(sign * .5, .61, 1.61);
-    pupil.scale.set(.55, .8, .4);
-    group.add(pupil);
-    const shine = new THREE.Mesh(shineGeo, shineMat);
-    shine.position.set(sign * .5 - .045, .68, 1.67);
-    group.add(shine);
-  });
-  const smileCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-.28, .2, 1.56),
-    new THREE.Vector3(0, .04, 1.62),
-    new THREE.Vector3(.28, .2, 1.56)
-  ]);
-  const smile = new THREE.Mesh(
-    new THREE.TubeGeometry(smileCurve, 24, .034, 8, false),
-    new THREE.MeshStandardMaterial({color: 0x213515, roughness: .4})
+  const stemEnd = new THREE.Mesh(
+    new THREE.SphereGeometry(.12, 16, 12),
+    new THREE.MeshStandardMaterial({color: 0x6f8e3b, roughness: .9})
   );
-  group.add(smile);
+  stemEnd.position.set(.43, 3.92, 0);
+  group.add(stemEnd);
 
-  scene.add(new THREE.HemisphereLight(0xc9ff96, 0x06110b, 1.7));
-  const key = new THREE.DirectionalLight(0xf0ffc8, 2.7);
-  key.position.set(-5, 6, 8);
+  // raised warts / skin texture in 3D
+  const wartGeo = new THREE.SphereGeometry(1, 12, 10);
+  const wartMats = [
+    new THREE.MeshStandardMaterial({color: 0x7d9e48, roughness: .86}),
+    new THREE.MeshStandardMaterial({color: 0x9cba64, roughness: .8}),
+    new THREE.MeshStandardMaterial({color: 0x3d651e, roughness: .9})
+  ];
+  for (let i = 0; i < 46; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const y = -2.25 + Math.random() * 4.5;
+    const r = 1.36 * (1 - .03 * Math.max(0, Math.abs(y) - 1.8));
+    const wart = new THREE.Mesh(wartGeo, wartMats[i % 3]);
+    wart.position.set(Math.sin(theta) * r + .13 * Math.sin(y * .52 + .25), y, Math.cos(theta) * r);
+    wart.rotation.y = theta;
+    const s = .035 + Math.random() * .055;
+    wart.scale.set(s, s * (1 + Math.random() * .5), s * .55);
+    group.add(wart);
+  }
+
+  scene.add(new THREE.HemisphereLight(0xb8d39b, 0x050804, 1.0));
+  const key = new THREE.DirectionalLight(0xfff0cc, 2.45);
+  key.position.set(-5, 7, 8);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0x7ef0c7, 2.2);
-  rim.position.set(6, 2, -6);
+  const rim = new THREE.DirectionalLight(0x95e070, 1.35);
+  rim.position.set(6, 1, -6);
   scene.add(rim);
-  const fill = new THREE.PointLight(0x9be33f, 1.8, 30);
-  fill.position.set(0, -3, 5);
+  const fill = new THREE.DirectionalLight(0x7da35b, .62);
+  fill.position.set(2, -2, 5);
   scene.add(fill);
 
   let width = 0, height = 0;
