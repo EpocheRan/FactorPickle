@@ -375,8 +375,17 @@ def test_runner_writes_data_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyP
         expected_sign=1,
         outcomes=[OutcomeSpec(universe="all_a")],
     )
-    result = runner.FactorRunner(gateway=Gateway()).run(hypothesis)
+    result = runner.FactorRunner(gateway=Gateway()).run(
+        hypothesis,
+        factor_artifact={"factor_id": "test.factor", "version": "v1", "code_hash": "abc"},
+    )
     manifest = json.loads((experiment_dir / "data_manifest.json").read_text(encoding="utf-8"))
     assert result["data_manifest"].endswith("data_manifest.json")
     assert manifest["source"] == "data_interface"
     assert manifest["factor_id"] == "test.factor"
+    assert manifest["factor_artifact"]["version"] == "v1"
+    with pytest.raises(Exception):
+        runner.FactorRunner(gateway=Gateway()).run(
+            hypothesis,
+            factor_artifact={"factor_id": "other.factor", "version": "v1"},
+        )

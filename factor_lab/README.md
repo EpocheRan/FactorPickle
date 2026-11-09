@@ -216,6 +216,9 @@ panels and the peer residual matrix are intentionally excluded.
   factor tests, so existing tests are unchanged.
 - `panel_builder.build_panel_like_research` copies data acquisition/extras/peer
   assembly only; factor calculation remains in the Research Module.
+- FactorBuilder artifacts **must carry `factor_id`** (plus version/code hash);
+  Runner validates it matches the hypothesis and records it in
+  `data_manifest.json` as `factor_artifact`.
 - Vectorized factor evaluation still uses `research.report` / `research.report.metrics`.
 - `rho_return` is still pending; G0.5 is exposure-only.
 - Multi-trial BH is still a batch step; current q is Bonferroni fallback.
@@ -234,7 +237,7 @@ production research/factor-data packages:
 | `factor_library.py` | Versioned `factor_lab/factors/generated/<family>/<factor_id>/vN/` |
 | `factor_builder.py` | FactorBuilder write path: generated Python + spec + tests + hash |
 | `runner.py` | Runner preflight + experiment + `data_manifest.json` |
-| `panel_builder.py` | Runner-owned `Panel` from data_interface (optional path) |
+| `panel_builder.py` | Runner-owned Panel; depends on the factor artifact's `factor_id` |
 | `ml_engine.py` | Non-Deep-Learning walk-forward ML runtime + signal admission |
 | `campaign.py` | Bounded PathFinder ↔ ML campaign, rounds/traces/stop rules |
 | `discovery.py` | Gateway discovery brief/map contracts + offline fallback |

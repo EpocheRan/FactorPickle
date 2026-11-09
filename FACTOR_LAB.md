@@ -18,6 +18,7 @@ python -m factor_lab campaign start --objective "研究因子"
   - `python -m factor_lab runner --data-bundle` copies the data-construction part of research `_resolve_panel` (same loader for now) and passes `panel=` into the adapter; ordinary factor tests keep the legacy path.
   - `python -m factor_lab runner --data-bundle --codes ...` uses the direct data_interface OHLC panel builder.
 - FactorBuilder writes versioned generated factors under `factor_lab/factors/generated/`.
+  - Every factor artifact must carry `factor_id` (plus version/code hash); the panel builder and Runner use it to select the correct data/contract.
 - ML Engine is non-Deep-Learning only.
 - Supervisor controls rounds, budget, readiness feedback, and safe agent reclamation.
 - Hard limits: ≤5 campaign rounds; ¥3,000/month LLM; 150GB Lab quota; human G4 for promotion.

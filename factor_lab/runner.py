@@ -96,8 +96,30 @@ class FactorRunner:
         panel: Any | None = None,
         built_panel: BuiltPanel | None = None,
         use_data_bundle: bool = False,
+        factor_artifact: Any | None = None,
     ) -> dict[str, Any]:
         status = self.preflight()
+        artifact_meta: dict[str, Any] = {}
+        if factor_artifact is not None:
+            artifact_factor_id = (
+                getattr(factor_artifact, "factor_id", None)
+                or (factor_artifact.get("factor_id") if isinstance(factor_artifact, dict) else None)
+            )
+            if not artifact_factor_id:
+                raise RunnerError("factor_artifact must carry factor_id")
+            if str(artifact_factor_id) != hypothesis.factor_id:
+                raise RunnerError(
+                    f"factor_artifact.factor_id={artifact_factor_id!r} does not match hypothesis.factor_id={hypothesis.factor_id!r}"
+                )
+            artifact_meta = {
+                "factor_id": str(artifact_factor_id),
+                "version": getattr(factor_artifact, "version", None)
+                or (factor_artifact.get("version") if isinstance(factor_artifact, dict) else None),
+                "code_hash": getattr(factor_artifact, "code_hash", None)
+                or (factor_artifact.get("code_hash") if isinstance(factor_artifact, dict) else None),
+                "family": getattr(factor_artifact, "family", None)
+                or (factor_artifact.get("family") if isinstance(factor_artifact, dict) else None),
+            }
         if built_panel is None and use_data_bundle:
             built_panel = self._build_panel_for_hypothesis(hypothesis)
         if built_panel is not None:
@@ -125,6 +147,7 @@ class FactorRunner:
                     "services": status.get("services", []),
                     "data_interface": status,
                     "factor_id": hypothesis.factor_id,
+                    "factor_artifact": artifact_meta,
                     "start": hypothesis.start,
                     "end": hypothesis.end,
                     "universe": hypothesis.outcomes[0].universe if hypothesis.outcomes else "",
