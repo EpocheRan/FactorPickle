@@ -571,6 +571,11 @@
     .pin-foot{position:relative;left:auto;right:auto;bottom:auto;width:min(440px,90vw);margin:18px auto 0}
     .pin-hint{display:none}
     .fp-hero{padding:calc(var(--header-h,80px) + 40px) 0 26px}
+    .fp-page .hero{padding:calc(var(--header-h,80px) + 40px) 0 26px!important}
+    .fp-page .hero h1{font-size:clamp(38px,10vw,54px)!important}
+    .fp-page .hero .lede{font-size:13.5px}
+    .fp-page .section{padding:34px 0!important}
+    .fp-page .sec-head{flex-direction:column;align-items:flex-start;gap:10px}
     .fp-hero h1{font-size:clamp(38px,10vw,54px)}
     .fp-lede{font-size:13.5px}
     .fp-metrics{grid-template-columns:1fr 1fr;margin-top:22px}
@@ -850,6 +855,47 @@
   .fp-box b{display:block;font-size:13px;color:#e6eef6;margin-bottom:6px}
   .fp-box span{font-size:11px;line-height:1.6;color:#8296a3}
   .fp-accent{color:#c9ff5a}
+
+  /* Explore pages adopt the feature-page visual language */
+  .fp-page .hero{padding:calc(var(--header-h,80px) + 82px) 0 38px!important}
+  .fp-page .hero .kicker{
+    font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:#c9ff5a;
+    text-transform:uppercase;margin:0;
+  }
+  .fp-page .hero .kicker::before,.fp-page .hero .kicker::after{display:none}
+  .fp-page .hero h1{
+    margin:14px 0 14px!important;font-size:clamp(40px,5.4vw,70px)!important;
+    line-height:1.02!important;letter-spacing:-.05em!important;font-weight:650!important;color:#eef5fb;
+  }
+  .fp-page .hero .lede{max-width:780px;margin:0;font-size:15px;line-height:1.8;color:#9caebe}
+  .fp-page .section{padding:47px 0!important;border-top:1px solid var(--line-soft)}
+  .fp-page .sec-head{align-items:flex-end;gap:24px;margin-bottom:22px}
+  .fp-page .sec-title{font-size:clamp(22px,2.4vw,30px);line-height:1.2;letter-spacing:-.025em;font-weight:600;color:#eef5fb}
+  .fp-page .sec-desc{font-size:13px;line-height:1.7;color:#8fa2b4;margin-top:8px;max-width:680px}
+  .fp-page .sec-tag{
+    font-size:8px;letter-spacing:.14em;color:#6d8275;border-color:var(--line);
+    padding:5px 8px;border-radius:2px;background:transparent;
+  }
+  .fp-page .mod-grid{gap:11px;margin-top:0}
+  .fp-page .mod{
+    border-radius:8px;padding:20px 19px;background:linear-gradient(180deg,rgba(11,19,18,.8),rgba(6,10,9,.72));
+    border-color:var(--line);
+  }
+  .fp-page .mod:hover{transform:translateY(-2px);border-color:rgba(201,255,90,.24)}
+  .fp-page .mod-role{font-size:12px;color:#91a4b4}
+  .fp-page .mod-funcs{border-top-color:var(--line-soft)}
+  .fp-page .fn{font-size:10.5px;color:#9fb2ae}
+  .fp-page .arch-shell{
+    border-radius:12px;border-color:var(--line);
+    background:linear-gradient(180deg,rgba(10,19,15,.92),rgba(5,10,9,.96));
+  }
+  .fp-page .arch-foot{background:rgba(5,10,9,.55)}
+  .fp-page .er-shell{
+    border-radius:12px;border-color:var(--line);
+    background:linear-gradient(180deg,rgba(10,19,15,.92),rgba(5,10,9,.96));
+  }
+  .fp-page .er-toolbar{background:rgba(7,12,11,.8);border-bottom-color:var(--line-soft)}
+  .fp-page .er-canvas{background:#050a08}
 
   /* ---------- start / deploy ---------- */
   .start-cta{
@@ -1418,7 +1464,7 @@
 
   <!-- ============ ARCHITECTURE ============ -->
   <section class="view" id="view-architecture">
-    <div class="wrap">
+    <div class="wrap fp-page">
       <div class="hero" style="padding:46px 0 10px">
         <div class="kicker">Architecture · System Map</div>
         <h1 style="font-size:clamp(28px,3.4vw,40px)">系统架构与数据流</h1>
@@ -1597,7 +1643,7 @@
 
   <!-- ============ MODULES ============ -->
   <section class="view" id="view-modules">
-    <div class="wrap">
+    <div class="wrap fp-page">
       <div class="hero" style="padding-bottom:6px">
         <div class="kicker">11 Modules · Responsibility &amp; Public API</div>
         <h1 style="font-size:clamp(28px,3.4vw,40px)">模块职责、核心函数与依赖</h1>
@@ -1615,7 +1661,7 @@
 
   <!-- ============ MODEL ============ -->
   <section class="view" id="view-model">
-    <div class="wrap">
+    <div class="wrap fp-page">
       <div class="hero" style="padding:46px 0 10px">
         <div class="kicker">Entity Map · 7 Data Domains</div>
         <h1 style="font-size:clamp(28px,3.4vw,40px)">数据模型与表关系</h1>
