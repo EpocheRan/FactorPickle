@@ -958,7 +958,7 @@
   .start-links a:hover{color:#fff}
   .start-links a span{color:#c9ff5a;padding-left:2px}
 
-  .foot{padding:56px 0 28px;color:var(--dim);font-size:11px;border-top:0;margin-top:0;background:#04070d}
+  .foot{padding:56px 0 28px;color:var(--dim);font-size:11px;border-top:1px solid var(--line);margin-top:0;background:#04070d}
   .foot-main{display:flex;justify-content:space-between;gap:30px;align-items:flex-start;padding-bottom:30px}
   .foot-brand{display:flex;align-items:center;gap:12px}
   .foot-brand .logo{width:34px;height:34px;filter:drop-shadow(0 0 10px rgba(185,255,63,.2))}
@@ -1381,14 +1381,6 @@
 
 <span class="c"># 环境不满足时返回 blocker_feedback</span>
 <span class="c"># 不在上一轮会话里猜状态</span></code></pre></div>
-      </div>
-      <div class="fp-section">
-        <div class="fp-sec-head"><div><div class="fp-label mono">04 / BOUNDARY</div><h2>边界不让步</h2></div></div>
-        <div class="fp-grid">
-          <div class="fp-card"><div class="idx mono">DATA</div><h3>唯一数据边界</h3><p>Runner 只调用 data_interface；不直连 QuestDB、不写 SQL，未暴露字段转成 data gap。</p></div>
-          <div class="fp-card"><div class="idx mono">BUDGET</div><h3>预算与轮次硬上限</h3><p>月度预算、campaign 预算、wall-clock、停滞检测与安全垫共同约束探索。</p></div>
-          <div class="fp-card"><div class="idx mono">HUMAN</div><h3>promote 必须 G4</h3><p>放开研究自由度，不放开上线权限；因子晋升仍需 Human 确认。</p></div>
-        </div>
       </div>
     </div>
   </section>
