@@ -30,6 +30,7 @@ def run_experiment(
     use_cache: bool = True,
     with_peers: bool = True,
     auto_audit: bool = True,
+    panel: Any | None = None,
 ) -> dict[str, Any]:
     config.ensure_dirs()
     assert_running()
@@ -97,6 +98,7 @@ def run_experiment(
         "git_commit": config.git_commit(),
         "policy": {"version": policy["version"], "sha256": policy["sha256"]},
         "evaluator": RESEARCH.source,
+        "data_path": "runner_panel" if panel is not None else "research_loader",
         "started_at": config.now_iso(),
         "status": "running",
     }
@@ -118,6 +120,7 @@ def run_experiment(
             groups=outcome.groups,
             profile=profile,
             use_cache=use_cache,
+            panel=panel,
         )
         report_html = result.html
         stable_html = root / "report.html"

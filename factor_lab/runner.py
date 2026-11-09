@@ -13,6 +13,7 @@ from typing import Any
 
 from . import config
 from .data_interface_adapter import DataInterfaceGateway
+from .panel_builder import BuiltPanel, build_price_panel
 from .schemas import Hypothesis
 from .store import read_json, write_json_atomic
 
@@ -32,6 +33,16 @@ class FactorRunner:
         require_data(status)
         return status
 
+    def build_panel(self, codes: list[str], start: str, end: str) -> BuiltPanel:
+        """Build a Runner-owned price panel via data_interface.
+
+        Callers remain responsible for choosing codes from the factor data
+        contract; no automatic fallback to the legacy research loader.
+        """
+
+        self.preflight()
+        return build_price_panel(self.gateway, codes, start, end)
+
     def run(
         self,
         hypothesis: Hypothesis,
@@ -39,8 +50,12 @@ class FactorRunner:
         profile: str = "quick",
         robustness: bool = False,
         auto_audit: bool = True,
+        panel: Any | None = None,
+        built_panel: BuiltPanel | None = None,
     ) -> dict[str, Any]:
         status = self.preflight()
+        if built_panel is not None:
+            panel = built_panel.panel
         from .run import run_experiment
 
         result = run_experiment(
@@ -48,16 +63,19 @@ class FactorRunner:
             profile=profile,
             robustness=robustness,
             auto_audit=auto_audit,
+            panel=panel,
         )
         experiment_dir = Path(str(result.get("experiment_dir") or ""))
         manifest_path = experiment_dir / "data_manifest.json"
         if experiment_dir.exists():
             experiment_manifest = read_json(experiment_dir / "manifest.json") or {}
+            manifest = built_panel.manifest.to_dict() if built_panel else {}
             write_json_atomic(
                 manifest_path,
                 {
                     "schema_version": "factor_lab.data_manifest.v1",
                     "source": "data_interface",
+                    "data_path": "runner_panel" if panel is not None else "legacy_research_loader",
                     "services": status.get("services", []),
                     "data_interface": status,
                     "factor_id": hypothesis.factor_id,
@@ -68,10 +86,11 @@ class FactorRunner:
                     "run_id": result.get("run_id"),
                     "data_version": experiment_manifest.get("data_version"),
                     "report_meta": experiment_manifest.get("report_meta"),
+                    "data_interface_manifest": manifest,
                     "note": (
-                        "Runner preflight is data_interface-only. The legacy research.report "
-                        "panel loader still executes behind ResearchReportAdapter; field-level "
-                        "lineage is in the experiment manifest/report_meta."
+                        "data_path=runner_panel means Runner built a Panel from data_interface "
+                        "and passed panel= into the Research Adapter. data_path=legacy_research_loader "
+                        "means the legacy research panel loader was used."
                     ),
                 },
             )

@@ -202,9 +202,10 @@ panels and the peer residual matrix are intentionally excluded.
 - Scout/Director/PathFinder/Gateway/ML Planner/FactorBuilder are tool-capable
   DSH subagents (tools inherited from preset/parent composition); the Python
   runtime still owns data access, execution, gates and budget.
-- Runner data preflight goes through `data_interface`; the new `factor_lab/runner.py`
-  records a `data_manifest.json`. The legacy research report loader remains the
-  production evaluator behind the Research Adapter.
+- Runner data preflight goes through `data_interface`; `panel_builder.py` can
+  build a Runner-owned price panel and pass `panel=` into the Research Adapter.
+  The legacy `research.report` loader remains the default path for ordinary
+  factor tests, so existing tests are unchanged.
 - Vectorized factor evaluation still uses `research.report` / `research.report.metrics`.
 - `rho_return` is still pending; G0.5 is exposure-only.
 - Multi-trial BH is still a batch step; current q is Bonferroni fallback.
@@ -223,6 +224,7 @@ production research/factor-data packages:
 | `factor_library.py` | Versioned `factor_lab/factors/generated/<family>/<factor_id>/vN/` |
 | `factor_builder.py` | FactorBuilder write path: generated Python + spec + tests + hash |
 | `runner.py` | Runner preflight + experiment + `data_manifest.json` |
+| `panel_builder.py` | Runner-owned `Panel` from data_interface (optional path) |
 | `ml_engine.py` | Non-Deep-Learning walk-forward ML runtime + signal admission |
 | `campaign.py` | Bounded PathFinder ↔ ML campaign, rounds/traces/stop rules |
 | `discovery.py` | Gateway discovery brief/map contracts + offline fallback |
@@ -246,6 +248,7 @@ python -m factor_lab ml run --dataset data.csv --spec ml_spec.json --out output/
 python -m factor_lab campaign start --objective "研究因子"
 python -m factor_lab campaign run --dataset data.csv --plan campaign_plan.json --objective "ml smoke"
 python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json
+python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json --data-bundle --codes 600000,000001
 python -m factor_lab discovery queries --question "研究问题"
 python -m factor_lab discovery ingest --result gateway_result.json
 ```

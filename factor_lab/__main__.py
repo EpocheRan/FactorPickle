@@ -89,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
     runner_parser.add_argument("--profile", default="quick")
     runner_parser.add_argument("--robustness", action="store_true")
     runner_parser.add_argument("--no-audit", action="store_true")
+    runner_parser.add_argument("--data-bundle", action="store_true", help="Runner builds a Panel from data_interface")
+    runner_parser.add_argument("--codes", default="", help="comma-separated codes for --data-bundle")
 
     discovery_parser = sub.add_parser("discovery", help="DSH Web Gateway query/ingest")
     discovery_parser.add_argument("action", choices=["queries", "ingest"], nargs="?", default="queries")
@@ -358,12 +360,21 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"hypothesis not found or invalid: {path}")
         from .runner import FactorRunner
 
+        hypothesis = Hypothesis.from_dict(raw)
+        runner = FactorRunner()
+        built = None
+        if args.data_bundle:
+            codes = [item.strip() for item in args.codes.split(",") if item.strip()]
+            if not codes:
+                raise SystemExit("runner --data-bundle requires --codes")
+            built = runner.build_panel(codes, hypothesis.start, hypothesis.end or "2026-11-01")
         _print(
-            FactorRunner().run(
-                Hypothesis.from_dict(raw),
+            runner.run(
+                hypothesis,
                 profile=args.profile,
                 robustness=args.robustness,
                 auto_audit=not args.no_audit,
+                built_panel=built,
             )
         )
         return 0

@@ -14,6 +14,7 @@ from factor_lab.factor_library import FactorLibrary, FactorLibraryError
 from factor_lab.factor_builder import build as build_factor
 from factor_lab.history import HistoryEntry, append as append_history, recent, search
 from factor_lab.ml_engine import MLExperimentSpec, run_experiment, signal_to_factor_decision
+from factor_lab.panel_builder import build_price_panel
 from factor_lab.readiness import ReadinessBlocked, require_data
 from factor_lab.schemas import Hypothesis, OutcomeSpec
 from factor_lab.web_gateway import build_context, parse_gateway_output, seed_queries
@@ -237,6 +238,16 @@ def test_workflows_do_not_forbid_inherited_tools():
         text = path.read_text(encoding="utf-8")
         assert "不要使用任何工具" not in text, path.name
         assert "Do not use tools" not in text, path.name
+
+
+def test_panel_builder_from_data_interface():
+    gateway = DataInterfaceGateway(market_loader_factory=FakeMarket)
+    built = build_price_panel(gateway, ["600000", "000001"], "2024-01-02", "2024-01-05", warmup_days=10)
+    assert built.panel.close.shape[1] == 2
+    assert list(built.panel.symbols) == ["600000", "000001"]
+    assert built.panel.eval_start is not None
+    assert built.manifest.source == "data_interface"
+    assert built.manifest.data_hash
 
 
 def test_web_gateway_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
