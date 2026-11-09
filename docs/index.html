@@ -522,6 +522,7 @@
     font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:#5f7288;
     opacity:1;transition:opacity .35s ease;
   }
+  .pin-swipe{display:none}
   .pin-scene.is-story .pin-card{opacity:0!important;pointer-events:none}
   .pin-scene.is-story .pin-foot{opacity:0}
   .pin-scene.is-story .pin-frame{opacity:.55}
@@ -551,12 +552,15 @@
       position:relative;inset:auto;display:flex;gap:12px;width:100%;
       margin:16px 0 0;padding:0 8vw 10px;overflow-x:auto;overscroll-behavior-x:contain;
       scroll-snap-type:x mandatory;pointer-events:auto;scrollbar-width:none;
+      -webkit-overflow-scrolling:touch;touch-action:pan-x;scroll-behavior:smooth;cursor:grab;
     }
+    .pin-cards:active{cursor:grabbing}
     .pin-cards::-webkit-scrollbar{display:none}
+    .pin-swipe{display:block;margin:4px auto 0;font-family:var(--mono);font-size:7.5px;letter-spacing:.16em;color:#5f7288;text-align:center}
     .pin-card,.pin-card.left,.pin-card.right{
       position:relative;top:auto;left:auto;right:auto;flex:0 0 84vw;width:84vw;max-width:410px;min-height:270px;
       transform:none!important;opacity:1!important;pointer-events:auto;scroll-snap-align:center;
-      padding:21px 21px 23px;border-radius:16px;
+      padding:21px 21px 23px;border-radius:16px;touch-action:pan-x;user-select:none;
     }
     .pin-card-top{margin-bottom:16px}
     .pin-card-icon{width:44px;height:44px}
@@ -1124,6 +1128,7 @@
           <p>PathFinder 生成假设，Runner 批量验证，Evaluator 评分；失败实验也进入可追溯账本。</p>
         </article>
         </div>
+        <div class="pin-swipe mono" aria-hidden="true">← SWIPE TO EXPLORE →</div>
         <div class="pin-foot">
           <div class="pin-progress mono"><span id="pinStage">01</span><i><b id="pinBar"></b></i><span>08</span></div>
           <div class="pin-hint mono">SCROLL TO ROTATE <span>↓</span></div>
@@ -2918,8 +2923,32 @@ function initPinScene() {
   const storyCopy = $('#storyCopy');
   const storyKicker = $('#storyKicker');
   const pickleWrap = $('#pickleWrap');
+  const cardRail = $('#pinCards');
   if (!scene || !cards.length) return;
   const INTRO = .12;
+
+  if (cardRail) {
+    let dragging = false, startX = 0, startLeft = 0;
+    cardRail.addEventListener('pointerdown', (e) => {
+      if (window.innerWidth > 900 || e.pointerType !== 'mouse') return;
+      dragging = true;
+      startX = e.clientX;
+      startLeft = cardRail.scrollLeft;
+      cardRail.style.cursor = 'grabbing';
+      cardRail.setPointerCapture(e.pointerId);
+    });
+    cardRail.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      cardRail.scrollLeft = startLeft - (e.clientX - startX);
+    });
+    const stopDrag = () => {
+      dragging = false;
+      cardRail.style.cursor = '';
+    };
+    cardRail.addEventListener('pointerup', stopDrag);
+    cardRail.addEventListener('pointercancel', stopDrag);
+    cardRail.addEventListener('lostpointercapture', stopDrag);
+  }
 
   const three = initPickle3D();
   let target = 0;
