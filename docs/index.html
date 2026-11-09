@@ -124,16 +124,21 @@
       #040806;
   }
   .hero-visual{position:absolute;inset:0;z-index:0;isolation:isolate;opacity:1;pointer-events:none;overflow:hidden}
-  .hero-visual img{position:relative;z-index:2;display:block;width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(1.015);will-change:transform,filter;animation:heroDrift 32s ease-in-out infinite alternate,heroPulse 7s ease-in-out infinite alternate}
+  .hero-visual img{position:relative;z-index:2;display:block;width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(1.015);will-change:transform,filter;animation:pickleFloat 9s ease-in-out infinite alternate,heroPulse 7s ease-in-out infinite alternate}
   .hero-aura{
     position:absolute;z-index:1;right:2%;top:10%;width:560px;height:560px;border-radius:50%;
     background:radial-gradient(circle,rgba(185,255,63,.15),rgba(185,255,63,.04) 44%,transparent 70%);
     filter:blur(18px);animation:heroAura 8s ease-in-out infinite alternate;pointer-events:none;
   }
-  .hero-scan{
-    position:absolute;z-index:3;top:-12%;bottom:-12%;left:-22%;width:140px;pointer-events:none;
-    background:linear-gradient(90deg,transparent,rgba(216,255,122,.10),rgba(255,255,255,.045),transparent);
-    filter:blur(14px);transform:skewX(-14deg);animation:heroScanSweep 7.5s linear infinite;
+  .pickle-scan{
+    position:absolute;z-index:3;pointer-events:none;overflow:hidden;
+    left:calc(70% - 12.2%);top:calc(50% - 46.65%);width:24.4%;height:93.3%;
+    border-radius:999px;transform:rotate(-31deg);
+  }
+  .pickle-scan::before{
+    content:"";position:absolute;top:-20%;bottom:-20%;left:-70%;width:45%;pointer-events:none;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),rgba(232,255,180,.72),rgba(255,255,255,.3),transparent);
+    filter:blur(9px);animation:pickleScanBg 2.2s cubic-bezier(.45,0,.55,1) infinite;
   }
   .hero-spark{
     position:absolute;z-index:4;width:5px;height:5px;border-radius:50%;pointer-events:none;
@@ -143,13 +148,13 @@
   .hero-spark.s1{left:67%;top:32%;animation-delay:-2s}
   .hero-spark.s2{left:80%;top:58%;width:3px;height:3px;animation-delay:-5.5s}
   .hero-spark.s3{left:73%;top:74%;width:4px;height:4px;animation-delay:-7s}
-  @keyframes heroDrift{from{transform:scale(1.015) translate3d(0,0,0)}to{transform:scale(1.045) translate3d(-1.2%,-.6%,0)}}
+  @keyframes pickleFloat{from{transform:translateY(-8px) scale(1.035)}to{transform:translateY(10px) scale(1.045)}}
+  @keyframes pickleScanBg{0%,4%{left:-70%;opacity:0}12%{opacity:.85}55%{left:120%;opacity:.85}56%,100%{left:120%;opacity:0}}
   @keyframes heroPulse{from{filter:drop-shadow(0 0 14px rgba(185,255,63,.03))}to{filter:drop-shadow(0 0 36px rgba(185,255,63,.08))}}
   @keyframes heroAura{from{transform:scale(.9);opacity:.35}to{transform:scale(1.08);opacity:.75}}
-  @keyframes heroScanSweep{0%{left:-22%}100%{left:112%}}
   @keyframes heroSpark{0%,100%{transform:translate3d(0,0,0);opacity:.22}50%{transform:translate3d(-22px,-34px,0);opacity:1}}
   .hero-veil{
-    position:absolute;inset:0;pointer-events:none;
+    position:absolute;inset:0;z-index:1;pointer-events:none;
     background:
       linear-gradient(90deg,#05080f 0%,rgba(5,8,15,.96) 30%,rgba(5,8,15,.9) 48%,rgba(5,8,15,.66) 60%,rgba(5,8,15,.24) 72%,rgba(5,8,15,0) 85%),
       linear-gradient(180deg,rgba(5,8,15,.55),transparent 20%,transparent 76%,rgba(5,8,15,.9));
@@ -594,7 +599,7 @@
     .hero-copy p{width:100%;max-width:100%;overflow-wrap:anywhere}
     .hero-bottom{width:100%;overflow:hidden}
     .hero-visual{opacity:.55}
-    .hero-visual img{object-position:68% center}
+    .hero-visual img{object-position:center}
     .hero-bottom{flex-direction:column;align-items:flex-start;gap:22px;padding-top:28px}
     .hero-side{position:static;right:auto;bottom:auto;margin-left:0;flex-direction:row;flex-wrap:wrap;gap:14px;text-align:left}
     .hero-scroll{display:none}
@@ -659,7 +664,7 @@
       <div class="hero-visual" id="heroVisual" aria-hidden="true">
         <span class="hero-aura"></span>
         <img src="assets/hero-factorpickle.svg" alt="">
-        <span class="hero-scan"></span>
+        <span class="pickle-scan"></span>
         <span class="hero-spark s1"></span>
         <span class="hero-spark s2"></span>
         <span class="hero-spark s3"></span>
