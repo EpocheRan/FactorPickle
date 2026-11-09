@@ -1,68 +1,46 @@
-# DSH workflow: Factor Lab research roles
+# DSH workflows: Factor Lab research roles
 
-Current role contracts:
+DSH subagents are full local Agents. Their tools come from the selected Agent
+preset / parent composition; by default a child joins the parent composition
+and inherits its tools. `maxDepth` limits grandchildren, not tools. If a child
+appears to have no tools, check the preset's plugins / imported services /
+activation state before changing the prompt.
 
-- `phase1_scout.js` / `phase1_director.js`: proven Phase 1 selection and memo.
-- `research_pathfinder.js`: proposes one bounded campaign round; Python
-  `campaign.py` enforces rounds, duplicates, budget and stop rules.
-- `ml_planner.js`: non-Deep-Learning ML experiment spec.
-- `factor_builder.js`: emits factor code + spec + tests; Python
-  `factor-build` writes it into the versioned Lab factor library.
-- `web_gateway.js`: no-tool LLM summarizer for raw DSH `web_search` results;
-  the DSH main session performs the search and this agent returns a cited
-  digest. Python `discovery ingest` writes the map.
+Tool-capable contracts:
 
-No-tool agents are deliberate: file/tool-using children have hung. The Python
-runtime owns data access, execution, gates, budget and reclamation.
+- `phase1_scout.js` / `phase1_director.js`: Phase 1 selection and memo; may
+  read artifacts with inherited tools. Inline context is still provided so the
+  call can also work in a minimal composition.
+- `research_pathfinder.js`: may use `read` / `glob` / `grep` / `web_search` to
+  inspect History, discovery maps and campaigns; it only proposes one round.
+- `web_gateway.js`: may use `web_search` directly; returns a cited digest with
+  `discovery_map`/`web_digest` inputs.
+- `ml_planner.js`: may read data coverage / history / prior result; returns a
+  non-Deep-Learning spec; Python executes.
+- `factor_builder.js`: may read existing factors and write generated factor
+  versions into the Lab library; Python `factor-build` remains the validator.
 
-`phase1_scout.js` and `phase1_director.js` are still the working Phase 1 path;
-the newer contracts are additive and can be wired into the campaign runner.
+The Python runtime owns data access, execution, Gate, budget, campaign rounds
+and reclamation. Do not let an LLM child promote a factor or bypass a Gate.
 
-
-Working pattern:
+Web discovery flow:
 
 ```text
-DSH workflow (Scout, no tools) -> phase1/agent_plan.json
+python -m factor_lab discovery queries --question "..."
+DSH web_gateway.js (web_search + summarize) -> gateway_result.json
+python -m factor_lab discovery ingest --result gateway_result.json
+```
+
+Phase 1 bridge:
+
+```text
+DSH workflow (Scout) -> phase1/agent_plan.json
 python -m factor_lab phase1-agent --plan phase1/agent_plan.json
-DSH workflow (Director, no tools) -> phase1/agent_memo.json
+DSH workflow (Director) -> phase1/agent_memo.json
 python -m factor_lab phase1-director --memo phase1/agent_memo.json
 ```
 
-- `phase1_scout.js`: one no-tool Scout agent; pass the current metrics and
-  fresh-factor list via `args.context`.
-- `phase1_director.js`: one no-tool Director agent; pass the cycle metrics via
-  `args.context`.
-- The Python Runner is a separate CLI; this avoids the subagent tool-call hang
-  observed when an agent tried to read files or run commands.
-- Both agents use a JSON schema and explicitly say “不要使用任何工具”.
-- Agent budget: at most 2 children per cycle; no ping/probe agents in
-  production. Run the reclaim script after the task, not while a workflow is
-  active.
-
-The bridge commands:
-
-```powershell
-python -m factor_lab phase1-agent --plan output/factor_lab/phase1/agent_plan.json
-python -m factor_lab phase1-director --memo output/factor_lab/phase1/agent_memo.json
-```
-
-`phase1-agent` validates the selected factors against the fresh catalog, runs
-the cycle, writes `agent_cycle.json`, and rebuilds `phase1_report`.
-`phase1-director` writes `agent_memo.json` and updates `research_queue.json`.
-
-Note: the Scout/Director prompts must be self-contained. Do not ask them to read
-files or execute commands; that path was observed to hang for >10 minutes.
-
-## Reclaim child sessions
-
-DSH has no public “close subagent” tool. Workflow child sessions are stored as
-non-`session-*` directories. After a task is complete:
-
-```powershell
-powershell -File factor_lab/workflows/reclaim_dsh_children.ps1          # dry run
-powershell -File factor_lab/workflows/reclaim_dsh_children.ps1 -Apply   # archive
-```
-
-The script moves inactive child sessions to
-`%USERPROFILE%\.dsh\reclaimed_sessions\...`; it does not delete them. Refresh the
-DSH page afterwards. Do not run this while a workflow is still active.
+Agent budget: keep a bounded number of children per cycle; no ping/probe
+agents in production. Use `factor_lab/agents.py` / `supervisor reclaim` for
+safety-gated registry-based reclamation; the PowerShell script remains a
+manual utility.

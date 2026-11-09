@@ -1,8 +1,8 @@
-// PathFinder round contract. The Python campaign runtime owns rounds,
-// budgets, duplicate detection and stop rules; this agent only proposes.
-// Pass args.context with History, discovery_map, previous ML results, and
-// campaign limits. Do not use tools.
-
+// PathFinder round contract. DSH subagents inherit the parent composition by
+// default, so this agent may use read / glob / grep / web_search tools to read
+// research history, discovery maps and campaign traces. It must not run
+// experiments or modify code; the Python campaign runtime owns lifecycle,
+// budget and stop rules.
 const schema = {
   type: "object",
   properties: {
@@ -20,11 +20,18 @@ const schema = {
 phase("pathfinder");
 const context = String(args.context || "");
 const proposal = await agent(
-  `你是 Factor Lab 的 PathFinder。不要使用任何工具，只根据下面的上下文提出下一轮研究动作。
-禁止 Deep Learning。必须带 escape_mode 和 novelty_vector（只对 factor/ml 动作）。
+  `你是 Factor Lab 的 PathFinder。你可以使用工具（read / glob / grep / web_search）读取当前研究状态：
+- output/factor_lab/research_history.jsonl
+- output/factor_lab/discovery/discovery_map.json
+- output/factor_lab/campaigns/
+- 需要外部机制时可用 web_search 检索，但必须保留来源 URL。
+不要运行研究、不要修改代码、不要写实验产物；你只提出下一轮动作。
+
+路径阅读顺序：History → discovery_map → 上一轮 ML result；如果没有文件，再使用下面内联上下文。
+禁止 Deep Learning。factor/ml 动作必须带 escape_mode 和 novelty_vector。
 上下文：
 ${context}
-返回 JSON；如果当前证据不足或已经达到停止条件，action=stop 并说明 reason。`,
+返回 JSON；证据不足或达到停止条件时 action=stop 并说明 reason。`,
   { schema, label: "PathFinder", phase: "pathfinder" }
 );
 return proposal;

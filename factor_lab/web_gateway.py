@@ -1,9 +1,10 @@
 """DSH LLM Gateway contracts for web discovery.
 
-DSH owns web search / browsing tools.  A DSH session collects raw search
-results, then calls the no-tool ``web_gateway.js`` summarizer.  This module
-builds queries, validates the LLM result, and writes the citation-bearing
-discovery artifacts consumed by PathFinder.
+A DSH subagent inherits its parent composition by default and may use
+``web_search`` directly; a main session may also pass raw search results into
+the no-tool summarizer path.  This module builds queries, validates the LLM
+result, and writes the citation-bearing discovery artifacts consumed by
+PathFinder.
 """
 
 from __future__ import annotations

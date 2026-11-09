@@ -231,6 +231,14 @@ def test_ml_plan_campaign_runs_and_stops(tmp_path: Path, monkeypatch: pytest.Mon
     assert (tmp_path / "campaigns" / result["campaign_id"] / "campaign_summary.json").exists()
 
 
+def test_workflows_do_not_forbid_inherited_tools():
+    workflows = Path(__file__).resolve().parents[1] / "factor_lab" / "workflows"
+    for path in workflows.glob("*.js"):
+        text = path.read_text(encoding="utf-8")
+        assert "不要使用任何工具" not in text, path.name
+        assert "Do not use tools" not in text, path.name
+
+
 def test_web_gateway_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from factor_lab.discovery import DiscoveryBrief
     import factor_lab.web_gateway as gateway

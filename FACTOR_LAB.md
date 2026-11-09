@@ -25,8 +25,9 @@ python -m factor_lab campaign start --objective "研究因子"
 
 ```powershell
 python -m factor_lab discovery queries --question "研究问题"
-# DSH main session: web_search over the returned queries
-# DSH LLM Gateway: factor_lab/workflows/web_gateway.js with raw search results
+# DSH Gateway child may use web_search directly (tools inherited from preset)
+# or the main session may supply raw results
+# DSH LLM Gateway: factor_lab/workflows/web_gateway.js
 python -m factor_lab discovery ingest --result gateway_result.json
 ```
 

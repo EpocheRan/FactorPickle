@@ -1,7 +1,6 @@
-// Working DSH Scout pattern: no-tool, self-contained prompt.
-// Tool-using subagents were observed to hang; the Python Runner is kept outside.
-// Pass `args.context` with the current metrics and fresh-factor list.
-
+// Phase 1 Scout. DSH subagents inherit the parent composition by default, so
+// this child may use read / glob / grep to inspect phase1 artifacts. Context is
+// still passed inline for a self-contained decision; tool use is optional.
 const schema = {
   type: "object",
   properties: {
@@ -21,7 +20,11 @@ const schema = {
 phase("scout");
 const context = String(args.context || "");
 const plan = await agent(
-  `你是 Factor Lab 的 Scout agent。不要使用任何工具，直接基于以下信息判断并返回 JSON。\n\n${context}\n\n请选择 2-4 个新因子，给出 family_id、中文 rationale、next_bet、discovery_verdict。`,
+  `你是 Factor Lab 的 Scout agent。你可以使用 read / glob / grep 读取
+output/factor_lab/phase1、experiments、research_history 等产物；如果上下文已经足够，也可以直接判断。
+不要运行实验、不要修改代码。
+基于已有结果和 fresh catalog 选择 2–4 个新因子，返回 JSON：
+${context}`,
   { schema, label: "Scout", phase: "scout" }
 );
 return plan;

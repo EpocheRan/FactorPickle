@@ -75,7 +75,7 @@ Four deterministic cycles with 16 new factors produced:
 
 A fifth fallback agent-plan cycle added `risk.vol_of_vol_120d` and
 `risk.high_low_ratio_60d` (both high IC, negative net). A sixth cycle used a
-**real DSH Scout/Director** no-tool workflow and added three factors. A seventh
+**real DSH Scout/Director** workflow and added three factors. A seventh
 full-flow test added three more. Final Phase 1:
 
 - **24 factors / 7 cycles**
@@ -89,13 +89,12 @@ The first agent-plan run was correctly blocked by **R4**: panel cache reached
 3.11GB > 3GB. After `maintenance clean --apply` archived one old panel file it
 completed with 2 successes. This is the intended R4 behavior.
 
-Root cause of the earlier Scout timeout: the LLM subagent hung when asked to
-read files or execute tools. The working pattern is a **no-tool, self-contained**
-Scout/Director prompt (`workflows/phase1_scout.js` and
-`workflows/phase1_director.js`) with the Python `phase1-agent` Runner between
-them. The sixth and seventh cycles used this path and produced real agent
-plan/memo files. Child sessions are archived after each task with
-`workflows/reclaim_dsh_children.ps1`.
+DSH subagents inherit the parent composition by default and can use tools. The
+Scout/Director prompts keep their context inline for a deterministic first
+decision, but the children may also use `read` / `glob` / `grep` to inspect
+artifacts. Tool availability is a property of the selected Agent preset /
+parent composition, not a hard DSH restriction; if a child has no tools, check
+the preset's plugins and service activation first.
 
 ## Evaluation adapter
 
@@ -200,10 +199,9 @@ panels and the peer residual matrix are intentionally excluded.
 
 ## Architecture v4.1 status
 
-- Scout/Director no-tool workflows are the proven LLM decision path; PathFinder,
-  Web Gateway, ML Engine planner, Evaluator narrative and Supervisor triage are
-  implemented as contracts/runtime scaffolding (not yet wired into a 24/7 DSH
-  scheduler).
+- Scout/Director/PathFinder/Gateway/ML Planner/FactorBuilder are tool-capable
+  DSH subagents (tools inherited from preset/parent composition); the Python
+  runtime still owns data access, execution, gates and budget.
 - Runner data preflight goes through `data_interface`; the new `factor_lab/runner.py`
   records a `data_manifest.json`. The legacy research report loader remains the
   production evaluator behind the Research Adapter.
@@ -253,7 +251,7 @@ python -m factor_lab discovery ingest --result gateway_result.json
 ```
 
 Budget price: input `¥0.04 / 1M tokens`, output `¥8.00 / 1M tokens`.
-DSH main session performs web search; the no-tool `workflows/web_gateway.js`
+DSH main session or the Gateway child can use `web_search`; the Gateway LLM
 summarizes raw results into citations, then `discovery ingest` writes the map.
 
 Portability:
