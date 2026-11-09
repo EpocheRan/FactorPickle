@@ -525,7 +525,7 @@
   .pin-swipe{display:none}
   .pin-scene.is-story .pin-card{opacity:0!important;pointer-events:none}
   .pin-scene.is-story .pin-foot{opacity:0}
-  .pin-scene.is-story .pin-frame{opacity:.55}
+  .pin-scene.is-story .pin-frame{opacity:1}
   .pin-scene.is-story .pickle-axis{opacity:0}
   .pin-progress{display:flex;align-items:center;gap:10px}
   .pin-progress i{display:block;width:112px;height:1px;background:rgba(148,163,184,.2);overflow:hidden}
@@ -1030,21 +1030,30 @@
                 <stop offset="1" stop-color="#9be33f" stop-opacity="0"/>
               </linearGradient>
               <filter id="waveBlur"><feGaussianBlur stdDeviation="26"/></filter>
+              <radialGradient id="waveHoleGrad">
+                <stop offset="0" stop-color="#000000"/>
+                <stop offset=".58" stop-color="#000000"/>
+                <stop offset=".82" stop-color="#555555"/>
+                <stop offset="1" stop-color="#ffffff"/>
+              </radialGradient>
+              <mask id="waveHole" maskUnits="userSpaceOnUse" x="0" y="0" width="1600" height="900">
+                <rect width="1600" height="900" fill="#ffffff"/>
+                <ellipse id="waveHoleEllipse" cx="800" cy="600" rx="220" ry="130" fill="url(#waveHoleGrad)"/>
+              </mask>
             </defs>
+            <g mask="url(#waveHole)">
             <g class="wave w1">
               <path d="M-320 610 C 80 500 340 700 760 580 S 1320 460 1920 620 L1920 940 L-320 940 Z" fill="url(#waveG1)" filter="url(#waveBlur)"/>
             </g>
             <g class="wave w2">
               <path d="M-260 700 C 150 620 420 790 840 690 S 1380 590 1900 720 L1900 940 L-260 940 Z" fill="url(#waveG2)" filter="url(#waveBlur)"/>
             </g>
-            <g class="wave w3">
-              <path d="M-240 640 C 120 540 380 730 800 620 S 1340 500 1880 660" fill="none" stroke="rgba(201,255,90,.42)" stroke-width="1.7"/>
-            </g>
             <g class="wave w4">
               <path d="M-180 750 C 200 670 460 830 900 720 S 1420 640 1900 750" fill="none" stroke="rgba(126,240,199,.3)" stroke-width="1.2"/>
             </g>
             <g class="wave w5">
               <path d="M-200 830 C 240 770 520 890 960 810 S 1470 760 1900 830" fill="none" stroke="rgba(185,255,63,.24)" stroke-width="1.2"/>
+            </g>
             </g>
           </svg>
         </div>
@@ -2924,6 +2933,8 @@ function initPinScene() {
   const storyKicker = $('#storyKicker');
   const pickleWrap = $('#pickleWrap');
   const cardRail = $('#pinCards');
+  const waveLayer = $('.pin-waves');
+  const waveHole = $('#waveHoleEllipse');
   if (!scene || !cards.length) return;
   const INTRO = .12;
 
@@ -3008,6 +3019,19 @@ function initPinScene() {
       pickleWrap.style.setProperty('--pickle-scale', (.62 + .38 * ease).toFixed(3));
       pickleWrap.style.setProperty('--pickle-entry-y', ((1 - revealEase) * 72).toFixed(1) + 'px');
       pickleWrap.style.opacity = revealEase.toFixed(3);
+
+      if (waveLayer && waveHole) {
+        const pr = pickleWrap.getBoundingClientRect();
+        const wr = waveLayer.getBoundingClientRect();
+        const cx = (pr.left + pr.width / 2 - wr.left) / Math.max(1, wr.width) * 1600;
+        const cy = (pr.top + pr.height / 2 - wr.top) / Math.max(1, wr.height) * 900;
+        const rx = pr.width * .62 / Math.max(1, wr.width) * 1600;
+        const ry = pr.height * .32 / Math.max(1, wr.height) * 900;
+        waveHole.setAttribute('cx', cx.toFixed(1));
+        waveHole.setAttribute('cy', cy.toFixed(1));
+        waveHole.setAttribute('rx', rx.toFixed(1));
+        waveHole.setAttribute('ry', ry.toFixed(1));
+      }
     }
     if (storyKicker) {
       storyKicker.style.opacity = revealEase.toFixed(3);
