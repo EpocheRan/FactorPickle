@@ -1,9 +1,9 @@
 """Adapter around the production research report evaluator.
 
-Factor Lab intentionally does not reimplement IC / quantile / cost / rating.
-The source of truth is ``research.report.runner.generate``.  This adapter makes
-that seam explicit so a future evaluator can be swapped without touching the
-experiment runner.
+Naming boundary: ``research.report.runner.generate`` is the Research Module
+entrypoint in the research library, not the Factor Lab Runner.  This adapter
+lets the Factor Lab Runner pass a raw Panel / data bundle in, then receives the
+Research Result; it does not reimplement factor computation or metrics.
 """
 
 from __future__ import annotations

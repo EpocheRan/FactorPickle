@@ -102,12 +102,19 @@ the preset's plugins and service activation first.
 through `factor_lab/research_adapter.py`:
 
 ```text
-ResearchReportAdapter.generate
-  -> research.report.runner.generate
-     -> research.report.metrics.build_report
-     -> research.report.sensitivity.compute
-     -> research.report.rating.rate
+FactorRunner (factor_lab/runner.py)       # Runner role
+  → data_interface → data_bundle/Panel
+  → ResearchReportAdapter
+    → research.report.runner.generate     # Research Module facade, NOT Runner
+      → research.report.metrics.build_report
+      → research.report.sensitivity.compute
+      → research.report.rating.rate
 ```
+
+Naming boundary: `research.report.runner.generate` is a research-library
+module, not the Factor Lab Runner. The Factor Lab Runner never computes a
+factor matrix; if a Panel is injected, `generate` still computes the factor
+inside the Research Module. Do not modify `research` for this boundary.
 
 `factor_engine` is not in the evaluation path; `research.report.definitions`
 uses its registry specs only for factor metadata. Check the active adapter with:

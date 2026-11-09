@@ -1,9 +1,15 @@
-"""Runner orchestration layer.
+"""Factor Lab Runner orchestration layer.
 
-The Runner is an LLM role in the target architecture.  This module provides the
-deterministic execution seam it calls: preflight the data_interface, run the
-existing research experiment, and persist a data_manifest.  The LLM itself is
-invoked by the DSH workflow / campaign layer, not by this module.
+Naming boundary:
+
+- ``factor_lab.runner.FactorRunner`` is the Runner role: data preflight,
+  data_bundle construction, factor-artifact loading and Adapter invocation.
+- ``research.report.runner.generate`` is a research-library module, not a
+  Runner role.  It remains the Research Module facade and is not modified here.
+
+The Runner never computes a factor matrix.  It may build a raw ``Panel`` /
+``data_bundle``; ``research.report.runner.generate`` computes the factor and
+metrics internally, then returns the Research Result.
 """
 
 from __future__ import annotations
