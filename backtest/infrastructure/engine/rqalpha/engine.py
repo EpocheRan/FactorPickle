@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 # RQAlpha 会触发 matplotlib 字体扫描；把缓存放到可写目录，避免每次 run 重建。
-_MPL_DIR = Path(tempfile.gettempdir()) / "finbridge-mpl"
+_MPL_DIR = Path(tempfile.gettempdir()) / "factorpickle-mpl"
 _MPL_DIR.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("MPLCONFIGDIR", str(_MPL_DIR))
 os.environ.setdefault("MPLBACKEND", "Agg")
@@ -30,7 +30,7 @@ from backtest.infrastructure.execution.ledger import (
 )
 
 from .adapter import StrategyAdapter
-from .cost import FinBridgeCostDecider
+from .cost import FactorPickleCostDecider
 from .instruments import build_instruments, code_of
 from .runtime import Runtime, clear_runtime, set_runtime
 from .source import RQAlphaDataSource
@@ -97,7 +97,7 @@ class RQAlphaEngine:
             request.data.security_status,
             freq=self._frequency(request.spec.freq),
         )
-        cost = FinBridgeCostDecider(request.rules)
+        cost = FactorPickleCostDecider(request.rules)
         selections = (
             request.cross_plan.selections.copy()
             if request.cross_plan is not None
@@ -189,7 +189,7 @@ class RQAlphaEngine:
                     "benchmark": None,
                     "strategy_name": request.spec.strategy_name,
                 },
-                "finbridge": {
+                "factorpickle": {
                     "enabled": True,
                     "lib": "backtest.infrastructure.engine.rqalpha.mod",
                     "priority": 200,

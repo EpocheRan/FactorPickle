@@ -1,6 +1,6 @@
 # Backtest（RQAlpha）
 
-> 设计见 [../design/backtest_architecture.md](../design/backtest_architecture.md)（v3）。
+> 设计见 [../design/backtest_architecture.md](../design/backtest_architecture.md)。
 > 本文只说明当前实现状态与用法。
 
 ## 状态
@@ -17,7 +17,7 @@
 | 输出 console / csv / html | ✅ |
 | CLI（`list/validate/run/research/optimize`） | ✅ |
 | `all_a / index / file` universe | ✅ `all_a`/`index` 由数据源 PIT 解析；`file` 为显式池 |
-| 分红送转 / 复权 | ⏳ v1 未接，用原始价 |
+| 分红送转 / 复权 | 未接，用原始价 |
 | 分钟线 / 日内止损 | ⚠️ 引擎支持 1m + `next_bar`；真实数据仅 2 只 × 1 月 |
 | benchmark（000300/000852） | ✅ `type='idx'` 已接；无数据时 `benchmark_used=False` |
 
@@ -121,7 +121,7 @@ STRATEGY = RankMom20
 横截面实现 `rank(panel, dt)`，开仓由 `CrossSectionPlan` 统一执行。
 
 **横截面执行**：只在调仓日换仓；非调仓日不因排名漂移清仓
-（旧版 `buffer_out` 日频清仓已移除，`buffer` 只在调仓日保留旧仓）。
+（`buffer` 只在调仓日保留旧仓，不做日频清仓）。
 
 ## 引擎配置
 
@@ -139,7 +139,7 @@ STRATEGY = RankMom20
 | `rules` | `ExecutionRules` | T+1、涨跌停、费率、印花税 |
 
 RQAlpha 侧配置在 `rqalpha/engine.py::_config`：`sys_simulation` 开启涨跌停/停牌限制，
-`sys_transaction_cost` 关闭并由 `FinBridgeCostDecider` 接管，`sys_analyser` 只收集结果不画图。
+`sys_transaction_cost` 关闭并由 `FactorPickleCostDecider` 接管，`sys_analyser` 只收集结果不画图。
 
 ## 输出
 

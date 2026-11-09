@@ -1,25 +1,24 @@
-# FinBridge 文档总索引
+# FactorPickle 文档总索引
 
 > 面向 **AI 与人类读者**。约定：
-> - `modules/` 只描述**当前实现**，每篇固定两节：**架构与依赖**、**核心类/方法**；
-> - `design/` 记录**设计意图与取舍**，不保证逐行对应现状；
+> - `modules/` 只描述**当前实现**；
+> - `design/` 记录当前设计取舍；
 > - `guides/` 是可直接照做的用法与运维约定；
-> - `notes/` 是按日期归档的变更记录、一次性迁移与回滚 SQL。
+> - 旧方案、迁移记录和历史版本不保留在文档树中，需要时查 git history。
 
 ## 一、目录结构
 
 | 目录 | 放什么 | 不放什么 |
 |---|---|---|
 | `modules/` | 11 个模块的现状文档 | 设计争论、历史方案 |
-| `design/` | 架构、因子库、物化、报告 v2、回测架构、数据管线 | 逐步操作教程 |
+| `design/` | 当前架构、因子库、物化、报告、回测、数据管线 | 逐步操作教程 |
 | `guides/` | 回测用法、选股用法、`output/` 目录约定 | 模块 API 全量清单 |
-| `data/` | 数据覆盖度报告（按日期） | 取数代码 |
-| `notes/` | 变更备注、一次性迁移、回滚 SQL | 长期维护的说明 |
+| `data/` | 数据覆盖度报告 | 取数代码 |
 | `index.html` | 交互式系统与数据模型图谱；GitHub Pages 首页 | 手工维护的表格 |
 
 ## 二、系统全景
 
-FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模块围绕它读写。
+FactorPickle 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模块围绕它读写。
 
 ```
                  ┌──────────────────────────────────────────────┐
@@ -65,13 +64,14 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 | 02 | `data_interface` | 统一数据访问：行情/财务/资金流/情绪/板块/披露 + 工具封装 | [02-data-interface.md](modules/02-data-interface.md) |
 | 03 | `factors` | 纯计算层：因子定义（DAG）、算子、横截面变换、面板构建 | [03-factors.md](modules/03-factors.md) |
 | 04 | `factor_engine` | 因子物化层：注册表、批量计算、长表落库、审计 | [04-factor-engine.md](modules/04-factor-engine.md) |
-| 05 | `research` | 因子报告：profile 章节、IC/分层/评级、样本敏感性、Panel 缓存 | [05-research.md](modules/05-research.md) |
+| 05 | `research` | 因子报告：profile 章节、IC/分层/评级、敏感性、Panel 缓存、pandas/Polars metrics | [05-research.md](modules/05-research.md) |
 | 06 | `screener` | 选股：快照构建、条件筛选、覆盖率与断点 | [06-screener.md](modules/06-screener.md) |
 | 07 | `backtest` | 回测：RQAlpha 引擎 + A 股规则 + 横截面执行 | [07-backtest.md](modules/07-backtest.md) |
 | 08 | `strategies` | 策略基类：单标的/横截面、股票池、权重、上下文 | [08-strategies.md](modules/08-strategies.md) |
 | 09 | `position` | 持仓管理：组合/持仓/交易记录、成本与风控模式 | [09-position.md](modules/09-position.md) |
 | 10 | `scripts` | 运维脚本：回填、修复、报告、评分卡、方向校准 | [10-scripts.md](modules/10-scripts.md) |
 | 11 | `MCPserver` | MCP 工具服务器：注册各模块工具、传输与生命周期 | [11-mcp-server.md](modules/11-mcp-server.md) |
+| — | `factor_lab` | 自主因子研究运行时：PathFinder / FactorBuilder / Runner / ML / Supervisor | [factor_lab.md](design/factor_lab.md) |
 
 ### 当前因子报告口径
 
@@ -83,10 +83,12 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 ```
 
 - profile 只描述报告章节：`default` 五章，`quick` 三章；
-- `eval_profile` 以 name 唯一，不设版本号；
+- `eval_profile` 以 name 唯一；
 - Panel 缓存：`output/cache/research_panel/`，`--no-cache` 强制重建；
 - 空间维度含 `ALL / EX_BSE / INVESTABLE / HIGH_LIQ` 样本敏感性；
 - 时间维度含分月份 IC；
+- metrics 后端：`REPORT_METRICS_BACKEND=auto|pandas|polars`；Rank IC 固定 pandas，
+  Quantile NAV 按截面规模路由，`FactorReport.metrics_engine` 记录实际后端；
 - `research.eval` 独立 CLI 已移除，数据层在 `research.data`。
 
 ## 四、文档索引
@@ -95,14 +97,17 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 
 | 文档 | 内容 |
 |---|---|
-| [design/architecture_v2.md](design/architecture_v2.md) | 模块边界、DB 所有权、存储分层与里程碑 |
-| [design/factor_library_v1.md](design/factor_library_v1.md) | 因子分类、命名、版本与增量方式 |
-| [design/factor_materialization_v1.md](design/factor_materialization_v1.md) | 因子物化：registry/长表/latest/缓存 |
-| [design/acquisition_backfill_v1.md](design/acquisition_backfill_v1.md) | 历史回补：阶段化、切批、覆盖率判定、自适应分片 |
-| [design/factor_report_v2.md](design/factor_report_v2.md) | 因子报告 v2：方向、价差、成本、断言、归因 |
+| [design/factor_lab.md](design/factor_lab.md) | Factor Lab：角色、数据契约、因子库、门禁、控制 |
+| [design/factor_library.md](design/factor_library.md) | 因子分类、命名、版本与增量方式 |
+| [design/factor_materialization.md](design/factor_materialization.md) | 因子物化：registry/长表/latest/缓存 |
+| [design/acquisition_backfill.md](design/acquisition_backfill.md) | 历史回补：切批、覆盖率判定、自适应分片 |
 | [design/backtest_architecture.md](design/backtest_architecture.md) | 回测引擎详细架构（RQAlpha + 自建账本） |
-| [design/data_pipeline_v1.md](design/data_pipeline_v1.md) | 分时/板块映射/披露三条 P0–P2 数据链路 |
-| [design/minute_data_v1.md](design/minute_data_v1.md) | 分钟线：zzshare 源、1,000 根上限、与日线同构的字段/复权/换手率、停牌假 bar 规则 |
+| [design/backtest_report.md](design/backtest_report.md) | 回测报告结构与归因 |
+| [design/data_pipeline.md](design/data_pipeline.md) | 分时、板块映射、披露数据链路 |
+| [design/minute_data.md](design/minute_data.md) | 分钟线：数据源、字段/复权/换手率、停牌规则 |
+| [design/fin_daily_materialization.md](design/fin_daily_materialization.md) | 财务因子日频化与面板完整性 |
+| [design/lowfreq_precompute.md](design/lowfreq_precompute.md) | 低频因子预计算与写入 |
+| [design/ai_module.md](design/ai_module.md) | AI/ML 因子模型接入研究体系 |
 
 ### 4.2 指南
 
@@ -111,23 +116,12 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 | [guides/backtest.md](guides/backtest.md) | 回测安装、CLI、策略/因子写法与当前限制 |
 | [guides/screener.md](guides/screener.md) | 选股四层结构、表、MCP 与 CLI 用法 |
 | [guides/output_layout.md](guides/output_layout.md) | `output/` 目录约定（交付物 / 日志 / 回测产物） |
-| [../analysis/README.md](../analysis/README.md) | 事件研究、覆盖度与数据库体检脚本（仓库根 `analysis/`） |
 
-### 4.3 数据与记录
+### 4.3 数据
 
 | 文档 | 内容 |
 |---|---|
 | [data/coverage.md](data/coverage.md) | `ohlcv_1d` 与结构数据的实际覆盖区间、可研究起点 |
-| [notes/20261031_factor_report_v2.md](notes/20261031_factor_report_v2.md) | 因子报告 v2 的全库实测与变更备注 |
-| [notes/20261031_factor_idea_backlog.md](notes/20261031_factor_idea_backlog.md) | 因子创意手册：五个生成器、8 张闲置数据的候选队列、实测结果 |
-| [notes/20261031_first_strategy_turnover_regime.md](notes/20261031_first_strategy_turnover_regime.md) | 第一条策略基线（年化 8.2%/Sharpe 0.54）与三个回测层缺口 |
-| [notes/20261031_three_walls_fixed.md](notes/20261031_three_walls_fixed.md) | 三堵墙的修复：PIT 成分池、turnover 取数、两融/资金流进面板 |
-| [notes/20261031_one_path.md](notes/20261031_one_path.md) | 一条可执行路径：固定战场/骨架/裁判 + 每周一次循环 |
-| [notes/20261101_backfill_results.md](notes/20261101_backfill_results.md) | 补数结果与问题复盘：六域覆盖、11 个坑 |
-| [notes/20261031_eval_architecture_v3.md](notes/20261031_eval_architecture_v3.md) | 评估体系 v3：全市场默认、评估项化、报告层零 SQL、170s |
-| [notes/20261031_eval_items_p1_p4.md](notes/20261031_eval_items_p1_p4.md) | 评估项化改造 P1–P4：item 目录、profile 存库、报告只增不减 |
-| [notes/20261106_report_profile_cache.md](notes/20261106_report_profile_cache.md) | 因子报告收敛：唯一 CLI、profile 章节、Panel 缓存、四样本敏感性、分月 IC |
-| [notes/20261030_drop_retired_tables.sql](notes/20261030_drop_retired_tables.sql) | 已删除的 5 张退役表回滚 SQL |
 
 ### 4.4 图谱
 
@@ -183,9 +177,7 @@ MCPserver        -> 全部（注册工具）
 ## 八、维护约定
 
 - **模块文档**：实现变更时同步更新对应 `modules/NN-*.md`，不保留过时签名；
-- **设计文档**：记录“为什么这么做”，实现细节变化时不强行回写；
+- **设计文档**：只描述当前设计，不保留版本号、阶段和已废弃方案；
 - **指南**：命令必须可在当前代码上直接执行；
-- **变更记录**：放 `notes/`，文件名以 `YYYYMMDD_` 开头；
+- **历史**：由 git history 保存，不在文档树中维护变更记录；
 - **图谱**：`index.html` 按当前模块与表结构维护，不包含本地数据行数；模块入口或表结构变化后同步更新。
-
-> 研究计划见 [notes/20261104_research_plan.md](notes/20261104_research_plan.md)。

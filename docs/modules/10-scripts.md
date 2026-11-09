@@ -61,10 +61,10 @@ QuestDB 跑在 Docker 里，数据存在 WSL2 的数据盘 `docker_data.vhdx`（
 
 ```powershell
 # 1) 先干跑：只做检查、打印计划与预计回收空间，不停止任何东西
-powershell -ExecutionPolicy Bypass -File D:\FinBridge\scripts\compact-docker-vhdx.ps1 -DryRun
+powershell -ExecutionPolicy Bypass -File "$PWD\scripts\compact-docker-vhdx.ps1" -DryRun
 
 # 2) 管理员 PowerShell 正式执行（需要输入 YES 确认）
-powershell -ExecutionPolicy Bypass -File D:\FinBridge\scripts\compact-docker-vhdx.ps1
+powershell -ExecutionPolicy Bypass -File "$PWD\scripts\compact-docker-vhdx.ps1"
 ```
 
 脚本流程：停容器 → 备份命名卷到 `D:\docker-backup`（带 tar 条目数校验）→ `compose down` /

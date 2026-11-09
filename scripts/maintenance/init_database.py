@@ -150,7 +150,7 @@ def connect_with_retry(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="FinBridge QuestDB 初始化主脚本")
+    parser = argparse.ArgumentParser(description="FactorPickle QuestDB 初始化主脚本")
     parser.add_argument(
         "--only",
         default="market,financial,moneyflow,sentiment,concept,disclosure,factor,position,screener,task",

@@ -26,13 +26,13 @@
     卷备份目录，默认 D:\docker-backup（脚本不会自动删除，确认后再手动删）。
 
 .PARAMETER ComposeDir
-    docker-compose.yml 所在目录，默认 D:\FinBridge。
+    docker-compose.yml 所在目录，默认脚本所在目录的上一级。
 
 .PARAMETER QuestDbVolume
-    QuestDB 数据卷名，默认 finbridge_questdb_data。
+    QuestDB 数据卷名，默认 factorpickle_questdb_data。
 
 .PARAMETER VenvVolume
-    mcp-app 的 Python 虚拟环境卷，默认 finbridge_mcp_venv。
+    mcp-app 的 Python 虚拟环境卷，默认 factorpickle_mcp_venv。
     备份它可让容器启动时跳过 uv sync（省 5–15 分钟）。
 
 .PARAMETER DryRun
@@ -52,16 +52,21 @@
 param(
     [string]$Vhdx = "D:\DockerData\docker_data.vhdx",
     [string]$BackupDir = "D:\docker-backup",
-    [string]$ComposeDir = "D:\FinBridge",
-    [string]$QuestDbVolume = "finbridge_questdb_data",
-    [string]$VenvVolume = "finbridge_mcp_venv",
+    [string]$ComposeDir = "",
+    [string]$QuestDbVolume = "factorpickle_questdb_data",
+    [string]$VenvVolume = "factorpickle_mcp_venv",
     [string]$QuestDbRest = "http://127.0.0.1:9000",
     [switch]$DryRun,
     [switch]$Force
 )
 
+if (-not $ComposeDir) {
+    $ComposeDir = Split-Path -Parent $PSScriptRoot
+}
+
 $ErrorActionPreference = "Stop"
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$HelperImage = "python:3.12-slim"
 
 function Write-Step([string]$text) {
     Write-Host ""
@@ -90,8 +95,17 @@ public static class SparseProbe {
 }
 
 function Invoke-Docker([string[]]$arguments) {
-    $out = & docker @arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    # Windows PowerShell 5.1 treats native stderr as a terminating error when
+    # ErrorActionPreference=Stop (docker compose progress goes to stderr).
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $out = & docker @arguments 2>&1
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    if ($code -ne 0) {
         throw "docker $($arguments -join ' ') 失败：`n$($out -join "`n")"
     }
     return $out
@@ -119,8 +133,10 @@ function Get-QuestDbCount([string]$sql) {
 function Wait-DockerReady([int]$timeoutSec = 300) {
     $deadline = (Get-Date).AddSeconds($timeoutSec)
     while ((Get-Date) -lt $deadline) {
-        & docker ps *> $null
-        if ($LASTEXITCODE -eq 0) { return $true }
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try { & docker ps *> $null; $code = $LASTEXITCODE } finally { $ErrorActionPreference = $previous }
+        if ($code -eq 0) { return $true }
         Start-Sleep -Seconds 5
     }
     return $false
@@ -129,11 +145,11 @@ function Wait-DockerReady([int]$timeoutSec = 300) {
 function Backup-Volume([string]$vol, [string]$backupDir, [string]$stamp) {
     $file = Join-Path $backupDir "$vol-$stamp.tgz"
     $leaf = Split-Path $file -Leaf
-    $out = & docker run --rm -v "${vol}:/data" -v "${backupDir}:/b" alpine sh -c "tar czf /b/$leaf -C /data . && echo BACKUP_OK" 2>&1
-    if ($LASTEXITCODE -ne 0 -or ($out -join "`n") -notmatch "BACKUP_OK") {
+    $out = Invoke-Docker @("run", "--rm", "-v", "${vol}:/data", "-v", "${backupDir}:/b", $HelperImage, "sh", "-c", "tar czf /b/$leaf -C /data . && echo BACKUP_OK")
+    if (($out -join "`n") -notmatch "BACKUP_OK") {
         throw "备份卷 $vol 失败：`n$($out -join "`n")"
     }
-    $entries = & docker run --rm -v "${backupDir}:/b" alpine sh -c "tar tzf /b/$leaf | wc -l" 2>&1
+    $entries = Invoke-Docker @("run", "--rm", "-v", "${backupDir}:/b", $HelperImage, "sh", "-c", "tar tzf /b/$leaf | wc -l")
     $n = [int]($entries | Select-Object -Last 1)
     if ($n -lt 10) { throw "备份 $file 内容异常（$n 个条目）" }
     Write-Ok ("{0} -> {1}（{2:N2} GB，{3} 个条目）" -f $vol, $file, ((Get-Item $file).Length / 1GB), $n)
@@ -176,12 +192,12 @@ if ($DryRun) {
     @(
         "1) docker compose -f $composeFile stop",
         "2) 备份卷 $QuestDbVolume / $VenvVolume -> $BackupDir",
-        "3) docker compose down，退出 Docker Desktop，wsl --shutdown",
-        "4) 删除 $Vhdx（当前 $beforeAlloc GB）",
-        "5) wsl --unregister docker-desktop",
-        "6) 启动 Docker Desktop，等待引擎就绪（会重建一个约 1 GB 的数据盘）",
-        "7) 重建卷并恢复备份",
-        "8) docker compose up -d，等待 healthy",
+        "3) 备份镜像（docker save）-> $BackupDir",
+        "4) docker compose down，退出 Docker Desktop，wsl --shutdown",
+        "5) 删除 $Vhdx（当前 $beforeAlloc GB）",
+        "6) wsl --unregister docker-desktop",
+        "7) 启动 Docker Desktop，等待引擎就绪（会重建一个约 1 GB 的数据盘）",
+        "8) 恢复镜像（docker load）与卷，启动服务",
         "9) 校验 ohlcv_1d 行数是否等于 $preCount"
     ) | ForEach-Object { Write-Host "    $_" }
     Write-Host ""
@@ -208,12 +224,31 @@ $backups = [ordered]@{}
 if ($hasDbVol) { $backups[$QuestDbVolume] = Backup-Volume $QuestDbVolume $BackupDir $stamp }
 if ($hasVenvVol) { $backups[$VenvVolume] = Backup-Volume $VenvVolume $BackupDir $stamp }
 
+# ---------------------------------------------------------- 2.1 备份镜像
+# 重建数据盘会清空本地镜像；不备份的话，重启后无法离线拉起服务。
+Write-Step "2.1 备份镜像"
+$imageList = @(Invoke-Docker @("compose", "-f", $composeFile, "config", "--images") |
+    ForEach-Object { $_.Trim() } |
+    Where-Object { $_ -and $_ -notmatch '^name:' } |
+    Select-Object -Unique)
+if (-not ($imageList -contains $HelperImage)) { $imageList += $HelperImage }
+$imageBackup = Join-Path $BackupDir "images-$stamp.tar"
+$saveArgs = @("save", "-o", $imageBackup) + $imageList
+Invoke-Docker $saveArgs | Out-Null
+if (-not (Test-Path $imageBackup) -or (Get-Item $imageBackup).Length -lt 1MB) {
+    throw "镜像备份失败：$imageBackup"
+}
+Write-Ok ("{0} -> {1}（{2:N2} GB）" -f ($imageList -join ", "), $imageBackup, ((Get-Item $imageBackup).Length / 1GB))
+
 # ------------------------------------------------------- 3. 停 Docker / WSL
 Write-Step "3. 停止 Docker Desktop 与 WSL"
 Invoke-Docker @("compose", "-f", $composeFile, "down") | Out-Null
 Get-Process -Name "Docker Desktop", "com.docker.backend", "com.docker.build", "docker-agent" -ErrorAction SilentlyContinue |
     Stop-Process -Force -ErrorAction SilentlyContinue
+$previous = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 & wsl --shutdown *> $null
+$ErrorActionPreference = $previous
 Start-Sleep -Seconds 10
 
 $unlocked = $false
@@ -232,7 +267,10 @@ if ($sizeCheck -lt 1) { throw ("数据盘只有 {0:N2} GB，疑似异常，终�
 Remove-Item $Vhdx -Force
 Write-Ok ("已删除，D 盘可用 {0:N1} GB" -f ((Get-PSDrive D).Free / 1GB))
 
+$previous = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 & wsl --unregister docker-desktop 2>&1 | Out-Null
+$ErrorActionPreference = $previous
 Write-Ok "已注销 docker-desktop 发行版"
 
 # ------------------------------------------------------ 5. 重启 Docker Desktop
@@ -243,15 +281,20 @@ Start-Process $exe
 if (-not (Wait-DockerReady 300)) { throw "Docker 引擎 300s 未就绪，请手动检查 Docker Desktop。" }
 Write-Ok ("Docker 引擎就绪，新数据盘 {0:N2} GB" -f (Get-VhdxAllocatedGb $Vhdx))
 
+# --------------------------------------------------------- 5.1 恢复镜像
+Write-Step "5.1 恢复镜像"
+Invoke-Docker @("load", "-i", $imageBackup) | Out-Null
+Write-Ok "镜像已恢复"
+
 # -------------------------------------------------------------- 6. 恢复卷
 Write-Step "6. 恢复卷"
 foreach ($item in $backups.GetEnumerator()) {
     $vol = $item.Key
     $file = $item.Value
     $leaf = Split-Path $file -Leaf
-    & docker volume create $vol *> $null
-    $out = & docker run --rm -v "${vol}:/data" -v "${BackupDir}:/b" alpine sh -c "tar xzf /b/$leaf -C /data && echo RESTORE_OK" 2>&1
-    if ($LASTEXITCODE -ne 0 -or ($out -join "`n") -notmatch "RESTORE_OK") {
+    Invoke-Docker @("volume", "create", $vol) | Out-Null
+    $out = Invoke-Docker @("run", "--rm", "-v", "${vol}:/data", "-v", "${BackupDir}:/b", $HelperImage, "sh", "-c", "tar xzf /b/$leaf -C /data && echo RESTORE_OK")
+    if (($out -join "`n") -notmatch "RESTORE_OK") {
         throw "恢复卷 $vol 失败。备份仍在：$file"
     }
     Write-Ok "$vol 已恢复"
@@ -264,7 +307,10 @@ Invoke-Docker @("compose", "-f", $composeFile, "up", "-d") | Out-Null
 $healthy = $false
 for ($i = 0; $i -lt 36; $i++) {
     Start-Sleep -Seconds 5
-    $state = (& docker inspect -f "{{.State.Health.Status}}" mcp-app 2>&1) -join ""
+    $state = ""
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try { $state = (& docker inspect -f "{{.State.Health.Status}}" mcp-app 2>&1) -join "" } finally { $ErrorActionPreference = $previous }
     if ($state -match "healthy") { $healthy = $true; break }
 }
 if ($healthy) { Write-Ok "mcp-app healthy" } else { Write-Warn2 "mcp-app 未在 180s 内 healthy，请检查 docker logs mcp-app" }

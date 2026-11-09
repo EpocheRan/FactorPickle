@@ -10,7 +10,7 @@ q = ("select period_end,publish_date,revenue,net_income_attributable_to_parent "
 r = requests.get("http://127.0.0.1:9000/exp", params={"query": q}, timeout=60)
 fin = pd.read_csv(io.StringIO(r.text), parse_dates=["period_end", "publish_date"])
 fin["publish_date"] = fin["publish_date"].dt.tz_localize(None)
-b = pd.read_csv(r"D:\FinBridge\analysis\data\bars_600418.csv", parse_dates=["ts"]).set_index("ts")
+b = pd.read_csv(r"D:\FactorPickle\analysis\data\bars_600418.csv", parse_dates=["ts"]).set_index("ts")
 
 rows = []
 for _, x in fin.iterrows():

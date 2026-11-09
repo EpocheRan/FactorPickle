@@ -67,7 +67,7 @@ BacktestRunner.run(strategy_path)
 | `RQAlphaEngine` | `run(request) -> BacktestResult` | `EnginePort` 实现 |
 | `RQAlphaDataSource` | `get_bar/history_bars/is_suspended/...` | DataBundle → RQAlpha |
 | `StrategyAdapter` | `init/open_auction/handle_bar/after_trading` | 策略回调与订单排队 |
-| `FinBridgeCostDecider` | `calc(args) -> TransactionCost` | 佣金/印花税/过户费 |
+| `FactorPickleCostDecider` | `calc(args) -> TransactionCost` | 佣金/印花税/过户费 |
 | `PortfolioLedger` | 持仓、现金、成交 | 多标的账本 |
 
 关键默认值：`fill="next_open"`、`rebalance="weekly"`、`warmup_min_bars=260`、
@@ -116,8 +116,8 @@ T+1 由 RQAlpha 股票账户（`market_tplus=1` + `stock_t1=True`）强制执行
 | **不要用 `handle_bar` 直接下单做次日开盘** | 日频会按当日收盘撮合，形成前视；必须走 `open_auction` |
 | **必须 `subscribe` 股票池** | 否则 `bar_dict` 为空，`handle_bar` 读不到 bar |
 | **没有原生止损单** | 止损在 `handle_bar` 里按收盘价触发、T+1 开盘卖；不是日内止损 |
-| **复权未接** | 引擎用原始价撮合/估值；分红送转暂不处理（v1 边界） |
-| **成交量上限关闭** | QuestDB 的 `volume` 单位需先校准，v1 设 `volume_limit=False` |
+| **复权未接** | 引擎用原始价撮合/估值；分红送转暂不处理 |
+| **成交量上限关闭** | QuestDB 的 `volume` 单位需先校准，`volume_limit=False` |
 | **benchmark 不在 RQAlpha 内** | 由 `equity_metrics` 用 `request.benchmark` 计算；无数据时 `benchmark_used=False` |
 | **Python 3.12** | RQAlpha 6.5.0 可装；升级前先跑 `tests/test_rqalpha_engine.py` |
 | **matplotlib 缓存警告** | 无写权限时会打印，不影响回测 |
@@ -125,7 +125,7 @@ T+1 由 RQAlpha 股票账户（`market_tplus=1` + `stock_t1=True`）强制执行
 ### 2.5 结果口径
 
 - `equity` / `metrics` 来自 RQAlpha 组合；`metrics_source="engine"`；
-- `orders` / `trades` 来自 RQAlpha 成交，转换为 FinBridge 列名；
+- `orders` / `trades` 来自 RQAlpha 成交，转换为 FactorPickle 列名；
 - `meta["ledger_reconciliation"]` 是诊断项：账本 vs RQAlpha 组合的相对误差；
   2024Q1 横截面实测 `max_rel_diff ≈ 4.7e-11`；长区间因退市股约 1.9%，不影响报告口径。
 - `meta["ledger_reconciliation_common"]` 只比较两边都持有的 `(date, symbol)`，

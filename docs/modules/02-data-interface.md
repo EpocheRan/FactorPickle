@@ -59,7 +59,7 @@
 含 `turnover` / `adj_factor` / `type`），`DEDUP UPSERT KEYS(ts, code, market, type)`。
 价格是不复权价；`adj_factor` 按 `(code, date)` 取日线当日因子，`turnover` 按日线隐含流通股本折算。
 批量导出/落库：`scripts/export_index_minutes.py` / `scripts/import_minutes_csv.py`，
-细节见 [../design/minute_data_v1.md](../design/minute_data_v1.md)。
+细节见 [../design/minute_data.md](../design/minute_data.md)。
 
 ### 1.4 数据流（以日线为例）
 
