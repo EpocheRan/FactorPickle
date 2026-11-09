@@ -549,6 +549,13 @@
     .pin-card p{font-size:13px}
     .pin-foot{position:relative;left:auto;right:auto;bottom:auto;width:min(440px,90vw);margin:18px auto 0}
     .pin-hint{display:none}
+    .start-cta{padding:72px 0 68px}
+    .start-cta h2{font-size:clamp(32px,8vw,44px)}
+    .start-cta > .wrap > p{font-size:13px;padding:0 5vw}
+    .start-terminal{margin-top:24px}
+    .start-code{font-size:11px;padding:18px 17px;line-height:1.9}
+    .start-note{font-size:7.5px!important}
+    .start-links{gap:18px;margin-top:22px}
   }
 
   .bars{display:flex;flex-direction:column;gap:11px}
@@ -742,6 +749,50 @@
   @keyframes npulse{0%{opacity:.2}50%{opacity:1}100%{opacity:1}}
 
   /* ---------- misc ---------- */
+  /* ---------- start / deploy ---------- */
+  .start-cta{
+    position:relative;padding:112px 0 104px;overflow:hidden;
+    background:
+      radial-gradient(720px 360px at 50% 15%,rgba(185,255,63,.08),transparent 70%),
+      linear-gradient(180deg,#04070d,#030605);
+  }
+  .start-cta .wrap{position:relative;z-index:1;text-align:center}
+  .start-kicker{font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:#c9ff5a;text-transform:uppercase}
+  .start-kicker span{color:#5f7288;padding:0 5px}
+  .start-cta h2{margin:14px 0 10px;font-size:clamp(34px,4.2vw,58px);line-height:1.08;letter-spacing:-.04em;font-weight:650;color:#eef5fb}
+  .start-cta h2 span{color:#c9ff5a}
+  .start-cta > .wrap > p{margin:0;font-size:14px;line-height:1.75;color:#8b9eae}
+  .start-terminal{
+    width:min(680px,92vw);margin:32px auto 0;text-align:left;overflow:hidden;
+    border:1px solid rgba(255,255,255,.12);border-radius:13px;
+    background:rgba(7,11,8,.95);
+    box-shadow:0 30px 80px -35px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .start-terminal-bar{
+    display:flex;align-items:center;gap:12px;padding:10px 14px;
+    border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);
+  }
+  .start-dots{display:flex;gap:5px}
+  .start-dots i{display:block;width:6px;height:6px;border-radius:50%;background:#52655a}
+  .start-dots i:first-child{background:#8fc45c}
+  .start-term-title{flex:1;font-size:8.5px;letter-spacing:.12em;color:#5f7288}
+  .start-copy{
+    appearance:none;border:1px solid rgba(255,255,255,.14);border-radius:6px;
+    background:rgba(255,255,255,.05);color:#a7b8ad;font-family:var(--mono);font-size:9px;
+    padding:4px 9px;cursor:pointer;transition:.16s;
+  }
+  .start-copy:hover{color:#fff;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3)}
+  .start-code{
+    margin:0;padding:22px 24px;overflow-x:auto;
+    font-family:var(--mono);font-size:13px;line-height:1.95;color:#dfe9e1;
+  }
+  .start-code .prompt{color:#c9ff5a;padding-right:9px;user-select:none}
+  .start-note{margin:12px 0 0!important;font-family:var(--mono);font-size:8px!important;letter-spacing:.08em;color:#53665b!important}
+  .start-links{display:flex;justify-content:center;gap:26px;margin-top:28px;flex-wrap:wrap}
+  .start-links a{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:#8fa2b8;text-decoration:none;transition:.16s}
+  .start-links a:hover{color:#fff}
+  .start-links a span{color:#c9ff5a;padding-left:2px}
+
   .foot{padding:56px 0 28px;color:var(--dim);font-size:11px;border-top:1px solid var(--line);margin-top:80px;background:#04070d}
   .foot-main{display:flex;justify-content:space-between;gap:30px;align-items:flex-start;padding-bottom:30px}
   .foot-brand{display:flex;align-items:center;gap:12px}
@@ -1024,6 +1075,29 @@
         </div>
       </div>
 </section>
+
+    <!-- ============ START / DEPLOY ============ -->
+    <section class="start-cta" id="start">
+      <div class="wrap">
+        <div class="start-kicker mono">GET STARTED <span>/</span> DOCKER</div>
+        <h2>开始使用 <span>Factor Pickle</span></h2>
+        <p>无需安装包。拉取最新代码并启动 Docker，即可进入 Factor Lab。</p>
+        <div class="start-terminal">
+          <div class="start-terminal-bar">
+            <span class="start-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="start-term-title mono">factorpickle / deploy</span>
+            <button class="start-copy mono" id="copyStart" type="button">复制</button>
+          </div>
+          <pre class="start-code" id="startCode"><code><span class="prompt">$</span> git pull
+<span class="prompt">$</span> docker compose up -d</code></pre>
+        </div>
+        <p class="start-note mono">首次运行前请先准备 config.json</p>
+        <div class="start-links">
+          <a href="https://github.com/EpocheRan/FactorPickle" target="_blank" rel="noopener">GitHub 仓库 <span>↗</span></a>
+          <a href="https://github.com/EpocheRan/FactorPickle#readme" target="_blank" rel="noopener">部署文档 <span>↗</span></a>
+        </div>
+      </div>
+    </section>
 </section>
 
   <!-- ============ ARCHITECTURE ============ -->
@@ -2952,6 +3026,31 @@ $('#dwBody').addEventListener('click', e => {
   if (rel) navigateTo(rel.dataset.goto);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+const copyStart = $('#copyStart');
+if (copyStart) {
+  copyStart.addEventListener('click', async () => {
+    const text = 'git pull\ndocker compose up -d';
+    const done = () => {
+      copyStart.textContent = '已复制';
+      setTimeout(() => { copyStart.textContent = '复制'; }, 1600);
+    };
+    try {
+      await navigator.clipboard.writeText(text);
+      done();
+    } catch (err) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); }
+      catch (e) { copyStart.textContent = '手动复制'; setTimeout(() => { copyStart.textContent = '复制'; }, 1600); }
+      ta.remove();
+    }
+  });
+}
 
 function routeFromHash() {
   const raw = location.hash.replace(/^#\/?/, '');
