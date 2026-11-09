@@ -395,7 +395,7 @@
   }
   .why-intro p{max-width:640px;margin:0 auto;font-size:14px;line-height:1.8;color:#8b9eae}
   .pin-scene{
-    position:relative;height:620vh;background:#04070d;border-top:1px solid var(--line);
+    position:relative;height:720vh;background:#04070d;border-top:0;
     isolation:isolate;
   }
   .pin-sticky{
@@ -420,6 +420,17 @@
   }
   .pin-kicker{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:#c9ff5a;text-transform:uppercase}
   .pin-kicker span{color:#5f7288;padding:0 5px}
+  .story-copy{
+    position:absolute;z-index:6;left:50%;top:42%;transform:translate(-50%,-50%);
+    width:min(780px,90vw);text-align:center;pointer-events:none;
+    will-change:opacity,transform;
+  }
+  .story-copy h2{
+    margin:15px 0 14px;font-size:clamp(36px,4.6vw,68px);line-height:1.06;
+    letter-spacing:-.045em;font-weight:650;color:#eef5fb;
+    text-shadow:0 18px 60px rgba(0,0,0,.55);
+  }
+  .story-copy p{max-width:650px;margin:0 auto;font-size:14px;line-height:1.8;color:#8b9eae}
   .pin-frame{
     position:absolute;z-index:1;pointer-events:none;
     inset:clamp(90px,12vh,130px) clamp(24px,5vw,90px) clamp(64px,9vh,96px);
@@ -432,7 +443,8 @@
   .pin-cross.tl{left:-7px;top:-7px}.pin-cross.tr{right:-7px;top:-7px}
   .pin-cross.bl{left:-7px;bottom:-7px}.pin-cross.br{right:-7px;bottom:-7px}
   .pin-pickle-wrap{
-    position:absolute;z-index:2;left:29%;top:49%;transform:translate(-50%,-50%);
+    position:absolute;z-index:2;left:var(--pickle-x,50%);top:var(--pickle-y,74%);
+    transform:translate(-50%,-50%) scale(var(--pickle-scale,.62));
     width:min(580px,44vw);height:min(78vh,780px);
     display:flex;align-items:center;justify-content:center;
   }
@@ -483,7 +495,12 @@
     position:absolute;z-index:4;left:max(4vw,calc(50% - 610px));right:max(4vw,calc(50% - 610px));bottom:26px;
     display:flex;justify-content:space-between;align-items:center;pointer-events:none;
     font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:#5f7288;
+    opacity:1;transition:opacity .35s ease;
   }
+  .pin-scene.is-story .pin-card{opacity:0!important;pointer-events:none}
+  .pin-scene.is-story .pin-foot{opacity:0}
+  .pin-scene.is-story .pin-frame{opacity:.55}
+  .pin-scene.is-story .pickle-axis{opacity:0}
   .pin-progress{display:flex;align-items:center;gap:10px}
   .pin-progress i{display:block;width:112px;height:1px;background:rgba(148,163,184,.2);overflow:hidden}
   .pin-progress b{display:block;height:100%;background:#c9ff5a;transform:scaleX(0);transform-origin:left;transition:transform .12s linear}
@@ -496,9 +513,14 @@
     .why-intro p{font-size:13px;padding:0 6vw}
     .pin-scene{height:auto}
     .pin-sticky{position:relative;top:auto;height:auto;min-height:0;padding:calc(var(--header-h,80px) + 20px) 0 44px;overflow:hidden}
-    .pin-frame{position:relative;inset:auto;width:min(470px,92vw);height:min(56vh,460px);margin:0 auto;border:0}
+    .story-copy{position:relative;top:auto;left:auto;transform:none!important;opacity:1!important;width:min(620px,92vw);margin:0 auto 18px}
+    .story-copy h2{font-size:clamp(32px,8vw,46px)}
+    .story-copy p{font-size:13px;padding:0 4vw}
+    .pin-scene.is-story .pin-card{opacity:1!important;pointer-events:auto}
+    .pin-scene.is-story .pin-foot,.pin-scene.is-story .pin-frame{opacity:1}
+    .pin-frame{position:relative;inset:auto;width:min(470px,92vw);height:min(54vh,440px);margin:0 auto;border:0}
     .pin-cross{display:none}
-    .pin-pickle-wrap{width:min(360px,82vw);height:100%;left:50%;top:50%}
+    .pin-pickle-wrap{width:min(360px,82vw);height:100%;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important}
     .pin-cards{
       position:relative;inset:auto;display:flex;gap:12px;width:100%;
       margin:16px 0 0;padding:0 8vw 10px;overflow-x:auto;overscroll-behavior-x:contain;
@@ -902,17 +924,14 @@
       </div>
     </div>
 
-    <section class="why-intro" id="features">
-      <div class="wrap">
-        <div class="pin-kicker mono">WHY FACTORPICKLE <span>/</span> 08 PRINCIPLES</div>
-        <h2>为什么是 FactorPickle</h2>
-        <p>不是又一个数据管道：把「研究结论可复现」写进模块边界、因子资产与报告口径。</p>
-      </div>
-    </section>
-
-    <div class="pin-scene" id="pinScene">
+    <section class="pin-scene is-story" id="features">
       <div class="pin-sticky">
         <div class="pin-grid" aria-hidden="true"></div>
+        <div class="story-copy" id="storyCopy">
+          <div class="pin-kicker mono">WHY FACTORPICKLE <span>/</span> 08 PRINCIPLES</div>
+          <h2>为什么是 FactorPickle</h2>
+          <p>不是又一个数据管道：把「研究结论可复现」写进模块边界、因子资产与报告口径。</p>
+        </div>
         <div class="pin-frame" aria-hidden="true">
           <span class="pin-cross tl"></span><span class="pin-cross tr"></span><span class="pin-cross bl"></span><span class="pin-cross br"></span>
           <div class="pin-pickle-wrap" id="pickleWrap">
@@ -993,7 +1012,7 @@
           <div class="pin-hint mono">SCROLL TO ROTATE <span>↓</span></div>
         </div>
       </div>
-    </div>
+</section>
 </section>
 
   <!-- ============ ARCHITECTURE ============ -->
@@ -2730,8 +2749,9 @@ function initPickle3D() {
   return {
     resize,
     loadModel,
-    render(progress, time) {
-      group.rotation.y = progress * Math.PI * 1.6;
+    render(progress, time, story = 0, cardP = 0) {
+      group.rotation.z = -.12 + (1 - story) * (Math.PI / 2 + .12);
+      group.rotation.y = cardP * Math.PI * 1.6;
       group.rotation.x = .03 + Math.sin(progress * Math.PI * 2.4) * .07;
       group.position.y = Math.sin(time * .0007) * .075;
       renderer.render(scene, camera);
@@ -2740,12 +2760,15 @@ function initPickle3D() {
 }
 
 function initPinScene() {
-  const scene = $('#pinScene');
+  const scene = $('#features');
   const cards = $$('.pin-card');
   const stageEl = $('#pinStage');
   const barEl = $('#pinBar');
   const degEl = $('#pickleDeg');
+  const storyCopy = $('#storyCopy');
+  const pickleWrap = $('#pickleWrap');
   if (!scene || !cards.length) return;
+  const INTRO = .12;
 
   const three = initPickle3D();
   let target = 0;
@@ -2770,8 +2793,9 @@ function initPinScene() {
     const rect = scene.getBoundingClientRect();
     const total = Math.max(1, scene.offsetHeight - window.innerHeight);
     target = clamp((-rect.top) / total, 0, 1);
-    setStage(Math.min(7, Math.floor(target * 7.999)));
-    if (barEl) barEl.style.transform = `scaleX(${target})`;
+    const cardP = clamp((target - INTRO) / (1 - INTRO), 0, 1);
+    setStage(Math.min(7, Math.floor(cardP * 7.999)));
+    if (barEl) barEl.style.transform = `scaleX(${cardP})`;
   };
 
   const requestUpdate = () => {
@@ -2789,14 +2813,29 @@ function initPinScene() {
 
   const loop = (time) => {
     display += (target - display) * .075;
+    const story = clamp(display / INTRO, 0, 1);
+    const ease = story * story * (3 - 2 * story);
+    const cardP = clamp((display - INTRO) / (1 - INTRO), 0, 1);
+    scene.classList.toggle('is-story', story < .992);
+
+    if (pickleWrap) {
+      pickleWrap.style.setProperty('--pickle-x', (50 - 21 * ease).toFixed(2) + '%');
+      pickleWrap.style.setProperty('--pickle-y', (74 - 25 * ease).toFixed(2) + '%');
+      pickleWrap.style.setProperty('--pickle-scale', (.62 + .38 * ease).toFixed(3));
+    }
+    if (storyCopy) {
+      storyCopy.style.opacity = clamp(1 - story / .72, 0, 1).toFixed(3);
+      storyCopy.style.transform = `translate(-50%, calc(-50% - ${(ease * 26).toFixed(1)}px))`;
+    }
+
     const rect = scene.getBoundingClientRect();
     const visible = rect.bottom > -80 && rect.top < window.innerHeight + 80;
     if (three && !modelRequested && rect.top < window.innerHeight * 1.6) {
       modelRequested = true;
       three.loadModel();
     }
-    if (three && visible) three.render(display, time);
-    if (degEl) degEl.textContent = String(Math.round(((display * 1.6 * 180) / Math.PI + 360) % 360)).padStart(3, '0') + '°';
+    if (three && visible) three.render(display, time, story, cardP);
+    if (degEl) degEl.textContent = String(Math.round(((cardP * 1.6 * 180) / Math.PI + 360) % 360)).padStart(3, '0') + '°';
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);
