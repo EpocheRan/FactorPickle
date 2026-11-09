@@ -128,7 +128,7 @@
   .hero-veil{
     position:absolute;inset:0;pointer-events:none;
     background:
-      linear-gradient(90deg,#05080f 0%,rgba(5,8,15,.94) 30%,rgba(5,8,15,.55) 50%,rgba(5,8,15,0) 76%),
+      linear-gradient(90deg,#05080f 0%,rgba(5,8,15,.96) 30%,rgba(5,8,15,.9) 48%,rgba(5,8,15,.66) 60%,rgba(5,8,15,.24) 72%,rgba(5,8,15,0) 85%),
       linear-gradient(180deg,rgba(5,8,15,.55),transparent 20%,transparent 76%,rgba(5,8,15,.9));
   }
   .hero-inner{
@@ -139,13 +139,14 @@
   .hero-home h1{
     margin:0;
     font-family:'JetBrains Mono',var(--mono);
-    font-size:clamp(44px,5.25vw,84px);line-height:1.03;letter-spacing:-.03em;
-    font-weight:400;max-width:1040px;text-wrap:balance;color:#f4f8fc;
+    font-size:clamp(52px,6.5vw,104px);line-height:.96;letter-spacing:-.04em;
+    font-weight:400;max-width:1180px;text-wrap:balance;color:#f4f8fc;
+    text-shadow:0 8px 38px rgba(0,0,0,.45);
   }
   .hero-home h1 .accent{
-    font-family:var(--sans);
-    color:#c9ff5a;font-style:normal;font-size:inherit;line-height:inherit;font-weight:650;
-    letter-spacing:-.045em;display:block;margin-top:0;
+    font-family:'JetBrains Mono',var(--mono);
+    color:#c9ff5a;font-style:normal;font-size:inherit;line-height:inherit;font-weight:400;
+    letter-spacing:inherit;display:block;margin-top:0;
   }
   .hero-bottom{position:relative;display:flex;justify-content:flex-start;align-items:flex-end;gap:40px;margin-top:40px}
   .hero-copy{max-width:460px}
@@ -561,7 +562,7 @@
     .hero-inner{padding:20px 18px 40px;justify-content:flex-start}
     .hero-top{position:static;font-size:8px;gap:10px}
     .hero-top span:last-child{display:none}
-    .hero-home h1{font-size:clamp(28px,8.2vw,36px);margin-top:12vh;max-width:calc(100vw - 36px);overflow-wrap:anywhere;line-height:1.04}
+    .hero-home h1{font-size:clamp(30px,8.6vw,38px);margin-top:12vh;max-width:calc(100vw - 36px);overflow-wrap:anywhere;line-height:1.02}
     .hero-copy{width:100%;max-width:100%;flex:none}
     .hero-copy p{width:100%;max-width:100%;overflow-wrap:anywhere}
     .hero-bottom{width:100%;overflow:hidden}
