@@ -49,62 +49,54 @@
   .mono{font-family:var(--mono);font-variant-ligatures:none}
   .wrap{max-width:1460px;margin:0 auto;padding:0 30px}
 
-  /* ---------- top bar ---------- */
+  /* ---------- floating glass header ---------- */
   .topbar{
-    position:sticky;top:0;z-index:50;
-    background:rgba(5,8,15,.78);
-    backdrop-filter:blur(20px) saturate(150%);
-    border-bottom:1px solid var(--line-soft);
-    transition:background .25s,box-shadow .25s,border-color .25s;
+    position:sticky;top:0;z-index:50;padding:16px 20px 0;background:transparent;
+    transition:padding .25s;
   }
-  .topbar-in{display:flex;align-items:center;gap:22px;height:64px;max-width:1460px;margin:0 auto;padding:0 30px;position:relative}
-  .brand{
-    display:flex;align-items:center;gap:11px;min-width:0;
+  .topbar-in{
+    display:flex;align-items:center;gap:18px;height:64px;width:fit-content;max-width:calc(100vw - 40px);
+    margin:0 auto;padding:8px 10px 8px 20px;position:relative;
+    border:1px solid rgba(185,255,63,.24);border-radius:999px;
+    background:linear-gradient(180deg,rgba(32,52,39,.68),rgba(8,19,13,.54));
+    backdrop-filter:blur(24px) saturate(165%);-webkit-backdrop-filter:blur(24px) saturate(165%);
+    box-shadow:0 18px 50px -24px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.1);
+    transition:background .25s,box-shadow .25s;
   }
+  .topbar-in::before{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:radial-gradient(420px 90px at 10% -20%,rgba(185,255,63,.16),transparent 68%);
+  }
+  .topbar-in > *{position:relative;z-index:1}
+  .topbar.scrolled{padding-top:10px}
+  .topbar.scrolled .topbar-in{background:linear-gradient(180deg,rgba(13,24,18,.86),rgba(4,10,7,.82));box-shadow:0 18px 55px -22px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.07)}
+  .brand{display:flex;align-items:center;gap:11px;min-width:0;text-decoration:none;color:inherit}
   .brand .logo{filter:drop-shadow(0 0 12px rgba(185,255,63,.22))}
-  .brand > div{display:flex;flex-direction:column;justify-content:space-between;height:32px}
-  .brand-sub,.tabs{transition:opacity .22s,transform .22s}
-  .topbar.compact{
-    background:transparent;
-    backdrop-filter:none;
-    -webkit-backdrop-filter:none;
-    box-shadow:none;
-    border-bottom-color:transparent;
-  }
-  .topbar.compact .brand{position:static;transform:none}
-  .topbar.compact .brand > div{height:auto;justify-content:center}
-  .topbar.compact .tabs{opacity:0;transform:translateY(-6px);pointer-events:none}
-  .topbar.compact .brand-sub{display:none}
-  .topbar.compact .gh-link{
-    background:rgba(7,13,23,.88);border-color:rgba(148,163,184,.3);color:#d3e1f0;
-    backdrop-filter:blur(10px);
-  }
-  .logo{
-    width:40px;height:40px;flex:none;display:block;position:relative;
-  }
+  .brand > div{display:flex;flex-direction:column;justify-content:center;height:36px}
+  .logo{width:40px;height:40px;flex:none;display:block;position:relative}
   .logo svg{display:block;width:100%;height:100%}
   .logo img{display:block;width:100%;height:100%;object-fit:contain}
   .brand-name{font-family:var(--sans);font-weight:650;letter-spacing:-.02em;font-size:18px;line-height:1.1}
-  .brand-sub{font-family:var(--mono);font-size:8px;color:#60738b;letter-spacing:.16em;line-height:1.2;margin-top:0}
-  .tabs{display:flex;gap:28px;margin-left:auto;padding:0;border:0;border-radius:0;background:transparent}
-  .tab{
-    appearance:none;border:0;background:transparent;color:#7c8ea6;font-family:var(--sans);
-    font-size:12px;letter-spacing:.1em;padding:6px 0;border-radius:0;cursor:pointer;transition:.18s;
-    white-space:nowrap;position:relative;
+  .brand-sub{font-family:var(--mono);font-size:7.5px;color:#6b7e74;letter-spacing:.15em;line-height:1.2;margin-top:2px}
+  .nav-links{display:flex;align-items:center;gap:2px;margin-left:26px}
+  .nav-item{
+    appearance:none;border:0;background:transparent;color:#a8b8ae;font-family:var(--sans);font-size:12.5px;
+    letter-spacing:.03em;padding:9px 13px;border-radius:999px;cursor:pointer;transition:.18s;white-space:nowrap;
   }
-  .tab:hover{color:#e6eef8}
-  .tab.active{color:#fff;background:none;box-shadow:none}
-  .tab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:#d9f2ff}
-  .top-meta{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--dim);white-space:nowrap}
-  .gh-link{
-    display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;
-    color:#9fb2c8;text-decoration:none;border:1px solid rgba(148,163,184,.22);background:transparent;
-    padding:8px 10px;border-radius:2px;transition:.18s;white-space:nowrap;
+  .nav-item:hover{color:#efffe0;background:rgba(185,255,63,.09)}
+  .nav-github{
+    width:38px;height:38px;margin-left:4px;display:grid;place-items:center;border-radius:50%;
+    border:1px solid rgba(185,255,63,.16);background:rgba(255,255,255,.03);color:#b9cbc0;
+    text-decoration:none;transition:.18s;flex:none;
   }
-  .gh-link:hover{color:#fff;border-color:rgba(148,163,184,.55);background:rgba(255,255,255,.04)}
-  .gh-link svg{width:13px;height:13px;fill:currentColor;flex:none}
-  .dot{width:6px;height:6px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399;animation:pulse 2.4s infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .nav-github:hover{color:#efffe0;background:rgba(185,255,63,.1);border-color:rgba(185,255,63,.36)}
+  .nav-github svg{width:16px;height:16px;fill:currentColor;flex:none}
+  .nav-cta{
+    display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 17px;border-radius:999px;
+    background:#eefbe5;color:#071108;font-family:var(--sans);font-size:12px;font-weight:650;text-decoration:none;
+    letter-spacing:.02em;white-space:nowrap;transition:.18s;flex:none;
+  }
+  .nav-cta:hover{background:#fff;transform:translateY(-1px)}
 
   /* ---------- views ---------- */
   .view{display:none;animation:rise .5s cubic-bezier(.22,.61,.36,1) both}
@@ -593,6 +585,19 @@
     .why-panel{grid-template-columns:1fr;gap:22px;padding:30px 0;min-height:0;scroll-margin-top:calc(var(--header-h, 64px) + 56px)}
     .why-art{max-width:260px}
   }
+  @media (max-width:860px){
+    .topbar{padding:10px 10px 0}
+    .topbar-in{width:calc(100vw - 20px);max-width:none;height:auto;flex-wrap:wrap;gap:6px;padding:8px 10px;border-radius:22px;overflow:hidden}
+    .brand{flex:1 1 0;min-width:0;overflow:hidden}
+    .brand .logo{width:36px;height:36px}
+    .brand > div{height:34px;min-width:0;overflow:hidden}
+    .brand-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .brand-sub{display:none}
+    .nav-links{order:4;width:100%;margin:4px 0 0;padding:7px 0 2px;justify-content:center;gap:2px;border-top:1px solid rgba(185,255,63,.12)}
+    .nav-item{padding:7px 12px}
+    .nav-github{width:32px;height:32px;margin-left:auto}
+    .nav-cta{height:32px;padding:0 12px;font-size:11px;flex:0 0 auto}
+  }
   @media (prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important}
   }
@@ -602,7 +607,7 @@
 
 <header class="topbar">
   <div class="topbar-in">
-    <div class="brand">
+    <a class="brand" href="#overview" aria-label="FactorPickle 总览">
       <span class="logo" aria-hidden="true">
         <img src="assets/logo-factorpickle.svg" alt="">
       </span>
@@ -610,16 +615,16 @@
         <div class="brand-name">FactorPickle</div>
         <div class="brand-sub">FACTOR RESEARCH INFRASTRUCTURE</div>
       </div>
-    </div>
-    <nav class="tabs" role="tablist" aria-label="视图切换">
-      <button class="tab active" data-view="overview" role="tab">总览</button>
-      <button class="tab" data-view="modules" role="tab">模块</button>
-      <button class="tab" data-view="model" role="tab">数据模型</button>
-    </nav>
-    <a class="gh-link" href="https://github.com/EpocheRan/FactorPickle" target="_blank" rel="noopener" aria-label="GitHub 仓库">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-      <span class="gh-text">GitHub · EpocheRan/FactorPickle</span>
     </a>
+    <nav class="nav-links" aria-label="主导航">
+      <button class="nav-item" type="button" data-nav="features">功能</button>
+      <button class="nav-item" type="button" data-nav="explore">探索</button>
+      <button class="nav-item" type="button" data-nav="about">关于</button>
+    </nav>
+    <a class="nav-github" href="https://github.com/EpocheRan/FactorPickle" target="_blank" rel="noopener" aria-label="GitHub 仓库">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+    </a>
+    <a class="nav-cta" href="https://github.com/EpocheRan/FactorPickle#readme" target="_blank" rel="noopener">开始使用</a>
   </div>
 </header>
 
@@ -832,7 +837,7 @@
         </div>
       </div>
 
-            <div class="section">
+            <div class="section" id="features">
         <div class="sec-head">
           <div>
             <h2 class="sec-title">为什么是 FactorPickle</h2>
@@ -963,7 +968,7 @@
     </div>
   </section>
 
-  <footer class="foot">
+  <footer class="foot" id="about">
     <div class="wrap foot-main">
       <div class="foot-brand">
         <span class="logo" aria-hidden="true">
@@ -1544,7 +1549,7 @@ function buildWhyArt() {
 }
 
 /* ============================================================
-   HEADER / COMPACT ON SCROLL
+   HEADER / FLOATING PILL
    ============================================================ */
 function initHeader() {
   const bar = $('.topbar');
@@ -1555,35 +1560,9 @@ function initHeader() {
   syncHeaderH();
   if ('ResizeObserver' in window) new ResizeObserver(syncHeaderH).observe(bar);
   else window.addEventListener('resize', syncHeaderH);
-
-  let last = window.scrollY;
-  let ticking = false;
-  const why = $('.why');
-  const update = () => {
-    ticking = false;
-    const y = window.scrollY;
-    if (why) {
-      const r = why.getBoundingClientRect();
-      bar.classList.toggle('over-feature', r.top <= bar.offsetHeight && r.bottom > bar.offsetHeight);
-    }
-    if (y < 80) {
-      bar.classList.remove('compact');
-      last = y;
-      syncHeaderH();
-      return;
-    }
-    if (y > last + 10) bar.classList.add('compact');
-    else if (y < last - 10) bar.classList.remove('compact');
-    last = y;
-    syncHeaderH();
-  };
-  window.addEventListener('scroll', () => {
-    if (!ticking) {
-      ticking = true;
-      requestAnimationFrame(update);
-    }
-  }, {passive: true});
-  update();
+  const onScroll = () => bar.classList.toggle('scrolled', window.scrollY > 12);
+  window.addEventListener('scroll', onScroll, {passive: true});
+  onScroll();
 }
 
 /* ============================================================
@@ -2334,6 +2313,20 @@ $$('.tab').forEach(b => b.addEventListener('click', () => {
   switchView(b.dataset.view);
 }));
 $$('[data-goto-view]').forEach(b => b.addEventListener('click', () => switchView(b.dataset.gotoView)));
+$$('.nav-item').forEach(b => b.addEventListener('click', () => {
+  const target = b.dataset.nav;
+  if (target === 'features') {
+    switchView('overview');
+    setTimeout(() => document.getElementById('features')?.scrollIntoView({behavior: 'smooth', block: 'start'}), 40);
+  } else if (target === 'explore') {
+    history.replaceState(null, '', '#modules');
+    switchView('modules');
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  } else if (target === 'about') {
+    switchView('overview');
+    setTimeout(() => document.getElementById('about')?.scrollIntoView({behavior: 'smooth', block: 'start'}), 40);
+  }
+}));
 $('#dwClose').addEventListener('click', closeDrawer);
 $('#dwScrim').addEventListener('click', closeDrawer);
 $('#dwBody').addEventListener('click', e => {
