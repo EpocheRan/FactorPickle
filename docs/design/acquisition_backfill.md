@@ -1,10 +1,10 @@
-# acquisition.backfill 设计（v1）
+# acquisition.backfill 设计
 
 > 目标：把「历史回补」从 `scripts/backfill_history.py` 收进 `acquisition` 模块，
 > **业务逻辑不出现在 `scripts/`**，脚本只做参数转发。
 >
 > 现状问题：增量（`acquisition run`）与回补（`scripts/backfill_history.py`）两套逻辑并存，
-> 分页、批量写入、时区、续跑判断各写一遍，坑也各踩一遍（见 `notes/20261101_backfill_results.md`）。
+> 分页、批量写入、时区、续跑判断各写一遍，坑也各踩一遍。
 
 ## 1. 边界
 
@@ -92,16 +92,16 @@ python -m acquisition backfill --phase p0-daily --start 2017-01-01 --end 2017-12
 python -m acquisition backfill --phase p1-index --start 2017-01-01 --end 2026-10-31 --dry-run
 ```
 
-`scripts/backfill_history.py` 改为 **deprecation shim**（20 行内）：打印迁移提示并转发到 `acquisition.cli`。
+`scripts/backfill_history.py` 保留为转发入口，实际执行走 `acquisition.backfill`。
 
-## 7. 迁移步骤
+## 7. 实现约定
 
-| 步 | 内容 | 验收 |
-|---|---|---|
-| **P1** | 建 `backfill/{registry,scope,writer,coverage,progress}`；移植 `p1-index` 与 `p3-valuation`（这两个踩坑最多，正好验证 writer/coverage） | 与现有脚本对同一区间产出行数一致（±0%）；`--dry-run` 的 GapReport 与手查一致 |
-| **P2** | 移植 `p0-daily`、`p2-structure`、`p2-periodic` | 2017 日线行数、结构表起点不变 |
-| **P3** | 移植 `p3-financial`（加"先查覆盖，已完整则跳过"的前置检查） | 财务四表零新增行（本来已齐），且日志明确说明"已覆盖" |
-| **P4** | `scripts/backfill_history.py` 转 shim；文档与 `scripts/README.md` 更新 | `grep -r "_query\\|insert into" scripts/` 为 0 |
+- 写入器每 500 行切批；NaN/NaT/None 统一转 None；
+- 单批失败只记 warning，累计成功行数；
+- 续跑基于 `max(ts)`，不看输入行数；
+- `--dry-run` 只生成 GapReport，不写库；
+- 每次取数命中源上限时自动按月分片；
+- 阶段注册表统一在 `acquisition/backfill/registry.py`。
 
 ## 8. 测试（离线，不依赖 DB）
 
@@ -118,7 +118,7 @@ python -m acquisition backfill --phase p1-index --start 2017-01-01 --end 2026-10
 
 | 风险 | 应对 |
 |---|---|
-| 移植过程改坏现有行为 | P1 用「同区间行数对比」做回归，先迁两个阶段验证 |
+| 阶段改动改坏现有行为 | 同区间行数对比做回归，先验证两个阶段 |
 | Tushare 限频 | 沿用现有 `_Api` 限流 + 退避，阶段内不做并发 |
 | `p3-financial` 再次白跑 | 阶段启动先 `assert_covered`，已完整直接跳过并记录 |
 | 脚本 shim 被误用 | shim 打印 deprecation 警告，并在 `scripts/README.md` 标注 |
@@ -127,36 +127,4 @@ python -m acquisition backfill --phase p1-index --start 2017-01-01 --end 2026-10
 
 - 分钟线回补（源有问题）；
 - 概念成分历史（源无数据）；
-- 把增量 syncer 也改成可回补（后续可加 `mode="backfill"`，本期不做）。
-
-## 11. 实现状态（2026-11-01）
-
-已落地 `acquisition/backfill/`（提交 `3a54858`）：
-
-| 组件 | 状态 |
-|---|---|
-| `write()` 500 行切批 / NaN→None / 单批失败隔离 | ✅ |
-| `max_ts()` 续跑（不看行数） | ✅ |
-| `gap_report()` + `--dry-run` | ✅ |
-| `fetch_range()` 命中上限自动按月分片 | ✅ |
-| `Scope` / `@phase` 注册 / `Api` 限流 | ✅ |
-
-七个阶段全部迁移，`python -m acquisition backfill --list` 可查：
-
-```
-daily · delisted · index_weight · structure · periodic · financial · valuation
-```
-
-与设计的差异：
-
-1. **不保留 alias**（用户要求），旧编号名 `p0-daily` / `p1-index` 等直接报错；
-2. `structure` 只保留按日三表，`share_float` / `repurchase` 移交 `periodic`（避免长区间被单次上限截断）；
-3. `financial` 阶段只做**覆盖率判定 + 跳过**，不做逐代码回补（数据已完整；缺失时明确报错而非静默空转）；
-4. `p0-codefix` 不迁移——它是一次性的"同码不同股"修复，实测 `code='000001'` 的 stock/idx 已互不覆盖。
-
-`scripts/backfill_history.py` 已转为 shim（import + deprecation 提示）。
-
-## 12. 待补
-
-- 三个单测：`write` 切批/NaN、`max_ts` 续跑、`fetch_range` 触顶退化；
-- 主 CLI 的 `--list` 已在 `python -m acquisition backfill` 下可用，`acquisition.cli` 未改动（用 `__main__.py` 分流）。
+- 把增量 syncer 也改成可回补（后续可加 `mode="backfill"`）。

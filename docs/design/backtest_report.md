@@ -1,4 +1,4 @@
-# 策略回测 HTML 报告设计方案 v1
+# 策略回测 HTML 报告设计
 
 > 目标：所有策略回测默认产出一份**单文件、离线、可交互**的 HTML 报告；
 > 报告必须回答“赚了多少、怎么赚的、风险在哪、相对基准有没有 alpha”。
@@ -70,7 +70,7 @@
 
 - CAPM：Alpha、Beta、R²、Alpha t 值、跟踪误差、信息比率
 - 超额收益分解：`beta × 基准超额 + alpha + 残差`
-- 按行业 Brinson 归因（配置/选股/交互），Phase 3
+- 按行业 Brinson 归因（配置/选股/交互）
 - 个股贡献 Top/Bottom 10
 - 费用/换手拖累
 
@@ -182,20 +182,13 @@ IR          = mean(rp - rb) / std(rp - rb) * sqrt(252)
 
 ## 7. 技术方案
 
-### 7.1 渲染库选型（实施修订）
+### 7.1 渲染方式
 
-> 2026-11-05 实施时目标环境无法访问 PyPI 与 CDN，Plotly/ECharts 都拉不下来。
-> v1 改为**零依赖 SVG + vanilla JS**：单文件离线、保留缩放/悬停/Tab/筛选/下载，
-> 只是图表由手写 JS 绘制。数据契约与交互设计不变，后续网络可用时可平滑替换 ECharts。
+报告使用**零依赖 SVG + vanilla JS**：单文件离线，支持缩放/悬停/Tab/筛选/下载，
+不引用外部脚本或 CDN。
 
-| 方案 | 体积 | 交互 | 开发成本 | 结论 |
-|---|---:|---|---|---|
-| **零依赖 SVG/JS** | ~150KB/报告 | 缩放/悬停/图例/Tab/表格筛选 | 中 | **v1 已采用** |
-| ECharts | ~1MB | 强，类 TradingView | 中 | 网络可用后的升级项 |
-| Plotly | ~3.5MB（inline） | 缩放/悬停/图例/多图 | 低 | 原推荐，环境拉取失败 |
-
-**v1 实现**：`backtest/reporting/render.py` 内嵌 JSON，用 SVG 画净值/回撤/滚动/散点/
-年度/分布/暴露，用 HTML 表格做月度热力与交易表；不引用任何外部脚本。
+`backtest/reporting/render.py` 内嵌 JSON，用 SVG 画净值/回撤/滚动/散点/年度/分布/暴露，
+用 HTML 表格做月度热力与交易表。
 
 ### 7.2 模块划分
 
@@ -206,7 +199,7 @@ backtest/reporting/
   alpha.py       # CAPM / 滚动 / 捕获率
   trades.py      # FIFO 回合交易
   exposure.py    # 仓位/行业暴露
-  render.py      # HTML 模板 + Plotly figures
+  render.py      # HTML 模板 + SVG figures
   template.html  # CSS/JS/布局
   output.py      # HtmlReportOutput(OutputPort)
 ```
@@ -220,20 +213,18 @@ backtest/reporting/
 
 ### 7.3 与引擎集成
 
-- `pyproject.toml` 增加 optional extra：`report = ["plotly>=5.0"]`；
+- 不依赖 Plotly/ECharts，不需要额外 optional extra；
 - `registry.py` 注册 `html` 输出；
-- `BacktestSettings.outputs` 默认从 `("console",)` 改为 `("console","html")`；
+- `BacktestSettings.outputs` 默认包含 `html`；
 - CLI：`--out console,html` 或默认带 html；
 - MCP 不需要新工具，报告路径进 `meta["report_path"]`；
-- 分钟模式：equity 仍是日频快照，trades 是分钟时间戳，报告照常；
-- 未安装 plotly 时降级为现有静态 HTML（或提示 `uv sync --extra report`）。
+- 分钟模式：equity 仍是日频快照，trades 是分钟时间戳，报告照常。
 
 ## 8. 体积与性能
 
 - 10 年日频：2500 个净值点、5000 笔成交、~2000 回合交易 → JSON 1–2MB；
-- Plotly inline 3.5MB，单文件 4–6MB；
-- 生成时间 < 1s（不含回测）；
-- 如嫌大：v2 换 ECharts（1MB）或 `include_plotlyjs="cdn"`（需联网）。
+- 单文件约 150KB–1MB；
+- 生成时间 < 1s（不含回测）。
 
 ## 9. 测试
 
@@ -242,21 +233,3 @@ backtest/reporting/
 - `test_report_smoke`：生成 HTML，断言包含 7 个 Tab、无 `http://`/`https://` 外链、JSON 可解析；
 - `test_report_benchmark_missing`：无基准时显示“未配置”，不报错；
 - Golden 只比 `report_data.json` 的指标，不比 HTML 字符串。
-
-## 10. 分阶段落地
-
-| 阶段 | 内容 | 验收 |
-|---|---|---|
-| P0 | `BacktestResult` 补 benchmark/round_trips/positions；FIFO + alpha/beta | 单测通过，数据契约冻结 |
-| P1 | 概览/绩效/风险 三个 Tab + Plotly 净值/回撤/月度/滚动 | `atr_trend`、`turnover_regime` 报告可看 |
-| P2 | 交易/暴露 Tab + 交易表筛选 | 回合交易与 fills 对账 |
-| P3 | 归因 Tab + 行业 Brinson + 个股贡献 | 归因和总收益对账 |
-| P4 | 默认 html 输出、文档、旧 `report_backtest.py` 下线 | 所有策略默认有报告 |
-
-## 11. 待确认
-
-1. **Plotly 还是 ECharts**？我倾向 v1 Plotly，v2 视体积再换。
-2. **单文件 4–6MB 能否接受**？如果必须 <1MB，直接上 ECharts。
-3. **默认基准**：统一 000300，还是按策略市值自动选 000300/000852？
-4. **是否需要个股 K 线 + 买卖点标记**？需要的话报告要带每只股票的行情，体积和计算都会上一个量级。
-5. **报告语言/主题**：中文深色（对齐截图），还是同时出浅色打印版？

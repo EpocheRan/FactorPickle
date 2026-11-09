@@ -1,4 +1,4 @@
-# 低频因子预计算 + ILP 写入方案（v1）
+# 低频因子预计算 + ILP 写入方案
 
 > 目标：让 `sentiment.holder_num_chg_q`、`event.unlock_pressure_60d`、`event.repurchase_intensity_120d`
 > 三个已注册但因数据未接而跑不起来的因子，走「离线算一次 → 落库 → 报告直接读」的路径。
@@ -112,18 +112,7 @@ return _pivot(...).reindex(index=close.index, columns=close.columns)
 
 必改：读取后按 code 做 `ffill`（并限制最多填充 400 个交易日，避免用两年前的旧值）。
 
-## 6. 工时估算
-
-| 阶段 | 内容 | 工时 |
-|---|---|---|
-| P1 | 修通 ILP（或退到 COPY）并做 1 万行压测 | 3 h |
-| P2 | 三个因子的计算脚本（含去重、重述、窗口） | 4 h |
-| P3 | 读取端 ffill + 稀疏容忍 | 2 h |
-| P4 | 全量回填 3,090 万行（跑批 + 校验） | 2 h（机器时间约 30 min） |
-| P5 | 单因子验证：抽 5 只股票对账 + 出第一份报告 | 2 h |
-| **合计** | | **约 1.5 人日** |
-
-## 7. 校验清单
+## 6. 校验清单
 
 | 检查 | 及格线 |
 |---|---|
@@ -134,7 +123,7 @@ return _pivot(...).reindex(index=close.index, columns=close.columns)
 | 对账 | 抽 5 只股票手算，与库内值误差 < 1e-6 |
 | 回归 | 现有 118 个 STORED 因子行数不变 |
 
-## 8. 风险
+## 7. 风险
 
 | 风险 | 应对 |
 |---|---|

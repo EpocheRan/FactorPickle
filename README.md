@@ -47,6 +47,7 @@ MCPserver ── 统一工具出口（http / sse / stdio）
 | `factors/` | 因子定义、时序与横截面算子 | `from factors import F` |
 | `factor_engine/` | 因子物化、宽表、审计与对账 | `python -m factor_engine` |
 | `research/` | 统一报告：profile 章节 + 单因子 HTML；默认全市场 | `python -m research.report` / `python -m scripts.cli profile` |
+| `factor_lab/` | 自主因子研究运行时：路径发现、因子构建、Runner、ML、Supervisor | `python -m factor_lab` |
 | `screener/` | 因子筛股、基线、停牌与覆盖检查 | `python -m screener` |
 | `backtest/` | 单股 / 横截面回测、执行规则、账本 | `python -m backtest` |
 | `strategies/` | 策略基类、universe、weighting、模型 | `python -m backtest list` |
@@ -100,7 +101,7 @@ python -m acquisition run --datasets ohlcv_1d,factors,screener
 - **价格口径**：存不复权价 + 累计复权因子，复权在读取时计算。
 - **分钟线与日线同构**：12 字段一致（含 `turnover` / `adj_factor` / `type`），
   `adj_factor` 按 `(code, date)` 取日线当日因子；`turnover` 用日线隐含流通股本折算，
-  日内加总 = 日线换手率；停牌日假 bar 不落库。详见 [docs/design/minute_data_v1.md](docs/design/minute_data_v1.md)。
+  日内加总 = 日线换手率；停牌日假 bar 不落库。详见 [docs/design/minute_data.md](docs/design/minute_data.md)。
 - **市场与品种**：`market` 是交易所（`SSE` / `SZSE` / `BSE`），`type` 是品种（`stock` / `etf` / `lof` / `fund` / `idx`）。
 - **时点正确**：财务按 `publish_date` 过滤，板块成分按 `as_of` 取最近整组快照。
 - **写入边界**：raw 表只由 `data_interface` 写，因子表只由 `factor_engine` 写。
@@ -120,9 +121,9 @@ python -m acquisition run --datasets ohlcv_1d,factors,screener
 | [在线系统图谱](https://epocheran.github.io/FinBridge/) | 模块职责、核心函数、数据域与表关系 |
 | [docs/README.md](docs/README.md) | 文档总索引、依赖关系、AI 阅读顺序 |
 | [docs/modules/](docs/modules/) | 11 个模块的架构与核心类/方法 |
-| [docs/design/](docs/design/) | 因子库、物化、回测架构、数据管线 |
+| [docs/design/](docs/design/) | 当前架构、因子库、回测、数据管线与 Factor Lab |
 | [docs/guides/](docs/guides/) | 回测、选股、`output/` 目录约定 |
-| [docs/notes/](docs/notes/) | 变更备注、迁移与回滚 SQL |
+| [FACTOR_LAB.md](FACTOR_LAB.md) | Factor Lab 运行时、数据边界与启动方式 |
 
 ## 测试
 

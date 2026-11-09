@@ -44,7 +44,7 @@
 - 字段与日线一致：`turnover` / `adj_factor` 非空率 **100%**（`adj_factor` 按 `(code,date)` join 日线，`turnover` 按日线隐含流通股本折算）；
 - 一致性：5min 聚合的开/高/低/收/量/额与 `ohlcv_1d` 完全相等；
 - 停牌日假 bar（zzshare 仍返回平盘零成交 bar）已按"当天无日线记录"剔除；
-- 设计说明见 [../design/minute_data_v1.md](../design/minute_data_v1.md)。
+- 设计说明见 [../design/minute_data.md](../design/minute_data.md)。
 
 ## 三、指数成分（index_weight）
 

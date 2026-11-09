@@ -1,7 +1,6 @@
-# 回测架构 v3（RQAlpha）
+# 回测架构
 
-> v2 的 PyBroker 适配已移除。本版以 RQAlpha 6.5.x 为唯一执行引擎，
-> 保留 `EnginePort`、自建 A 股规则、自建账本与对账。
+> 以 RQAlpha 6.5.x 为唯一执行引擎，保留 `EnginePort`、自建 A 股规则、自建账本与对账。
 
 ## 1. 目标与边界
 
@@ -12,7 +11,7 @@
 - 逐笔止损/移动止损（收盘触发、T+1 开盘执行）；
 - 输出 `equity/orders/trades/metrics`，并能与引擎组合对账。
 
-**不做**（v1）：分钟/tick、日内止损、融资融券、期权/期货、分红送转、PIT 成分。
+**不做**：分钟/tick、日内止损、融资融券、期权/期货、分红送转、PIT 成分。
 
 ## 2. 分层
 
@@ -67,7 +66,7 @@ T+1 由 RQAlpha 股票账户强制执行：`Instrument.market_tplus=1` +
 | 整手 | `Instrument.round_lot` + `order_shares` | 主板/创业板 100；科创板 1（200 起由下单层保证） |
 | 停牌 | `sys_simulation.inactive_limit` + `is_suspended` | 成交量为 0 不成交 |
 | 佣金/印花税/过户费 | `FinBridgeCostDecider` | 复用 `FeeModel`，印花税按日期切换 |
-| 滑点 | `sys_simulation.slippage=0` | v1 不计；后续可配 |
+| 滑点 | `sys_simulation.slippage=0` | 暂不计；后续可配 |
 | 成交量上限 | 关闭 | QuestDB `volume` 单位待校准 |
 
 ## 5. 数据模型
@@ -84,7 +83,7 @@ limit_up limit_down prev_close hfq_close settlement open_interest
 - `datetime` 用 `YYYYMMDD` 整数，`searchsorted` 取 bar；
 - `prev_close` 用 `shift(1)`；`limit_up/down` 用 `a_share.limit_pct`；
 - `hfq_close` 供 `StrategyContext.hfq_close`（因子信号用）；
-- 复权/分红/拆股暂不处理，v1 用原始价撮合与估值。
+- 复权/分红/拆股暂不处理，用原始价撮合与估值。
 
 `Instrument` 由 `build_instruments` 生成：交易所后缀 `.XSHG/.XSHE/.BJSE`、
 `board_type`、`market_tplus=1`、`special_type=ST/Normal`。
@@ -104,7 +103,7 @@ limit_up limit_down prev_close hfq_close settlement open_interest
 
 ## 7. 止损
 
-v1 只做**收盘价止损**：
+只做**收盘价止损**：
 
 - `handle_bar` 读 T 日收盘；
 - 若 `close <= stop` 且 `position.sellable > 0`，排队卖单；
@@ -112,7 +111,7 @@ v1 只做**收盘价止损**：
 - 买入当天 `sellable=0`，不会卖；次日再判。
 
 这是对 T+1 的诚实近似：**不是日内止损**。要精确日内止损，需要分钟线或自定义
-`AbstractBroker`，放到 v2。
+`AbstractBroker`，后续扩展。
 
 ### 7.1 分钟模式（1m）
 
@@ -157,9 +156,3 @@ v1 只做**收盘价止损**：
 | 分钟线/日内止损 | 引擎已支持 1m + `next_bar`；真实数据仅 2 只 × 1 月 | 先跑 pilot，再扩 5m/15m |
 | 横截面 explicit 池 | 幸存者偏差 | PIT 成分池 |
 | 无日内止损 | 止损按次日开盘 | 分钟线 + 自定义 Broker |
-
-## 11. 迁移记录
-
-- 2026-11-05：删除 `pybroker_engine.py`、`lib-pybroker`、`metrics_pybroker`、
-  `test_pybroker_contract.py`；新增 `rqalpha/` 适配层与 `test_rqalpha_engine.py`。
-- `EnginePort` 保留：即使只有一个引擎，它仍是测试缝与未来替换点。

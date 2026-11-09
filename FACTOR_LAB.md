@@ -1,6 +1,6 @@
 # Factor Lab
 
-Portable research workspace. A new DSH session should not need any prior chat
+Portable research workspace. A new DSH session should not need prior chat
 history.
 
 ## Start
@@ -13,16 +13,46 @@ python -m factor_lab campaign start --objective "研究因子"
 
 ## Architecture
 
-- PathFinder → FactorBuilder / ML Engine → Runner → Evaluator
-- Runner is an LLM execution role; it fetches data **only through `data_interface`** and loads the Research Adapter.
-  - `python -m factor_lab runner --codes ...` builds a Runner-owned Panel through DataInterfaceGateway and passes `panel=` into the adapter.
-  - `python -m factor_lab runner --legacy-panel` keeps the old research `_resolve_panel` path for parity/debugging.
-- FactorBuilder writes versioned generated factors under `factor_lab/factors/generated/`.
-  - Every factor artifact must carry `factor_id` (plus version/code hash); the panel builder and Runner use it to select the correct data/contract.
+```text
+PathFinder
+  → Web Gateway / FactorBuilder / ML Engine
+  → Runner
+  → Research Adapter
+  → Evaluator / Supervisor
+```
+
+- PathFinder chooses research direction from history, data coverage and discovery.
+- Web Gateway generates search questions and retains cited results.
+- FactorBuilder writes versioned factors under `factor_lab/factors/generated/`.
+- Runner is an LLM execution role; it selects codes, builds a Panel through
+  `DataInterfaceGateway`, and submits one pre-registered experiment.
+- Research Module computes factor values and `FactorReport`.
 - ML Engine is non-Deep-Learning only.
-- Supervisor controls rounds, budget, readiness feedback, and safe agent reclamation.
-- Hard limits: ≤5 campaign rounds; ¥3,000/month LLM; 150GB Lab quota; human G4 for promotion.
-- LLM pricing: input ¥0.04 / 1M tokens, output ¥8.00 / 1M tokens.
+- Supervisor owns campaign rounds, budgets, readiness blockers and safe reclamation.
+
+## Data and evaluation boundary
+
+```text
+DataInterfaceGateway
+  → market / flow / margin / valuation / industry / regime / ML bundles
+  → build_factor_panel
+  → Panel + data_manifest
+  → research.report.runner.generate
+  → research.report.metrics.build_report
+```
+
+Runner never computes a factor matrix and never accesses QuestDB directly.
+Factor artifacts must carry `factor_id`, category, version, code hash and
+`data_contract`; Runner validates the factor id and records the artifact in
+`data_manifest.json`.
+
+Research Module metrics use a pandas/Polars backend:
+
+- `REPORT_METRICS_BACKEND=auto` (default)
+- Rank IC stays on pandas
+- Quantile NAV uses Polars for moderate cross-sections and pandas for the
+  full market
+- `FactorReport.metrics_engine` records the actual engines
 
 ## Discovery
 
@@ -34,6 +64,17 @@ python -m factor_lab discovery queries --question "研究问题"
 python -m factor_lab discovery ingest --result gateway_result.json
 ```
 
+## Rules
+
+- One trial = hypothesis × pre-registered outcome.
+- N is family-scoped; confirmation runs do not enter development N.
+- Quarantine and ledger-repair gaps still count in N.
+- `control` is human-owned; stop drains work, it does not kill running workers.
+- Max 5 campaign rounds, 12 ML experiments, ¥60/campaign.
+- LLM pricing: input ¥0.04 / 1M tokens, output ¥8.00 / 1M tokens.
+- Lab quota 150GB: 100 output + 20 cache + 30 archive; 50GB free floor.
+- Do not promote factors or change policy without human G4.
+
 ## State
 
 All mutable state is under `output/factor_lab`:
@@ -42,9 +83,10 @@ All mutable state is under `output/factor_lab`:
 control/       directive, budget, heartbeat, cycle, agents
 ledger/        trial ledger
 experiments/   immutable experiment artifacts
-campaigns/     multi-round campaign traces
+campaigns/     campaign traces
 factors/       generated Lab factors (versioned)
 dashboard/     read-only dashboard
+ml/            ML datasets and outputs
 ```
 
 If data credentials/configuration are absent, `doctor` must fail with an

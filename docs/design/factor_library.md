@@ -1,28 +1,9 @@
-# 因子库架构设计 v1.1
+# 因子库架构设计
 
-> 状态：草案（按评审意见修订）
-> 日期：2026-10-28
+> 状态：当前设计
 > 目标：统一 `factors` / `indicator`，建立带分类、时点语义、版本血缘的因子库，支持入库、预计算、回测、筛股、MCP 多阶段调用。
 >
-> **模块归属以 [architecture_v2.md](architecture_v2.md) 为准**：本文件里的 `factor_engine/` 已上移为独立模块 `factor_engine/`，`screener` 只做筛选、计算全在 `factor_engine`，旧数据一次性迁移到新表。
-
----
-
-## 0. 修订摘要（v1.0 → v1.1）
-
-| # | 评审问题 | v1.1 决策 |
-|---|---|---|
-| 1 | 财务因子 `ts` 是报告期还是可用日未定义 | 拆成 **daily 时点表 + announce 事件表**；财务因子落 `factor_value_announce`，`ts = available_at`（公告日 + 披露滞后），另存 `report_period` / `announce_date` |
-| 2 | 长表缺 `source_version`，复权重算破坏可复现 | 两张值表都加 `source_version`；价格因子记录复权因子快照版本，财务记录报表版本，分档记录源口径版本 |
-| 3 | DEDUP 键不含版本，升级覆盖历史 | DEDUP 键加入 `version` + `source_version`；旧版本保留，查询默认取 registry 当前版本，可按版本回放（**2026-11-05 回退**：daily 键改回 `(ts, code, factor_id)`，重算即覆盖，版本字段仅作审计，见 §7.2） |
-| 4 | 增量只算末尾一天，递归/长窗因子会漂移 | `FactorSpec.update_mode`：`shift / window / recursive / event`；recursive 必须从锚点重算，window 带足 lookback；增量结果与全量抽检按 `FactorSpec.tolerance`（默认相对 1e-9） |
-| 5 | dependencies 命名空间与拓扑未定 | 依赖统一为 `raw:` / `factor:` / `ref:`；注册时建 DAG + 环检测；用拓扑层级替换 base/derived 两轮；行业用 `ref:industry`，不伪装成因子值 |
-| 6 | `screener_daily` 投影一致性只留一句“需要校验” | 硬性 `factor_projection_audit`：长表投影 vs 宽表现算，抽样 + 全量，按分因子容差（默认相对 1e-9），定时执行并阻断发布 |
-| 7 | `F.stored` 两代语义冲突 | 保留 `F.stored(column)` 读 legacy `screener_daily`；新增 `F.factor(factor_id, window=...)` 读长表；两套入口显式区分 |
-| 8 | 新旧 id 并存、registry 重复注册 | 规范 id = `category.name`（窗口只做标签）；`factor_alias` 表维护 `mom20 → momentum.ret@20`；注册时拒绝 canonical/alias 冲突 |
-| 9 | hooks 失败只记日志，静默不一致 | hooks 写 `factor_build_state`（FAILED/RETRY）+ 退避重试 + 健康度 `data_ts - factor_ts` 告警 |
-
-**工期修正**：P5（财务时点语义）由 3–4 人日调整为 **5–7 人日**；总工期约 **25–30 人日**。
+> **模块归属以仓库根 README 的模块表为准**：`factor_engine/` 是独立模块，`screener` 只做筛选，计算在 `factor_engine`。
 
 ---
 
@@ -197,7 +178,7 @@ def ret_20d(close: pd.Series) -> pd.Series:
 
 ---
 
-## 6. 时间语义（v1.1 新增，最关键）
+## 6. 时间语义
 
 ### 6.1 两类因子，两张表
 
@@ -424,7 +405,7 @@ resolve specs(category, freq, value_kind)
 | `concept_board_daily` | concept 类 |
 | 分析师同步 | analyst（受限） |
 
-**失败处理（v1.1 修正）**：
+**失败处理**：
 
 - hook 先写 `factor_build_state(status=PENDING)`，执行后 `DONE/FAILED`。
 - 失败任务带 `attempts` / `retry_at`，调度器指数退避重试，超过上限转 `DEAD` 并告警。
@@ -524,24 +505,7 @@ scripts/
 
 ---
 
-## 15. 分期与验收
-
-| 阶段 | 交付 | 验收 | 人日 |
-|---|---|---|---|
-| P0 | taxonomy / spec / registry / alias / DAG | 现有因子有 3 类标签；alias 冲突/环检测测试 | 3 |
-| P1 | indicator 合并 + screener 纯函数迁移 + shim | 310 测试全绿；无反向依赖 | 2 |
-| P2 | registry / daily / announce / state / pipeline / CLI | 增量幂等；版本化不覆盖；时点测试通过 | 4 |
-| P3 | backtest `F.factor` + stored/auto + run_id | 同一策略 compute/stored 结果一致 | 3 |
-| P4 | 价格类因子 | 与旧 screener 列抽检（分因子容差） | 3 |
-| P5 | 财务类因子 + 时点语义 | 公告日前后断言；重述可回放；无未来函数 | **5–7** |
-| P6 | 资金流/分析师/概念 + hooks | 分档同步后自动更新；失败重试 | 3 |
-| P7 | screener 投影 + 对账 + MCP | 每日对账（分因子容差）；MCP 可查目录/值 | 3 |
-
-总计约 **26–28 人日**（P5 上调后）。
-
----
-
-## 16. 风险与待决
+## 15. 风险与待决
 
 1. **长表体量**：核心集 40–60 个；版本化保留旧行，需设定清理策略。
 2. **财务重述**：同一报告期多版本，回测必须按 `available_at` + `version` 解析，不能取“最新”。
