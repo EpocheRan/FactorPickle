@@ -574,7 +574,14 @@
     font-family:inherit;font-size:inherit;letter-spacing:inherit;
   }
   .foot-links a:hover,.foot-link:hover{color:#fff}
-  .foot-links .foot-mail{letter-spacing:.03em;text-transform:none}
+  .foot-links .foot-mail{
+    display:inline-flex;align-items:center;gap:6px;
+    letter-spacing:.03em;text-transform:none;font-size:10px;
+  }
+  .foot-links .foot-mail svg{
+    width:11px;height:11px;flex:none;fill:none;stroke:currentColor;stroke-width:1.4;
+    stroke-linecap:round;stroke-linejoin:round;opacity:.85;
+  }
   .foot-legal{
     display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
     border-top:1px solid var(--line-soft);padding-top:18px;
@@ -1075,7 +1082,10 @@
       <div class="foot-links">
         <a href="https://github.com/EpocheRan/FactorPickle" target="_blank" rel="noopener">GITHUB</a>
         <a href="https://github.com/EpocheRan/FactorPickle/issues/" target="_blank" rel="noopener">ISSUES</a>
-        <a class="foot-mail" href="mailto:crrswm@hotmail.com">crrswm@hotmail.com</a>
+        <a class="foot-mail" href="mailto:crrswm@hotmail.com">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="m2.5 4.5 5.5 4 5.5-4"/></svg>
+          <span>crrswm@hotmail.com</span>
+        </a>
       </div>
     </div>
     <div class="wrap foot-legal">
