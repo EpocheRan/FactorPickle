@@ -123,27 +123,31 @@
       radial-gradient(620px 420px at 16% 8%,rgba(126,240,199,.05),transparent 70%),
       #040806;
   }
-  .hero-visual{position:absolute;inset:0;opacity:1;pointer-events:none;overflow:hidden}
-  .hero-visual img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(1.015);will-change:transform,filter;animation:heroDrift 32s ease-in-out infinite alternate,heroPulse 7s ease-in-out infinite alternate}
-  .hero-visual::before{
-    content:"";position:absolute;inset:-8%;pointer-events:none;opacity:.24;mix-blend-mode:screen;
-    background-image:
-      radial-gradient(circle at 18% 32%,rgba(216,255,122,.9) 0 1px,transparent 2px),
-      radial-gradient(circle at 72% 24%,rgba(126,240,199,.7) 0 1px,transparent 2px),
-      radial-gradient(circle at 54% 74%,rgba(201,255,90,.75) 0 1px,transparent 2px),
-      radial-gradient(circle at 86% 62%,rgba(216,255,122,.55) 0 1px,transparent 2px);
-    background-size:220px 180px,280px 230px,260px 210px,320px 260px;
-    animation:heroParticles 26s linear infinite;
+  .hero-visual{position:absolute;inset:0;z-index:0;isolation:isolate;opacity:1;pointer-events:none;overflow:hidden}
+  .hero-visual img{position:relative;z-index:2;display:block;width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(1.015);will-change:transform,filter;animation:heroDrift 32s ease-in-out infinite alternate,heroPulse 7s ease-in-out infinite alternate}
+  .hero-aura{
+    position:absolute;z-index:1;right:2%;top:10%;width:560px;height:560px;border-radius:50%;
+    background:radial-gradient(circle,rgba(185,255,63,.15),rgba(185,255,63,.04) 44%,transparent 70%);
+    filter:blur(18px);animation:heroAura 8s ease-in-out infinite alternate;pointer-events:none;
   }
-  .hero-visual::after{
-    content:"";position:absolute;inset:-20%;pointer-events:none;opacity:.55;mix-blend-mode:screen;
-    background:linear-gradient(105deg,transparent 40%,rgba(201,255,90,.08) 47%,rgba(255,255,255,.055) 50%,rgba(201,255,90,.04) 54%,transparent 61%);
-    animation:heroScan 12s ease-in-out infinite;
+  .hero-scan{
+    position:absolute;z-index:3;top:-12%;bottom:-12%;left:-22%;width:140px;pointer-events:none;
+    background:linear-gradient(90deg,transparent,rgba(216,255,122,.10),rgba(255,255,255,.045),transparent);
+    filter:blur(14px);transform:skewX(-14deg);animation:heroScanSweep 7.5s linear infinite;
   }
+  .hero-spark{
+    position:absolute;z-index:4;width:5px;height:5px;border-radius:50%;pointer-events:none;
+    background:#e2ff9a;box-shadow:0 0 14px 5px rgba(185,255,63,.36);
+    animation:heroSpark 9s ease-in-out infinite;
+  }
+  .hero-spark.s1{left:67%;top:32%;animation-delay:-2s}
+  .hero-spark.s2{left:80%;top:58%;width:3px;height:3px;animation-delay:-5.5s}
+  .hero-spark.s3{left:73%;top:74%;width:4px;height:4px;animation-delay:-7s}
   @keyframes heroDrift{from{transform:scale(1.015) translate3d(0,0,0)}to{transform:scale(1.045) translate3d(-1.2%,-.6%,0)}}
-  @keyframes heroPulse{from{filter:drop-shadow(0 0 16px rgba(185,255,63,.04))}to{filter:drop-shadow(0 0 55px rgba(185,255,63,.15))}}
-  @keyframes heroParticles{from{transform:translate3d(0,0,0)}to{transform:translate3d(-36px,-24px,0)}}
-  @keyframes heroScan{0%,100%{transform:translate3d(-22%,0,0)}50%{transform:translate3d(22%,0,0)}}
+  @keyframes heroPulse{from{filter:drop-shadow(0 0 14px rgba(185,255,63,.03))}to{filter:drop-shadow(0 0 36px rgba(185,255,63,.08))}}
+  @keyframes heroAura{from{transform:scale(.9);opacity:.35}to{transform:scale(1.08);opacity:.75}}
+  @keyframes heroScanSweep{0%{left:-22%}100%{left:112%}}
+  @keyframes heroSpark{0%,100%{transform:translate3d(0,0,0);opacity:.22}50%{transform:translate3d(-22px,-34px,0);opacity:1}}
   .hero-veil{
     position:absolute;inset:0;pointer-events:none;
     background:
@@ -653,7 +657,12 @@
   <section class="view active" id="view-overview">
     <div class="hero-home">
       <div class="hero-visual" id="heroVisual" aria-hidden="true">
+        <span class="hero-aura"></span>
         <img src="assets/hero-factorpickle.svg" alt="">
+        <span class="hero-scan"></span>
+        <span class="hero-spark s1"></span>
+        <span class="hero-spark s2"></span>
+        <span class="hero-spark s3"></span>
       </div>
       <div class="hero-veil"></div>
       <div class="hero-inner wrap">
