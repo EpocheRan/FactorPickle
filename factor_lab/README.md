@@ -212,14 +212,22 @@ panels and the peer residual matrix are intentionally excluded.
 - Runner data preflight goes through `data_interface`; `panel_builder.py`
   builds Runner-owned Panels from `DataInterfaceGateway` bundles and passes
   `panel=` into the Research Adapter.
-- `panel_builder.build_factor_panel` routes by factor category:
+- `panel_builder.build_factor_panel` routes by factor category through
+  `DataInterfaceGateway`:
   - price → market bundle
-  - sentiment → market + flow bundle
-  - quality/value → explicit DataGap until a materialized financial bundle exists
+  - sentiment → market + moneyflow + margin extras
+  - quality/value → market + valuation/reference; materialized factor values
+    remain in the Research Module
+  - market_cap / industry / regime / benchmark are gateway bundles now.
 - `--legacy-panel` keeps the research `_resolve_panel` path for parity/debugging.
 - FactorBuilder artifacts **must carry `factor_id`** (plus category/version/
   data_contract/code hash); Runner validates it matches the hypothesis and
   records it in `data_manifest.json` as `factor_artifact`.
+- Real parity smoke (5 codes, 2022-01-04..2026-11-01): legacy vs Gateway price
+  panel `ok=true`; close/open/high/low max abs diff ≈ 5e-5 (4-decimal rounding),
+  volume/amount/turnover diff 0.
+- Actual sentiment Panel built with moneyflow + margin extras; quality/value
+  Panel built with valuation extras, market_cap, industry and regime.
 - Vectorized factor evaluation still uses `research.report` / `research.report.metrics`.
 - `rho_return` is still pending; G0.5 is exposure-only.
 - Multi-trial BH is still a batch step; current q is Bonferroni fallback.
@@ -259,7 +267,8 @@ python -m factor_lab agents status
 python -m factor_lab library list
 python -m factor_lab factor-build --family demo --factor-id demo.mom --code factor.py --spec spec.json --tests test_factor.py
 python -m factor_lab ml run --dataset data.csv --spec ml_spec.json --out output/factor_lab/ml/demo
-python -m factor_lab ml data --codes 600000,000001 --start 2022-01-04 --end 2026-11-01 --out output/factor_lab/ml/data
+python -m factor_lab ml data --codes "600000,000001" --start 2022-01-04 --end 2026-11-01 --out output/factor_lab/ml/data
+python -m factor_lab parity --codes "600000,000001,600519,000858,601318" --start 2022-01-04 --end 2026-11-01
 python -m factor_lab campaign start --objective "研究因子"
 python -m factor_lab campaign run --dataset data.csv --plan campaign_plan.json --objective "ml smoke"
 python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json --codes 600000,000001

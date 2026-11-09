@@ -94,13 +94,16 @@ class DataInterfaceGateway:
         moneyflow_factory: Callable[[], Any] | None = None,
         disclosure_factory: Callable[[], Any] | None = None,
         calendar_factory: Callable[[], Any] | None = None,
+        client_factory: Callable[[], Any] | None = None,
     ) -> None:
         self._market_loader_factory = market_loader_factory
         self._financial_factory = financial_factory
         self._moneyflow_factory = moneyflow_factory
         self._disclosure_factory = disclosure_factory
         self._calendar_factory = calendar_factory
+        self._client_factory = client_factory
         self._market: Any | None = None
+        self._client: Any | None = None
 
     # ---------------------------------------------------------------- imports
     @staticmethod
@@ -120,9 +123,38 @@ class DataInterfaceGateway:
                 self._market = self._runtime().get_market_loader()
         return self._market
 
+    def _get_client(self) -> Any:
+        """Low-level QuestDB client, only used by typed gateway bundles.
+
+        Runner/PanelBuilder never import this client directly.  The raw query
+        helpers below are the gateway's fallback for datasets that
+        data_interface does not yet expose as a service (margin, industry,
+        regime, materialized factor values).
+        """
+
+        if self._client is None:
+            if self._client_factory is not None:
+                self._client = self._client_factory()
+            else:
+                from data_interface.common.questdb_client import QuestDBClient
+
+                self._client = QuestDBClient(connect=False)
+        return self._client
+
+    def query_frame(self, sql: str, params: Any | None = None) -> pd.DataFrame:
+        try:
+            frame = self._get_client().query_dataframe(sql, params)
+        except Exception as exc:  # noqa: BLE001
+            raise DataInterfaceUnavailable(
+                f"data_interface query failed: {type(exc).__name__}: {exc}"
+            ) from exc
+        return frame if isinstance(frame, pd.DataFrame) else pd.DataFrame()
+
     def _get(self, name: str) -> Any:
         if name == "market":
             return self._get_market()
+        if name == "questdb":
+            return self._get_client()
         factory = {
             "financial": self._financial_factory,
             "moneyflow": self._moneyflow_factory,
@@ -176,12 +208,12 @@ class DataInterfaceGateway:
         end: str,
         *,
         freq: str = "d",
-        adjust: str = "hfq",
+        adjust: str = "qfq",
     ) -> tuple[dict[str, pd.DataFrame], DataManifest]:
         """Read OHLC through data_interface only.
 
-        Missing/empty result becomes ``DataGap``; we never fall back to a raw
-        database query.
+        ``qfq`` matches the research loader's ``hfq_*`` convention (scale by
+        last adj_factor), so a Runner panel and legacy panel are comparable.
         """
 
         try:
@@ -213,7 +245,7 @@ class DataInterfaceGateway:
         end: str,
         *,
         warmup_days: int = 800,
-        adjust: str = "hfq",
+        adjust: str = "qfq",
     ) -> DataBundle:
         fetch_start = (
             pd.Timestamp(start) - pd.Timedelta(days=int(warmup_days))
@@ -242,6 +274,15 @@ class DataInterfaceGateway:
         service = self._get("moneyflow")
         if not hasattr(service, "get_by_code"):
             raise DataGap("moneyflow service does not expose get_by_code")
+        mapping = {
+            "buy_sm_amount": "mf_buy_sm",
+            "sell_sm_amount": "mf_sell_sm",
+            "buy_lg_amount": "mf_buy_lg",
+            "sell_lg_amount": "mf_sell_lg",
+            "buy_elg_amount": "mf_buy_elg",
+            "sell_elg_amount": "mf_sell_elg",
+            "net_mf_amount": "mf_net_amount",
+        }
         by_column: dict[str, dict[str, pd.Series]] = {}
         rows = 0
         for code in codes:
@@ -264,9 +305,10 @@ class DataInterfaceGateway:
                 name = str(column).lower()
                 if name in {"code", "symbol"}:
                     continue
+                target = mapping.get(name, name)
                 values = pd.to_numeric(frame[column], errors="coerce")
                 if values.notna().any():
-                    by_column.setdefault(name, {})[str(code)] = values
+                    by_column.setdefault(target, {})[str(code)] = values
                     rows += int(values.notna().sum())
         if not by_column:
             raise DataGap(f"moneyflow returned no usable fields for {codes} {start}..{end}")
@@ -328,6 +370,133 @@ class DataInterfaceGateway:
             data_hash=_frame_hash({"ml": long.set_index("date") if "date" in long else long}),
         )
         return DataBundle(kind="ml", frame=long, fields=list(wanted), manifest=manifest)
+
+    @staticmethod
+    def _code_literals(codes: list[str]) -> str:
+        return ",".join("'" + str(code).replace("'", "''") + "'" for code in codes)
+
+    def _extra_bundle(
+        self,
+        *,
+        kind: str,
+        table: str,
+        mapping: dict[str, str],
+        codes: list[str],
+        start: str,
+        end: str,
+    ) -> DataBundle:
+        columns = ", ".join(["ts", "code"] + list(mapping))
+        sql = (
+            f"select {columns} from {table} "
+            f"where code in ({self._code_literals(codes)}) "
+            f"and ts between '{start}' and '{end}'"
+        )
+        frame = self.query_frame(sql)
+        if frame.empty:
+            raise DataGap(f"{table} returned no rows for {len(codes)} codes")
+        if frame.index.name == "ts":
+            frame = frame.reset_index()
+        if "ts" in frame.columns:
+            frame["ts"] = pd.to_datetime(frame["ts"], errors="coerce").dt.tz_localize(None)
+        extras: dict[str, pd.DataFrame] = {}
+        for source, target in mapping.items():
+            if source not in frame.columns:
+                continue
+            pivoted = frame.pivot_table(index="ts", columns="code", values=source, aggfunc="last")
+            if pivoted.notna().any().any():
+                extras[target] = pivoted
+        if not extras:
+            raise DataGap(f"{table} has none of the requested fields: {sorted(mapping)}")
+        manifest = DataManifest(
+            services=[kind],
+            fields=sorted(extras),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=int(len(frame)),
+            data_hash=_frame_hash(extras),
+        )
+        return DataBundle(kind=kind, frames=extras, fields=sorted(extras), manifest=manifest)
+
+    def margin_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
+        return self._extra_bundle(
+            kind="margin",
+            table="margin_detail",
+            mapping={"rzye": "margin_rzye", "rzmre": "margin_rzmre", "rqye": "margin_rqye", "rqyl": "margin_rqyl"},
+            codes=codes,
+            start=start,
+            end=end,
+        )
+
+    def valuation_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
+        return self._extra_bundle(
+            kind="valuation",
+            table="fin_valuation_daily",
+            mapping={"market_cap": "total_mv", "float_market_cap": "float_mv"},
+            codes=codes,
+            start=start,
+            end=end,
+        )
+
+    def industry_map(self) -> pd.Series:
+        frame = self.query_frame(
+            "select code, last(board_name) as name from map_stock_board "
+            "where is_primary = true group by code"
+        )
+        if frame.empty:
+            return pd.Series(dtype=object)
+        return pd.Series(frame["name"].to_numpy(), index=frame["code"].astype(str)).dropna()
+
+    def regime_series(self, dates: pd.DatetimeIndex) -> pd.Series | None:
+        frame = self.query_frame(
+            "select ts, close from ohlcv_1d where type='idx' and code='399006' order by ts"
+        )
+        if frame.empty:
+            return None
+        if frame.index.name == "ts":
+            frame = frame.reset_index()
+        index = pd.to_datetime(frame["ts"], utc=True).dt.tz_convert(None).dt.normalize()
+        close = pd.Series(pd.to_numeric(frame["close"], errors="coerce").to_numpy(), index=index)
+        close = close[~close.index.duplicated()].sort_index()
+        ma = close.rolling(200, min_periods=120).mean()
+        regime = pd.Series("neutral", index=close.index, dtype=object)
+        regime[close > ma * 1.03] = "bull"
+        regime[close < ma * 0.97] = "bear"
+        regime[ma.isna()] = "neutral"
+        return regime.reindex(dates).ffill()
+
+    def stored_factor_bundle(
+        self,
+        factor_id: str,
+        codes: list[str],
+        start: str,
+        end: str,
+    ) -> DataBundle:
+        sql = (
+            "select ts, code, value from factor_value_daily "
+            f"where factor_id='{factor_id.replace(chr(39), chr(39) * 2)}' "
+            f"and ts between '{start}' and '{end}' "
+            f"and code in ({self._code_literals(codes)})"
+        )
+        frame = self.query_frame(sql)
+        if frame.empty:
+            raise DataGap(f"factor_value_daily has no values for {factor_id}")
+        if frame.index.name == "ts":
+            frame = frame.reset_index()
+        if "ts" in frame.columns:
+            frame["ts"] = pd.to_datetime(frame["ts"], errors="coerce").dt.tz_localize(None)
+        frame["value"] = pd.to_numeric(frame["value"], errors="coerce")
+        wide = frame.pivot_table(index="ts", columns="code", values="value", aggfunc="last")
+        manifest = DataManifest(
+            services=["factor_value_daily"],
+            fields=[factor_id],
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=int(len(frame)),
+            data_hash=_frame_hash({"values": wide}),
+        )
+        return DataBundle(kind="stored_factor", frames={factor_id: wide}, manifest=manifest)
 
 
     def financial(self, code: str, *args: Any, **kwargs: Any) -> Any:

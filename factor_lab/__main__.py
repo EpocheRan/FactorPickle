@@ -103,6 +103,13 @@ def main(argv: list[str] | None = None) -> int:
     discovery_parser.add_argument("--result", default="")
     discovery_parser.add_argument("--brief", default=str(config.LAB_ROOT / "discovery" / "discovery_brief.json"))
 
+    parity_parser = sub.add_parser("parity", help="legacy vs Runner panel parity")
+    parity_parser.add_argument("--factor-id", default="momentum.ret_21d")
+    parity_parser.add_argument("--codes", required=True)
+    parity_parser.add_argument("--start", default="2022-01-04")
+    parity_parser.add_argument("--end", default="2026-11-01")
+    parity_parser.add_argument("--out", default="output/factor_lab/parity_panel.json")
+
     control_parser = sub.add_parser("control", help="show / pause / resume the lab")
     control_parser.add_argument("action", choices=["show", "pause", "resume", "stop"])
     control_parser.add_argument("--reason", default="")
@@ -401,7 +408,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "discovery":
         from .discovery import DiscoveryBrief
         from .web_gateway import parse_gateway_output, read_brief, seed_queries
-
         if args.action == "queries":
             brief = DiscoveryBrief(
                 research_question=args.question,
@@ -416,6 +422,22 @@ def main(argv: list[str] | None = None) -> int:
                 raise SystemExit(f"invalid gateway result: {args.result}")
             brief = read_brief(Path(args.brief))
             _print(parse_gateway_output(payload.get("gateway") if isinstance(payload.get("gateway"), dict) else payload, brief))
+        return 0
+
+    if args.command == "parity":
+        from .parity import compare_price_panel, write_parity
+
+        codes = [item.strip() for item in args.codes.split(",") if item.strip()]
+        if not codes:
+            raise SystemExit("parity requires --codes")
+        result = compare_price_panel(
+            factor_id=args.factor_id,
+            codes=codes,
+            start=args.start,
+            end=args.end,
+        )
+        write_parity(result, args.out)
+        _print(result)
         return 0
 
     if args.command == "control":

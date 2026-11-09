@@ -45,6 +45,22 @@ class FakeService:
         return {"ok": True}
 
 
+class FakeGateway(DataInterfaceGateway):
+    """Gateway with no reference DB queries for unit tests."""
+
+    def valuation_bundle(self, *args, **kwargs):
+        return None
+
+    def margin_bundle(self, *args, **kwargs):
+        return None
+
+    def industry_map(self):
+        return None
+
+    def regime_series(self, dates):
+        return None
+
+
 class FakeCalendar:
     def trading_days(self, start, end):
         return ["2024-01-02"]
@@ -260,7 +276,7 @@ def test_panel_builder_routes_factor_categories():
             dates = pd.bdate_range("2024-01-01", periods=3)
             return pd.DataFrame({"ts": dates, "code": code, "net_mf_amount": [1.0, 2.0, 3.0]})
 
-    gateway = DataInterfaceGateway(
+    gateway = FakeGateway(
         market_loader_factory=FakeMarket,
         moneyflow_factory=FlowService,
     )
@@ -283,19 +299,20 @@ def test_panel_builder_routes_factor_categories():
         warmup_days=10,
     )
     assert sentiment.category == "sentiment"
-    assert "net_mf_amount" in (sentiment.panel.extras or {})
-    with pytest.raises(Exception):
-        build_factor_panel(
-            gateway,
-            {"factor_id": "quality.test", "category": "quality"},
-            ["600000"],
-            "2024-01-02",
-            "2024-01-05",
-        )
+    assert "mf_net_amount" in (sentiment.panel.extras or {})
+    quality = build_factor_panel(
+        gateway,
+        {"factor_id": "quality.test", "category": "quality"},
+        ["600000"],
+        "2024-01-02",
+        "2024-01-05",
+        warmup_days=10,
+    )
+    assert quality.category == "quality"
 
 
 def test_panel_builder_price_matches_raw_data_interface_frames():
-    gateway = DataInterfaceGateway(market_loader_factory=FakeMarket)
+    gateway = FakeGateway(market_loader_factory=FakeMarket)
     built = build_factor_panel(
         gateway,
         {"factor_id": "price.test", "category": "price"},
@@ -314,7 +331,7 @@ def test_panel_builder_price_matches_raw_data_interface_frames():
 
 
 def test_panel_builder_from_data_interface():
-    gateway = DataInterfaceGateway(market_loader_factory=FakeMarket)
+    gateway = FakeGateway(market_loader_factory=FakeMarket)
     built = build_factor_panel(
         gateway,
         {"factor_id": "price.test", "category": "price"},
@@ -396,7 +413,7 @@ def test_readiness_writes_blocker_when_data_interface_missing(tmp_path: Path, mo
 def test_runner_default_data_bundle_uses_gateway(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from factor_lab import runner as runner_mod
 
-    class Gateway(DataInterfaceGateway):
+    class Gateway(FakeGateway):
         def status(self):
             return {"available": True, "services": ["market"]}
 

@@ -1,15 +1,13 @@
 """Build a research ``Panel`` from DataInterfaceGateway bundles.
 
-There is one Runner data path now: DataInterfaceGateway -> DataBundle ->
+There is one Runner data path: DataInterfaceGateway -> DataBundle ->
 build_factor_panel -> Panel.  The legacy research loader is not imported here.
 
-Category rules are data contracts, not hidden branch logic:
+Category rules:
 
-- price: market bundle
-- sentiment: market + flow bundle (moneyflow/margin data exposed by gateway)
-- quality/value: require materialized factor inputs; the gateway must expose the
-  required bundle or this builder raises a clear DataGap instead of silently
-  changing the factor's data source.
+- price: market bundle + reference data
+- sentiment: market + moneyflow/margin extras
+- quality/value: market + valuation/reference; factor values stay in Research Module
 """
 
 from __future__ import annotations
@@ -92,6 +90,25 @@ def _wide(bundle: DataBundle, field: str) -> pd.DataFrame | None:
     return pd.DataFrame(series).sort_index()
 
 
+def _pivot_extras(frames: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    result: dict[str, pd.DataFrame] = {}
+    for name, frame in frames.items():
+        if isinstance(frame, pd.DataFrame):
+            normalized = frame.copy()
+            if not isinstance(normalized.index, pd.DatetimeIndex):
+                normalized = _plain_index(normalized)
+            result[name] = normalized
+    return result
+
+
+def _safe_bundle(gateway: DataInterfaceGateway, method: str, *args: Any, **kwargs: Any) -> DataBundle | None:
+    try:
+        fn = getattr(gateway, method)
+        return fn(*args, **kwargs)
+    except Exception:  # noqa: BLE001 - reference data is optional
+        return None
+
+
 def build_factor_panel(
     gateway: DataInterfaceGateway,
     factor_artifact: Any,
@@ -100,7 +117,7 @@ def build_factor_panel(
     end: str,
     *,
     warmup_days: int = 800,
-    adjust: str = "hfq",
+    adjust: str = "qfq",
 ) -> BuiltPanel:
     if not codes:
         raise PanelBuildError("codes must not be empty")
@@ -124,26 +141,50 @@ def build_factor_panel(
             return None
         return frame.reindex(index=close.index, columns=columns)
 
-    extras: dict[str, pd.DataFrame] | None = None
+    extras: dict[str, pd.DataFrame] = {}
     manifests = [market.manifest]
+    reference = bool(contract.get("reference", True))
     if category == "sentiment":
-        required_flow = contract.get("datasets") or ["moneyflow_daily"]
-        flow = gateway.flow_bundle(codes, fetch_start, end)
-        extras = dict(flow.frames)
-        manifests.append(flow.manifest)
-    elif category in ("quality", "value"):
-        # The production financial path evaluates materialized factor values;
-        # there is no raw-panel equivalent in data_interface yet.  Fail loudly.
-        raise DataGap(
-            f"{category} factor { _artifact_value(factor_artifact, 'factor_id', '') } "
-            "requires materialized financial factor data; DataInterfaceGateway has no bundle for it yet"
-        )
+        flow = _safe_bundle(gateway, "flow_bundle", codes, fetch_start, end)
+        if flow is not None:
+            extras.update(_pivot_extras(flow.frames))
+            manifests.append(flow.manifest)
+        margin = _safe_bundle(gateway, "margin_bundle", codes, fetch_start, end)
+        if margin is not None:
+            extras.update(_pivot_extras(margin.frames))
+            manifests.append(margin.manifest)
+        if not extras:
+            raise DataGap("sentiment factor requires moneyflow/margin extras; none available")
+    if category in ("quality", "value") or reference:
+        valuation = _safe_bundle(gateway, "valuation_bundle", codes, fetch_start, end)
+        if valuation is not None:
+            extras.update(_pivot_extras(valuation.frames))
+            manifests.append(valuation.manifest)
 
     benchmark = None
     returns = close.pct_change(fill_method=None).mean(axis=1)
     if returns.notna().any():
         benchmark = (1.0 + returns.fillna(0.0)).cumprod()
         benchmark.name = "data_interface_equal_weight"
+
+    market_cap = extras.get("float_mv")
+    if market_cap is not None and market_cap.notna().any().any():
+        median = float(market_cap.stack().median())
+        if median < 1e6:
+            market_cap = market_cap * 10000.0
+    else:
+        market_cap = None
+    industry = None
+    regime = None
+    if reference:
+        try:
+            industry = gateway.industry_map()
+        except Exception:  # noqa: BLE001
+            industry = None
+        try:
+            regime = gateway.regime_series(close.index)
+        except Exception:  # noqa: BLE001
+            regime = None
 
     manifest = DataManifest(
         services=sorted({service for item in manifests for service in item.services}),
@@ -158,16 +199,16 @@ def build_factor_panel(
     panel = Panel(
         close=close,
         open=align(open_),
-        market_cap=None,
-        industry=None,
-        regime=None,
+        market_cap=market_cap.reindex(index=close.index, columns=columns) if market_cap is not None else None,
+        industry=industry,
+        regime=regime,
         symbols=columns,
         high=align(high),
         low=align(low),
         volume=align(volume),
         amount=align(amount),
         turnover=align(turnover),
-        extras=extras,
+        extras=extras or None,
         benchmark=benchmark,
         pool={
             "selection": "data_interface",
