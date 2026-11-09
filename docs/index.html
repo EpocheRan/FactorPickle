@@ -431,6 +431,8 @@
     text-shadow:0 18px 60px rgba(0,0,0,.55);
   }
   .story-copy p{max-width:650px;margin:0 auto;font-size:14px;line-height:1.8;color:#8b9eae}
+  .story-copy .story-brand{color:#c9ff5a;font-weight:650}
+  .story-kicker{opacity:0;will-change:opacity,transform}
   .pin-frame{
     position:absolute;z-index:1;pointer-events:none;
     inset:clamp(90px,12vh,130px) clamp(24px,5vw,90px) clamp(64px,9vh,96px);
@@ -444,7 +446,7 @@
   .pin-cross.bl{left:-7px;bottom:-7px}.pin-cross.br{right:-7px;bottom:-7px}
   .pin-pickle-wrap{
     position:absolute;z-index:2;left:var(--pickle-x,50%);top:var(--pickle-y,74%);
-    transform:translate(-50%,-50%) scale(var(--pickle-scale,.62));
+    transform:translate(-50%,calc(-50% + var(--pickle-entry-y,0px))) scale(var(--pickle-scale,.62));
     width:min(580px,44vw);height:min(78vh,780px);
     display:flex;align-items:center;justify-content:center;
   }
@@ -458,7 +460,7 @@
     filter:drop-shadow(0 24px 46px rgba(0,0,0,.55)) drop-shadow(0 0 34px rgba(185,255,63,.2));
   }
   .pin-pickle-wrap.has-3d .pickle-fallback{opacity:0}
-  #pickleCanvas{position:relative;z-index:2;display:block;width:100%;height:100%}
+  #pickleCanvas{position:relative;z-index:2;display:block;width:100%;height:100%;filter:brightness(1.14) saturate(1.1)}
   .pickle-axis{
     position:absolute;z-index:4;left:50%;bottom:1%;transform:translateX(-50%);
     display:flex;align-items:center;gap:9px;white-space:nowrap;
@@ -514,13 +516,14 @@
     .pin-scene{height:auto}
     .pin-sticky{position:relative;top:auto;height:auto;min-height:0;padding:calc(var(--header-h,80px) + 20px) 0 44px;overflow:hidden}
     .story-copy{position:relative;top:auto;left:auto;transform:none!important;opacity:1!important;width:min(620px,92vw);margin:0 auto 18px}
+    .story-kicker{opacity:1!important;transform:none!important}
     .story-copy h2{font-size:clamp(32px,8vw,46px)}
     .story-copy p{font-size:13px;padding:0 4vw}
     .pin-scene.is-story .pin-card{opacity:1!important;pointer-events:auto}
     .pin-scene.is-story .pin-foot,.pin-scene.is-story .pin-frame{opacity:1}
     .pin-frame{position:relative;inset:auto;width:min(470px,92vw);height:min(54vh,440px);margin:0 auto;border:0}
     .pin-cross{display:none}
-    .pin-pickle-wrap{width:min(360px,82vw);height:100%;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important}
+    .pin-pickle-wrap{width:min(360px,82vw);height:100%;left:50%!important;top:50%!important;opacity:1!important;transform:translate(-50%,-50%)!important}
     .pin-cards{
       position:relative;inset:auto;display:flex;gap:12px;width:100%;
       margin:16px 0 0;padding:0 8vw 10px;overflow-x:auto;overscroll-behavior-x:contain;
@@ -928,8 +931,8 @@
       <div class="pin-sticky">
         <div class="pin-grid" aria-hidden="true"></div>
         <div class="story-copy" id="storyCopy">
-          <div class="pin-kicker mono">WHY FACTORPICKLE <span>/</span> 08 PRINCIPLES</div>
-          <h2>为什么是 FactorPickle</h2>
+          <div class="pin-kicker story-kicker mono" id="storyKicker">WHY FACTORPICKLE</div>
+          <h2>为什么是 <span class="story-brand">Factor Pickle</span></h2>
           <p>不是又一个数据管道：把「研究结论可复现」写进模块边界、因子资产与报告口径。</p>
         </div>
         <div class="pin-frame" aria-hidden="true">
@@ -2623,7 +2626,7 @@ function initPickle3D() {
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = .82;
+  renderer.toneMappingExposure = .96;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(32, 1, .1, 100);
@@ -2656,14 +2659,14 @@ function initPickle3D() {
     pmrem.dispose();
   } catch (e) {}
 
-  scene.add(new THREE.HemisphereLight(0xd8e8c4, 0x050804, .55));
-  const key = new THREE.DirectionalLight(0xfff0d0, 1.45);
+  scene.add(new THREE.HemisphereLight(0xe4f0d2, 0x0a1007, 1.65));
+  const key = new THREE.DirectionalLight(0xfff0d0, .9);
   key.position.set(-5, 7, 8);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0x9fe477, .65);
+  const rim = new THREE.DirectionalLight(0x9fe477, .5);
   rim.position.set(6, 1, -6);
   scene.add(rim);
-  const fill = new THREE.DirectionalLight(0x8aa86a, .32);
+  const fill = new THREE.DirectionalLight(0x8aa86a, .4);
   fill.position.set(2, -2, 5);
   scene.add(fill);
 
@@ -2687,16 +2690,26 @@ function initPickle3D() {
         if (!o.isMesh) return;
         o.frustumCulled = false;
         if (o.material) {
-          const m = o.material;
-          m.side = THREE.FrontSide;
-          m.envMapIntensity = .18;
-          m.roughness = .72;
-          m.metalness = .06;
-          if (m.normalScale) m.normalScale.set(.58, -.58);
+          const src = o.material;
           const maxAniso = renderer.capabilities.getMaxAnisotropy();
-          if (m.map) { m.map.anisotropy = Math.min(8, maxAniso); m.map.needsUpdate = true; }
-          if (m.normalMap) { m.normalMap.anisotropy = Math.min(8, maxAniso); m.normalMap.needsUpdate = true; }
-          m.needsUpdate = true;
+          const mat = new THREE.MeshStandardMaterial({
+            map: src.map || null,
+            normalMap: src.normalMap || null,
+            color: 0xffffff,
+            roughness: .94,
+            metalness: 0,
+            envMapIntensity: 0
+          });
+          if (mat.normalMap) {
+            mat.normalScale.set(.55, -.55);
+            mat.normalMap.anisotropy = Math.min(8, maxAniso);
+            mat.normalMap.needsUpdate = true;
+          }
+          if (mat.map) {
+            mat.map.anisotropy = Math.min(8, maxAniso);
+            mat.map.needsUpdate = true;
+          }
+          o.material = mat;
         }
       });
       group.add(model);
@@ -2766,6 +2779,7 @@ function initPinScene() {
   const barEl = $('#pinBar');
   const degEl = $('#pickleDeg');
   const storyCopy = $('#storyCopy');
+  const storyKicker = $('#storyKicker');
   const pickleWrap = $('#pickleWrap');
   if (!scene || !cards.length) return;
   const INTRO = .12;
@@ -2818,10 +2832,20 @@ function initPinScene() {
     const cardP = clamp((display - INTRO) / (1 - INTRO), 0, 1);
     scene.classList.toggle('is-story', story < .992);
 
+    const revealRect = scene.getBoundingClientRect();
+    const entrance = clamp((window.innerHeight - revealRect.top) / window.innerHeight, 0, 1);
+    const revealEase = entrance * entrance * (3 - 2 * entrance);
+
     if (pickleWrap) {
       pickleWrap.style.setProperty('--pickle-x', (50 - 21 * ease).toFixed(2) + '%');
       pickleWrap.style.setProperty('--pickle-y', (74 - 25 * ease).toFixed(2) + '%');
       pickleWrap.style.setProperty('--pickle-scale', (.62 + .38 * ease).toFixed(3));
+      pickleWrap.style.setProperty('--pickle-entry-y', ((1 - revealEase) * 72).toFixed(1) + 'px');
+      pickleWrap.style.opacity = revealEase.toFixed(3);
+    }
+    if (storyKicker) {
+      storyKicker.style.opacity = revealEase.toFixed(3);
+      storyKicker.style.transform = `translateY(${((1 - revealEase) * 17).toFixed(1)}px)`;
     }
     if (storyCopy) {
       storyCopy.style.opacity = clamp(1 - story / .72, 0, 1).toFixed(3);
