@@ -1283,6 +1283,7 @@
 </aside>
 
 <script src="assets/three.min.js"></script>
+<script src="assets/GLTFLoader.js"></script>
 <script>
 /* ============================================================
    DATA
@@ -2603,153 +2604,112 @@ function initPickle3D() {
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = .94;
+  renderer.toneMappingExposure = .82;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(33, 1, .1, 100);
-  camera.position.set(0, 0, 14.6);
+  const camera = new THREE.PerspectiveCamera(32, 1, .1, 100);
+  camera.position.set(0, 0, 14.8);
 
   const group = new THREE.Group();
-  group.rotation.z = -.34;
-  group.scale.setScalar(.95);
+  group.rotation.z = -.25;
   scene.add(group);
 
-  const bodyMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, roughness: .52, metalness: 0,
-    clearcoat: .38, clearcoatRoughness: .42
-  });
-
-  const makePickleTexture = () => {
+  let envTex = null;
+  try {
     const c = document.createElement('canvas');
-    c.width = 1024;
-    c.height = 1024;
+    c.width = 256; c.height = 128;
     const x = c.getContext('2d');
-    const g = x.createLinearGradient(0, 0, 1024, 1024);
-    g.addColorStop(0, '#1d3c0e');
-    g.addColorStop(.22, '#315b16');
-    g.addColorStop(.52, '#527f20');
-    g.addColorStop(.76, '#3b6616');
-    g.addColorStop(1, '#17300a');
-    x.fillStyle = g;
-    x.fillRect(0, 0, 1024, 1024);
+    const g = x.createLinearGradient(0, 0, 0, 128);
+    g.addColorStop(0, '#11170e');
+    g.addColorStop(.46, '#314d1e');
+    g.addColorStop(.68, '#182511');
+    g.addColorStop(1, '#050805');
+    x.fillStyle = g; x.fillRect(0, 0, 256, 128);
+    const glow = x.createRadialGradient(82, 37, 0, 82, 37, 62);
+    glow.addColorStop(0, 'rgba(255,248,205,.95)');
+    glow.addColorStop(.28, 'rgba(179,225,123,.42)');
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = glow; x.fillRect(0, 0, 256, 128);
+    envTex = new THREE.CanvasTexture(c);
+    envTex.mapping = THREE.EquirectangularReflectionMapping;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromEquirectangular(envTex).texture;
+    pmrem.dispose();
+  } catch (e) {}
 
-    // wet vertical streaks
-    for (let i = 0; i < 150; i++) {
-      const sx = Math.random() * 1024;
-      const sy = Math.random() * 1024;
-      const len = 40 + Math.random() * 260;
-      x.strokeStyle = `rgba(218,244,169,${.025 + Math.random() * .07})`;
-      x.lineWidth = .5 + Math.random() * 2;
-      x.beginPath();
-      x.moveTo(sx, sy);
-      x.quadraticCurveTo(sx + 3, sy + len * .55, sx + (Math.random() - .5) * 8, sy + len);
-      x.stroke();
-    }
-    // mottled skin
-    for (let i = 0; i < 600; i++) {
-      const sx = Math.random() * 1024, sy = Math.random() * 1024;
-      const r = 2 + Math.random() * 10;
-      x.fillStyle = Math.random() > .45
-        ? `rgba(194,224,137,${.03 + Math.random() * .1})`
-        : `rgba(10,32,5,${.04 + Math.random() * .12})`;
-      x.beginPath(); x.ellipse(sx, sy, r, r * (1 + Math.random()), Math.random() * 3, 0, Math.PI * 2); x.fill();
-    }
-    // pale warts and pores
-    for (let i = 0; i < 520; i++) {
-      const sx = Math.random() * 1024, sy = Math.random() * 1024;
-      const r = .8 + Math.random() * 3.2;
-      x.fillStyle = Math.random() > .5 ? 'rgba(236,248,205,.38)' : 'rgba(215,243,177,.24)';
-      x.beginPath(); x.arc(sx, sy, r, 0, Math.PI * 2); x.fill();
-    }
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    return tex;
-  };
-
-  const makeBumpTexture = () => {
-    const c = document.createElement('canvas');
-    c.width = 512; c.height = 512;
-    const x = c.getContext('2d');
-    x.fillStyle = '#7d7d7d'; x.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 1400; i++) {
-      const sx = Math.random() * 512, sy = Math.random() * 512;
-      const r = .6 + Math.random() * 2.6;
-      x.fillStyle = `rgba(255,255,255,${.08 + Math.random() * .2})`;
-      x.beginPath(); x.arc(sx, sy, r, 0, Math.PI * 2); x.fill();
-    }
-    const tex = new THREE.CanvasTexture(c);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    return tex;
-  };
-
-  bodyMat.map = makePickleTexture();
-  bodyMat.bumpMap = makeBumpTexture();
-  bodyMat.bumpScale = .07;
-
-  const bodyGeo = new THREE.CapsuleGeometry(1.36, 4.25, 48, 96);
-  const pos = bodyGeo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const vx = pos.getX(i), vy = pos.getY(i), vz = pos.getZ(i);
-    const taper = 1 - .07 * Math.pow(Math.max(0, Math.abs(vy) - 1.6) / 1.6, 2);
-    const bend = .2 * Math.sin(vy * .52 + .25);
-    pos.setX(i, vx * taper + bend);
-    pos.setZ(i, vz * taper);
-  }
-  bodyGeo.computeVertexNormals();
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
-  group.add(body);
-
-  const stemCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, 3.15, 0),
-    new THREE.Vector3(.03, 3.5, .03),
-    new THREE.Vector3(.2, 3.78, 0),
-    new THREE.Vector3(.43, 3.92, 0)
-  ]);
-  const stem = new THREE.Mesh(
-    new THREE.TubeGeometry(stemCurve, 28, .12, 10, false),
-    new THREE.MeshStandardMaterial({color: 0x4d6c26, roughness: .82, metalness: 0})
-  );
-  group.add(stem);
-  const stemEnd = new THREE.Mesh(
-    new THREE.SphereGeometry(.12, 16, 12),
-    new THREE.MeshStandardMaterial({color: 0x6f8e3b, roughness: .9})
-  );
-  stemEnd.position.set(.43, 3.92, 0);
-  group.add(stemEnd);
-
-  // raised warts / skin texture in 3D
-  const wartGeo = new THREE.SphereGeometry(1, 12, 10);
-  const wartMats = [
-    new THREE.MeshStandardMaterial({color: 0x7d9e48, roughness: .86}),
-    new THREE.MeshStandardMaterial({color: 0x9cba64, roughness: .8}),
-    new THREE.MeshStandardMaterial({color: 0x3d651e, roughness: .9})
-  ];
-  for (let i = 0; i < 46; i++) {
-    const theta = Math.random() * Math.PI * 2;
-    const y = -2.25 + Math.random() * 4.5;
-    const r = 1.36 * (1 - .03 * Math.max(0, Math.abs(y) - 1.8));
-    const wart = new THREE.Mesh(wartGeo, wartMats[i % 3]);
-    wart.position.set(Math.sin(theta) * r + .13 * Math.sin(y * .52 + .25), y, Math.cos(theta) * r);
-    wart.rotation.y = theta;
-    const s = .035 + Math.random() * .055;
-    wart.scale.set(s, s * (1 + Math.random() * .5), s * .55);
-    group.add(wart);
-  }
-
-  scene.add(new THREE.HemisphereLight(0xb8d39b, 0x050804, 1.0));
-  const key = new THREE.DirectionalLight(0xfff0cc, 2.45);
+  scene.add(new THREE.HemisphereLight(0xd8e8c4, 0x050804, .55));
+  const key = new THREE.DirectionalLight(0xfff0d0, 1.45);
   key.position.set(-5, 7, 8);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0x95e070, 1.35);
+  const rim = new THREE.DirectionalLight(0x9fe477, .65);
   rim.position.set(6, 1, -6);
   scene.add(rim);
-  const fill = new THREE.DirectionalLight(0x7da35b, .62);
+  const fill = new THREE.DirectionalLight(0x8aa86a, .32);
   fill.position.set(2, -2, 5);
   scene.add(fill);
+
+  let modelStarted = false;
+  const loadModel = () => {
+    if (modelStarted) return;
+    modelStarted = true;
+    if (!THREE.GLTFLoader) return;
+    const onModel = (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const longest = Math.max(size.x, size.y, size.z);
+      const scale = 6.65 / longest;
+      model.scale.setScalar(scale);
+      model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+      if (size.z > size.y * 1.35) model.rotation.x = Math.PI / 2;
+      if (size.x > size.y * 1.35) model.rotation.z = Math.PI / 2;
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        o.frustumCulled = false;
+        if (o.material) {
+          const m = o.material;
+          m.side = THREE.FrontSide;
+          m.envMapIntensity = .18;
+          m.roughness = .72;
+          m.metalness = .06;
+          if (m.normalScale) m.normalScale.set(.58, -.58);
+          const maxAniso = renderer.capabilities.getMaxAnisotropy();
+          if (m.map) { m.map.anisotropy = Math.min(8, maxAniso); m.map.needsUpdate = true; }
+          if (m.normalMap) { m.normalMap.anisotropy = Math.min(8, maxAniso); m.normalMap.needsUpdate = true; }
+          m.needsUpdate = true;
+        }
+      });
+      group.add(model);
+      wrap.classList.add('has-3d');
+    };
+    const loader = new THREE.GLTFLoader();
+    const parseB64 = () => {
+      try {
+        const raw = atob(window.PICKLE_MODEL_B64);
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        loader.parse(bytes.buffer, '', onModel, (err) => console.warn('pickle model parse failed', err));
+      } catch (err) {
+        console.warn('pickle model decode failed', err);
+      }
+    };
+    try {
+      if (window.PICKLE_MODEL_B64) {
+        parseB64();
+      } else if (location.protocol === 'file:') {
+        const script = document.createElement('script');
+        script.src = 'assets/pickle-model.js';
+        script.onload = parseB64;
+        script.onerror = () => loader.load('assets/pickle-model.glb', onModel, undefined, (err) => console.warn('pickle model load failed', err));
+        document.head.appendChild(script);
+      } else {
+        loader.load('assets/pickle-model.glb', onModel, undefined, (err) => console.warn('pickle model load failed', err));
+      }
+    } catch (err) {
+      console.warn('pickle model init failed', err);
+    }
+  };
 
   let width = 0, height = 0;
   const resize = () => {
@@ -2766,13 +2726,13 @@ function initPickle3D() {
   if ('ResizeObserver' in window) new ResizeObserver(resize).observe(wrap);
   else window.addEventListener('resize', resize);
   resize();
-  wrap.classList.add('has-3d');
 
   return {
     resize,
+    loadModel,
     render(progress, time) {
       group.rotation.y = progress * Math.PI * 1.6;
-      group.rotation.x = .04 + Math.sin(progress * Math.PI * 2.4) * .11;
+      group.rotation.x = .03 + Math.sin(progress * Math.PI * 2.4) * .07;
       group.position.y = Math.sin(time * .0007) * .075;
       renderer.render(scene, camera);
     }
@@ -2792,6 +2752,7 @@ function initPinScene() {
   let display = 0;
   let activeStage = -1;
   let ticking = false;
+  let modelRequested = false;
 
   const setStage = (stage) => {
     if (stage === activeStage) return;
@@ -2830,6 +2791,10 @@ function initPinScene() {
     display += (target - display) * .075;
     const rect = scene.getBoundingClientRect();
     const visible = rect.bottom > -80 && rect.top < window.innerHeight + 80;
+    if (three && !modelRequested && rect.top < window.innerHeight * 1.6) {
+      modelRequested = true;
+      three.loadModel();
+    }
     if (three && visible) three.render(display, time);
     if (degEl) degEl.textContent = String(Math.round(((display * 1.6 * 180) / Math.PI + 360) % 360)).padStart(3, '0') + '°';
     requestAnimationFrame(loop);
