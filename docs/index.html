@@ -414,6 +414,20 @@
     -webkit-mask-image:radial-gradient(ellipse at center,#000 0%,rgba(0,0,0,.82) 52%,transparent 82%);
     mask-image:radial-gradient(ellipse at center,#000 0%,rgba(0,0,0,.82) 52%,transparent 82%);
   }
+  .pin-waves{
+    position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+    opacity:.9;
+  }
+  .pin-waves svg{display:block;width:100%;height:100%}
+  .pin-waves .wave{will-change:transform;transform-box:fill-box;transform-origin:center}
+  .pin-waves .w1{animation:waveDrift1 15s ease-in-out infinite alternate}
+  .pin-waves .w2{animation:waveDrift2 21s ease-in-out infinite alternate}
+  .pin-waves .w3{animation:waveDrift3 17s ease-in-out infinite alternate}
+  .pin-waves .w4{animation:waveDrift2 25s ease-in-out infinite alternate-reverse}
+  .pin-waves .w5{animation:waveDrift3 29s ease-in-out infinite alternate-reverse}
+  @keyframes waveDrift1{from{transform:translate3d(-2.8%,0,0) scaleY(.98)}to{transform:translate3d(2.8%,1.2%,0) scaleY(1.03)}}
+  @keyframes waveDrift2{from{transform:translate3d(2.5%,0,0)}to{transform:translate3d(-2.5%,-.8%,0)}}
+  @keyframes waveDrift3{from{transform:translate3d(-1.8%,0,0)}to{transform:translate3d(1.8%,-.6%,0)}}
   .pin-head{
     position:absolute;z-index:4;top:calc(var(--header-h,80px) + 24px);left:50%;
     width:min(720px,90vw);transform:translateX(-50%);text-align:center;
@@ -473,9 +487,10 @@
     padding:27px 29px 29px;pointer-events:none;display:flex;flex-direction:column;overflow:hidden;
     border:1px solid rgba(255,255,255,.55);border-radius:18px;
     background:
-      radial-gradient(110% 82% at 6% -10%,rgba(255,255,255,.98) 0%,rgba(255,255,255,0) 52%),
-      radial-gradient(100% 88% at 102% 104%,rgba(40,88,34,.24) 0%,rgba(40,88,34,0) 64%),
-      linear-gradient(155deg,#f7fcf3 0%,#e2f3d8 28%,#c6e7b8 60%,#a2d18e 100%);
+      radial-gradient(110% 82% at 6% -10%,rgba(255,255,255,.94) 0%,rgba(255,255,255,0) 52%),
+      radial-gradient(100% 88% at 102% 104%,rgba(40,88,34,.22) 0%,rgba(40,88,34,0) 64%),
+      linear-gradient(155deg,rgba(247,252,243,.9) 0%,rgba(230,246,220,.84) 28%,rgba(207,237,193,.77) 60%,rgba(180,221,160,.7) 100%);
+    backdrop-filter:blur(18px) brightness(1.45) saturate(122%);-webkit-backdrop-filter:blur(18px) brightness(1.45) saturate(122%);
     box-shadow:0 30px 80px -28px rgba(0,0,0,.92),0 0 0 1px rgba(24,56,10,.05),inset 0 1px 0 rgba(255,255,255,.78);
     opacity:0;transform:translate(120px,-50%) scale(.95);
     transition:opacity .5s ease,transform .75s cubic-bezier(.22,.61,.36,1);
@@ -989,6 +1004,39 @@
     <section class="pin-scene is-story" id="features">
       <div class="pin-sticky">
         <div class="pin-grid" aria-hidden="true"></div>
+        <div class="pin-waves" aria-hidden="true">
+          <svg viewBox="0 0 1600 900" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="waveG1" x1="0" y1="0" x2="1" y2="1">
+                <stop stop-color="#b9ff3f" stop-opacity=".16"/>
+                <stop offset=".55" stop-color="#7ef0c7" stop-opacity=".08"/>
+                <stop offset="1" stop-color="#b9ff3f" stop-opacity="0"/>
+              </linearGradient>
+              <linearGradient id="waveG2" x1="0" y1="0" x2="1" y2="0">
+                <stop stop-color="#22d3ee" stop-opacity="0"/>
+                <stop offset=".42" stop-color="#22d3ee" stop-opacity=".1"/>
+                <stop offset=".72" stop-color="#9be33f" stop-opacity=".08"/>
+                <stop offset="1" stop-color="#9be33f" stop-opacity="0"/>
+              </linearGradient>
+              <filter id="waveBlur"><feGaussianBlur stdDeviation="26"/></filter>
+            </defs>
+            <g class="wave w1">
+              <path d="M-320 610 C 80 500 340 700 760 580 S 1320 460 1920 620 L1920 940 L-320 940 Z" fill="url(#waveG1)" filter="url(#waveBlur)"/>
+            </g>
+            <g class="wave w2">
+              <path d="M-260 700 C 150 620 420 790 840 690 S 1380 590 1900 720 L1900 940 L-260 940 Z" fill="url(#waveG2)" filter="url(#waveBlur)"/>
+            </g>
+            <g class="wave w3">
+              <path d="M-240 640 C 120 540 380 730 800 620 S 1340 500 1880 660" fill="none" stroke="rgba(201,255,90,.42)" stroke-width="1.7"/>
+            </g>
+            <g class="wave w4">
+              <path d="M-180 750 C 200 670 460 830 900 720 S 1420 640 1900 750" fill="none" stroke="rgba(126,240,199,.3)" stroke-width="1.2"/>
+            </g>
+            <g class="wave w5">
+              <path d="M-200 830 C 240 770 520 890 960 810 S 1470 760 1900 830" fill="none" stroke="rgba(185,255,63,.24)" stroke-width="1.2"/>
+            </g>
+          </svg>
+        </div>
         <div class="story-copy" id="storyCopy">
           <div class="pin-kicker story-kicker mono" id="storyKicker">WHY FACTORPICKLE</div>
           <h2>为什么是 <span class="story-brand">Factor Pickle</span></h2>
