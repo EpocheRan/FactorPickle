@@ -118,7 +118,7 @@ python -m acquisition run --datasets ohlcv_1d,factors,screener
 
 | 入口 | 内容 |
 |---|---|
-| [在线系统图谱](https://epocheran.github.io/FinBridge/) | 模块职责、核心函数、数据域与表关系 |
+| [在线系统图谱](https://epocheran.github.io/FinBridge/) | Factor Lab 研究闭环、模块职责、核心函数与数据模型 |
 | [docs/README.md](docs/README.md) | 文档总索引、依赖关系、AI 阅读顺序 |
 | [docs/modules/](docs/modules/) | 11 个模块的架构与核心类/方法 |
 | [docs/design/](docs/design/) | 当前架构、因子库、回测、数据管线与 Factor Lab |

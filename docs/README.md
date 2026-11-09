@@ -127,7 +127,7 @@ FinBridge 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有模�
 
 | 文档 | 内容 |
 |---|---|
-| [index.html](index.html) | 交互图谱：模块职责/核心函数 + 数据域、表结构与逻辑关系 |
+| [index.html](index.html) | 交互图谱：模块职责/核心函数 + 数据域、表结构 + Factor Lab 研究闭环 |
 
 ## 五、依赖规则（实测 import 关系）
 
