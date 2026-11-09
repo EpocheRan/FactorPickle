@@ -69,6 +69,14 @@
   }
   .topbar-in > *{position:relative;z-index:1}
   .topbar.scrolled .topbar-in{background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.08));box-shadow:0 18px 55px -22px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.24)}
+  .top-fade{
+    position:fixed;top:0;left:0;right:0;height:calc(var(--header-h, 80px) + 28px);z-index:49;
+    pointer-events:none;
+    background:linear-gradient(180deg,rgba(4,8,7,.58),rgba(4,8,7,.2) 58%,rgba(4,8,7,0));
+    backdrop-filter:blur(16px) saturate(130%);-webkit-backdrop-filter:blur(16px) saturate(130%);
+    -webkit-mask-image:linear-gradient(to bottom,#000 0%,rgba(0,0,0,.88) 48%,transparent 100%);
+    mask-image:linear-gradient(to bottom,#000 0%,rgba(0,0,0,.88) 48%,transparent 100%);
+  }
   .brand{display:flex;align-items:center;gap:11px;min-width:0;text-decoration:none;color:inherit}
   .brand .logo{filter:drop-shadow(0 0 12px rgba(185,255,63,.22))}
   .brand .logo img{position:relative;z-index:1}
@@ -656,6 +664,8 @@
     <a class="nav-cta" href="https://github.com/EpocheRan/FactorPickle#readme" target="_blank" rel="noopener">开始使用</a>
   </div>
 </header>
+
+<div class="top-fade" aria-hidden="true"></div>
 
 <main>
   <!-- ============ OVERVIEW ============ -->
