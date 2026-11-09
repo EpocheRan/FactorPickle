@@ -23,7 +23,7 @@ import pandas as pd
 from . import metrics
 from .panel import price_factor_panel
 from .panel_adapter import load_panel
-from .metrics_polars import quantile_forward_spread, rank_ic_frame
+from .metrics_polars import quantile_forward_spread, quantile_nav, rank_ic_frame
 
 
 def _pandas_quantile_forward_spread(
@@ -101,6 +101,45 @@ def benchmark(
         )
     ) if len(spread_common) else None
 
+    pandas_q, pandas_q_sec = _time(
+        lambda: metrics._quantile_nav(
+            factor,
+            panel.close.reindex(factor.index),
+            panel.open.reindex(factor.index),
+            groups=groups,
+            horizon=horizon,
+        ),
+        repeat,
+    )
+    polars_q, polars_q_sec = _time(
+        lambda: quantile_nav(
+            factor,
+            panel.close.reindex(factor.index),
+            panel.open.reindex(factor.index),
+            groups=groups,
+            horizon=horizon,
+        ),
+        repeat,
+    )
+
+    def _max_diff(left: pd.DataFrame, right: pd.DataFrame) -> float | None:
+        common_index = left.index.intersection(right.index)
+        common_columns = left.columns.intersection(right.columns)
+        if len(common_index) == 0 or len(common_columns) == 0:
+            return None
+        delta = (
+            left.loc[common_index, common_columns].to_numpy(dtype="float64")
+            - right.loc[common_index, common_columns].to_numpy(dtype="float64")
+        )
+        return float(np.nanmax(np.abs(delta))) if np.isfinite(delta).any() else None
+
+    quantile_parity = {
+        "periods_gross": _max_diff(pandas_q.periods_gross, polars_q.periods_gross),
+        "periods_net": _max_diff(pandas_q.periods_net, polars_q.periods_net),
+        "turnover_df": _max_diff(pandas_q.turnover_df, polars_q.turnover_df),
+        "nav": _max_diff(pandas_q.nav, polars_q.nav),
+    }
+
     return {
         "schema_version": "factor_lab.polars_benchmark.v1",
         "universe": universe,
@@ -127,6 +166,12 @@ def benchmark(
             "pandas_n": int(len(pandas_spread)),
             "polars_n": int(len(polars_spread)),
             "max_abs_diff": spread_diff,
+        },
+        "quantile_nav": {
+            "pandas_sec": round(pandas_q_sec, 4),
+            "polars_sec": round(polars_q_sec, 4),
+            "speedup": round(pandas_q_sec / polars_q_sec, 3) if polars_q_sec else None,
+            "max_abs_diff": quantile_parity,
         },
     }
 

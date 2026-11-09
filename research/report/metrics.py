@@ -392,6 +392,20 @@ def _quantile_nav(
 
     返回 ``(nav, turnover_df, periods_net, periods_gross, daily_gross, ls_cost, turnover_mean)``。
     """
+    from .metrics_backend import resolve_quantile_backend
+
+    if resolve_quantile_backend(int(factor.shape[0]) * int(factor.shape[1])) == "polars":
+        from .metrics_polars import quantile_nav as _polars_quantile_nav
+
+        return _polars_quantile_nav(
+            factor,
+            close,
+            open_,
+            groups=groups,
+            horizon=horizon,
+            cost_bps=cost_bps,
+            tradeable=tradeable,
+        )
     dates = factor.index
     labels = [f"Q{i + 1}" for i in range(groups)]
     nav = pd.DataFrame(np.nan, index=dates, columns=labels)
@@ -668,6 +682,7 @@ class FactorReport:
     size_ranges: dict | None = None
     horizon_spreads: object | None = None
     annual_ic_return: pd.DataFrame | None = None
+    metrics_engine: dict[str, str] = field(default_factory=dict)
 
     ic_neutral: pd.DataFrame | None = None
     ic_by_size: pd.Series | None = None
@@ -1177,6 +1192,9 @@ def build_report(
         freshness=freshness or {},
         raw_direction=direction,
     )
+    from .metrics_backend import engine_metadata
+
+    report.metrics_engine = engine_metadata(factor.shape)
 
     quality = None
     if cleaning is not None:
