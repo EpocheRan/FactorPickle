@@ -1130,7 +1130,7 @@
           </button>
           <button class="nav-menu-item" type="button" data-subnav="modules" role="menuitem">
             <span class="nav-menu-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="4.3" height="4.3" rx="1"/><rect x="9.2" y="2.5" width="4.3" height="4.3" rx="1"/><rect x="2.5" y="9.2" width="4.3" height="4.3" rx="1"/><rect x="9.2" y="9.2" width="4.3" height="4.3" rx="1"/></svg></span>
-            <span class="nav-menu-text"><span class="nav-menu-title">功能模块</span><span class="nav-menu-desc">11 个模块职责与 API</span></span>
+            <span class="nav-menu-text"><span class="nav-menu-title">系统模块</span><span class="nav-menu-desc">12 个模块职责与 API</span></span>
           </button>
           <button class="nav-menu-item" type="button" data-subnav="model" role="menuitem">
             <span class="nav-menu-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="3.6" rx="4.8" ry="1.9"/><path d="M3.2 3.6v4.1c0 1.05 2.15 1.9 4.8 1.9s4.8-.85 4.8-1.9V3.6"/><path d="M3.2 7.7v4.1c0 1.05 2.15 1.9 4.8 1.9s4.8-.85 4.8-1.9V7.7"/></svg></span>
@@ -1173,7 +1173,7 @@
               <button class="cta ghost" type="button" data-goto-view="modules">EXPLORE THE MAP <span>→</span></button>
             </div>
             <div class="hero-side mono">
-              <span>11 MODULES</span>
+              <span>12 MODULES</span>
               <span>85+ FACTORS</span>
               <span>MCP NATIVE</span>
             </div>
@@ -1649,16 +1649,27 @@
   <section class="view" id="view-modules">
     <div class="wrap fp-page">
       <div class="hero" style="padding-bottom:6px">
-        <div class="kicker">11 Modules · Responsibility &amp; Public API</div>
-        <h1 style="font-size:clamp(28px,3.4vw,40px)">模块职责、核心函数与依赖</h1>
+        <div class="kicker">12 Modules · Responsibility &amp; Public API</div>
+        <h1 style="font-size:clamp(28px,3.4vw,40px)">系统模块：职责、核心函数与依赖</h1>
         <p class="lede">每个模块只做一件事，并用明确的读写边界与相邻模块连接。点击底部的表名可直接跳转到数据模型并打开字段详情。</p>
       </div>
       <div class="section" style="padding-top:26px">
         <div class="sec-head">
-          <div><h2 class="sec-title">模块卡片</h2><p class="sec-desc">函数名为代码中的真实入口（类名 + 方法名），不是概念描述。</p></div>
+          <div><h2 class="sec-title">系统模块卡片</h2><p class="sec-desc">函数名为代码中的真实入口（类名 + 方法名），不是概念描述。</p></div>
           <span class="sec-tag" id="modTag"></span>
         </div>
         <div class="mod-grid" id="modGrid"></div>
+      </div>
+      <div class="fp-section">
+        <div class="fp-sec-head">
+          <div><div class="fp-label mono">12 / FACTOR LAB</div><h2>最新的 Factor Lab</h2><p>一个面向自主因子研究的运行时：不是“再跑一次回测”，而是把假设、发现、实验、评估与预算控制串成可审计的 campaign。</p></div>
+          <span class="fp-tag">RESEARCH RUNTIME</span>
+        </div>
+        <div class="fp-grid">
+          <div class="fp-card"><div class="idx mono">AGENT LOOP</div><h3>Agent 研究闭环</h3><p>PathFinder 在 ML Engine、History 与 Gateway 发现之间反复推演；失败模式进入下一轮，而不是静默丢失。</p></div>
+          <div class="fp-card"><div class="idx mono">DSH NATIVE</div><h3>跑在 DSH 工作区</h3><p>AGENTS.md / FACTOR_LAB.md 定义入口；新会话从 session_brief 恢复，Agent 与 Supervisor 在同一个工作区协作。</p></div>
+          <div class="fp-card"><div class="idx mono">GUARDRAILS</div><h3>边界不让步</h3><p>Runner 不直连数据库；轮次、预算与停滞检测有硬上限；promote 仍必须 Human G4。</p></div>
+        </div>
       </div>
     </div>
   </section>
@@ -2075,6 +2086,12 @@ const MODULES = [
    funcs:['PositionManager.create_profolio / create_position','add_trade_record(pos_id, type, qty, price)','refresh_all_positions(portfolio_id)','calculate_profit / get_portfolio_summary','PositionAgentInterface / ATRMode / GridMode'],
    deps:['data_interface','factors'], tables:['portfolios','positions','trade_records'],
    note:'create_profolio / list__profolio 是历史拼写，不要改名。交易记录才是台账真相来源。'},
+
+  {id:'factor_lab', name:'factor_lab', cn:'自主因子研究运行时', layer:'研究层', color:'#c9ff5a',
+   role:'Agent 驱动的因子研究闭环：PathFinder 发起多轮 campaign、Web Gateway 自主发现、FactorBuilder 固化 artifact、Runner 做实验、ML Engine 提供非深度学习分支、Evaluator 解释结论、Supervisor 控制预算与回收。',
+   funcs:['python -m factor_lab bootstrap / doctor','campaign start / PathFinder.run','Runner.execute / run_experiment','FactorBuilder.build / freeze','Supervisor.check_budget / reclaim_child'],
+   deps:['data_interface','factors','research','MCPserver'], tables:[],
+   note:'研究状态落在 output/factor_lab；Runner 只经 data_interface；promote 仍需 Human G4。'},
 
   {id:'scripts', name:'scripts', cn:'运维脚本', layer:'运维层', color:'#94a3b8',
    role:'一次性迁移、回填、体检与方向校准；只做运维动作，不承载业务逻辑。',
