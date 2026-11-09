@@ -68,7 +68,6 @@
     background:radial-gradient(420px 90px at 10% -20%,rgba(185,255,63,.16),transparent 68%);
   }
   .topbar-in > *{position:relative;z-index:1}
-  .topbar.scrolled{padding-top:10px}
   .topbar.scrolled .topbar-in{background:linear-gradient(180deg,rgba(13,24,18,.86),rgba(4,10,7,.82));box-shadow:0 18px 55px -22px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.07)}
   .brand{display:flex;align-items:center;gap:11px;min-width:0;text-decoration:none;color:inherit}
   .brand .logo{filter:drop-shadow(0 0 12px rgba(185,255,63,.22))}
@@ -116,6 +115,7 @@
 
   .hero-home{
     position:relative;height:clamp(660px,80vh,860px);display:flex;overflow:hidden;
+    margin-top:calc(-1 * var(--header-h, 80px));
     border-bottom:1px solid rgba(148,163,184,.1);
     background:
       radial-gradient(900px 560px at 76% 40%,rgba(185,255,63,.12),transparent 64%),
@@ -637,10 +637,7 @@
       </div>
       <div class="hero-veil"></div>
       <div class="hero-inner wrap">
-        <div class="hero-top mono">
-          <span>PICK THE FACTOR. KEEP THE ALPHA.</span>
-        </div>
-        <h1>The infrastructure<br>behind A-share<br><span class="accent">alpha.</span></h1>
+        <h1>PICK THE FACTOR.<br><span class="accent">KEEP THE ALPHA.</span></h1>
         <div class="hero-bottom">
           <div class="hero-copy">
             <p>FactorPickle 将数据契约、因子物化、Agent 自动因子发现、<span class="nowrap">策略构建</span>、<span class="nowrap">选股</span>、<span class="nowrap">回测</span>与研究报告连成一条可复现链路，并通过 MCP 向 AI Agent <span class="nowrap">开放全部能力</span>。</p>
