@@ -107,6 +107,8 @@
     transition:opacity .18s ease,transform .18s ease,visibility .18s;
   }
   .nav-drop.open .nav-menu{opacity:1;visibility:visible;pointer-events:auto;transform:translate(-50%,0)}
+  .nav-menu.feature-menu{width:560px;display:grid;grid-template-columns:1fr 1fr;gap:2px}
+  .feature-menu .nav-menu-item{padding:11px 12px}
   .nav-menu-item{
     display:flex;align-items:center;gap:11px;width:100%;padding:9px 10px;border:0;border-radius:10px;
     background:transparent;color:#dfe9e1;text-align:left;cursor:pointer;transition:.16s;
@@ -568,6 +570,21 @@
     .pin-card p{font-size:13px}
     .pin-foot{position:relative;left:auto;right:auto;bottom:auto;width:min(440px,90vw);margin:18px auto 0}
     .pin-hint{display:none}
+    .fp-hero{padding:calc(var(--header-h,80px) + 40px) 0 26px}
+    .fp-hero h1{font-size:clamp(38px,10vw,54px)}
+    .fp-lede{font-size:13.5px}
+    .fp-metrics{grid-template-columns:1fr 1fr;margin-top:22px}
+    .fp-section{padding:34px 0}
+    .fp-grid{grid-template-columns:1fr}
+    .fp-flow{grid-template-columns:1fr 1fr}
+    .fp-split{grid-template-columns:1fr;gap:22px}
+    .fp-report{padding:17px}
+    .fp-report-metrics{grid-template-columns:1fr 1fr}
+    .fp-report-head{flex-direction:column}
+    .fp-bar-row{grid-template-columns:88px 1fr 44px}
+    .fp-boxrow{grid-template-columns:1fr}
+    .fp-sec-head{flex-direction:column;align-items:flex-start;gap:10px}
+    .fp-terminal .fp-code{font-size:10.5px}
     .start-cta{padding:72px 0 68px}
     .start-cta h2{font-size:clamp(32px,8vw,44px)}
     .start-cta > .wrap > p{font-size:13px;padding:0 5vw}
@@ -768,6 +785,72 @@
   @keyframes npulse{0%{opacity:.2}50%{opacity:1}100%{opacity:1}}
 
   /* ---------- misc ---------- */
+  /* ---------- feature detail pages ---------- */
+  .fp-page{padding-bottom:88px}
+  .fp-hero{padding:calc(var(--header-h,80px) + 82px) 0 38px}
+  .fp-kicker{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:#c9ff5a;text-transform:uppercase}
+  .fp-hero h1{margin:14px 0 14px;font-size:clamp(40px,5.4vw,70px);line-height:1.02;letter-spacing:-.05em;font-weight:650;color:#eef5fb}
+  .fp-lede{max-width:780px;margin:0;font-size:15px;line-height:1.8;color:#9caebe}
+  .fp-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:32px 0 0}
+  .fp-metric{padding:15px 17px;border:1px solid var(--line);border-radius:10px;background:rgba(8,14,12,.62)}
+  .fp-metric b{display:block;font-family:var(--mono);font-size:19px;line-height:1.2;color:#c9ff5a;font-weight:400}
+  .fp-metric span{display:block;margin-top:5px;font-family:var(--mono);font-size:8px;letter-spacing:.12em;color:#65796c}
+  .fp-section{padding:47px 0;border-top:1px solid var(--line-soft)}
+  .fp-sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:22px}
+  .fp-label{font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;color:#c9ff5a;margin-bottom:8px}
+  .fp-sec-head h2{margin:0;font-size:clamp(22px,2.4vw,30px);line-height:1.2;letter-spacing:-.025em;font-weight:600;color:#eef5fb}
+  .fp-sec-head p{margin:8px 0 0;font-size:13px;line-height:1.7;color:#8fa2b4;max-width:680px}
+  .fp-tag{font-family:var(--mono);font-size:8px;letter-spacing:.14em;color:#6d8275;white-space:nowrap;border:1px solid var(--line);padding:5px 8px;border-radius:2px}
+  .fp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+  .fp-card{padding:20px 19px;border:1px solid var(--line);border-radius:8px;background:linear-gradient(180deg,rgba(11,19,18,.8),rgba(6,10,9,.72))}
+  .fp-card .idx{font-family:var(--mono);font-size:8px;letter-spacing:.12em;color:#c9ff5a;margin-bottom:12px}
+  .fp-card h3{margin:0 0 8px;font-size:16px;line-height:1.3;letter-spacing:-.01em;font-weight:550;color:#edf4fa}
+  .fp-card p{margin:0;font-size:12px;line-height:1.7;color:#91a4b4}
+  .fp-card .who{margin-top:13px;font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:#61766a}
+  .fp-flow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--line-soft)}
+  .fp-step{min-height:118px;padding:16px 14px;background:rgba(7,12,12,.9)}
+  .fp-step .n{font-family:var(--mono);font-size:8px;letter-spacing:.12em;color:#c9ff5a}
+  .fp-step b{display:block;margin:14px 0 6px;font-size:13px;line-height:1.35;color:#e6eef6;font-weight:550}
+  .fp-step span{display:block;font-size:10.5px;line-height:1.6;color:#8094a4}
+  .fp-split{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
+  .fp-copy h3{margin:0 0 9px;font-size:18px;font-weight:550;color:#e9f2fa}
+  .fp-copy p{margin:0 0 12px;font-size:13px;line-height:1.75;color:#9aadbd}
+  .fp-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px}
+  .fp-list li{position:relative;padding-left:16px;font-size:12.5px;line-height:1.65;color:#9aadb9}
+  .fp-list li::before{content:"›";position:absolute;left:0;color:#c9ff5a}
+  .fp-terminal{border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden;background:#070b08;box-shadow:0 22px 55px -30px rgba(0,0,0,.9)}
+  .fp-terminal-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.08);font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:#5f7288}
+  .fp-terminal-bar i{width:6px;height:6px;border-radius:50%;background:#52655a;display:block}
+  .fp-terminal-bar i:first-child{background:#8fc45c}
+  .fp-code{margin:0;padding:18px 20px;overflow-x:auto;font-family:var(--mono);font-size:11.5px;line-height:1.9;color:#dfe9e1}
+  .fp-code .p{color:#c9ff5a;padding-right:7px;user-select:none}
+  .fp-code .c{color:#61766a}
+  .fp-chip-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+  .fp-chip{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;color:#9fb2ae;border:1px solid var(--line);border-radius:3px;padding:5px 8px;background:rgba(255,255,255,.025)}
+  .fp-report{padding:24px;border:1px solid rgba(148,163,184,.16);border-radius:12px;background:linear-gradient(160deg,rgba(12,23,23,.9),rgba(5,10,9,.86))}
+  .fp-report-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:17px;border-bottom:1px solid var(--line-soft)}
+  .fp-report-head .k{font-family:var(--mono);font-size:8px;letter-spacing:.14em;color:#c9ff5a}
+  .fp-report-head h3{margin:8px 0 5px;font-size:21px;color:#edf4fa;font-weight:600}
+  .fp-report-head p{margin:0;font-family:var(--mono);font-size:9px;color:#6e8176}
+  .fp-report-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin:17px 0;background:var(--line-soft);border:1px solid var(--line-soft)}
+  .fp-report-metric{padding:13px;background:#070d0c}
+  .fp-report-metric span{display:block;font-family:var(--mono);font-size:7.5px;letter-spacing:.1em;color:#64786b}
+  .fp-report-metric b{display:block;margin-top:7px;font-family:var(--mono);font-size:17px;font-weight:400;color:#dff0d8}
+  .fp-bars{display:flex;flex-direction:column;gap:9px}
+  .fp-bar-row{display:grid;grid-template-columns:110px 1fr 58px;gap:10px;align-items:center;font-family:var(--mono);font-size:9px;color:#8da0ad}
+  .fp-bar-track{height:4px;background:rgba(148,163,184,.12);overflow:hidden}
+  .fp-bar-fill{height:100%;background:linear-gradient(90deg,#7d9a50,#c9ff5a)}
+  .fp-note{margin:14px 0 0;font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:#5c7065}
+  .fp-table{width:100%;border-collapse:collapse;font-size:12px;color:#9aadb9}
+  .fp-table th{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:#6e8276;text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  .fp-table td{padding:11px 10px;border-bottom:1px solid var(--line-soft)}
+  .fp-table td.mono{font-family:var(--mono);font-size:10px;color:#c9ff5a}
+  .fp-boxrow{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:14px}
+  .fp-box{padding:16px;border:1px solid var(--line);border-radius:8px;background:rgba(9,15,14,.78)}
+  .fp-box b{display:block;font-size:13px;color:#e6eef6;margin-bottom:6px}
+  .fp-box span{font-size:11px;line-height:1.6;color:#8296a3}
+  .fp-accent{color:#c9ff5a}
+
   /* ---------- start / deploy ---------- */
   .start-cta{
     position:relative;padding:112px 0 104px;overflow:hidden;
@@ -917,6 +1000,8 @@
     .topbar{padding:8px 10px 0}
     .topbar-in{width:calc(100vw - 20px);max-width:none;height:48px;flex-wrap:nowrap;gap:8px;padding:5px 8px;border-radius:999px;overflow:visible}
     .nav-menu{width:min(272px,calc(100vw - 28px));left:50%}
+    .nav-menu.feature-menu{position:fixed;left:50%;top:calc(var(--header-h,56px) + 10px);width:min(360px,calc(100vw - 24px));grid-template-columns:1fr;transform:translate(-50%,-4px)}
+    .nav-drop.open .feature-menu{transform:translate(-50%,0)}
     .brand{flex:0 0 auto;min-width:0;overflow:visible}
     .brand .logo{width:32px;height:32px}
     .brand > div{height:34px;min-width:0;overflow:hidden}
@@ -949,7 +1034,35 @@
       </span>
     </a>
     <nav class="nav-links" aria-label="主导航">
-      <button class="nav-item" type="button" data-nav="features">功能</button>
+      <div class="nav-drop" id="featureNav">
+        <button class="nav-item nav-trigger" type="button" data-dropdown="features" aria-haspopup="true" aria-expanded="false">功能</button>
+        <div class="nav-menu feature-menu" role="menu" aria-label="功能页面">
+          <button class="nav-menu-item" type="button" data-feature="mining" role="menuitem">
+            <span class="nav-menu-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="3.8"/><path d="m10 10 3 3"/><path d="M12 2v2m2-1h-2"/></svg></span>
+            <span class="nav-menu-text"><span class="nav-menu-title">因子挖掘</span><span class="nav-menu-desc">Agent 驱动的研究闭环</span></span>
+          </button>
+          <button class="nav-menu-item" type="button" data-feature="evaluation" role="menuitem">
+            <span class="nav-menu-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13V8m4 5V5m4 8V3m3 10H2"/></svg></span>
+            <span class="nav-menu-text"><span class="nav-menu-title">因子评估</span><span class="nav-menu-desc">标准报告与评分</span></span>
+          </button>
+          <button class="nav-menu-item" type="button" data-feature="backtest" role="menuitem">
+            <span class="nav-menu-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 4.5V8l2.5 1.5"/></svg></span>
+            <span class="nav-menu-text"><span class="nav-menu-title">策略回测</span><span class="nav-menu-desc">A 股规则与账本</span></span>
+          </button>
+          <button class="nav-menu-item" type="button" data-feature="mcp" role="menuitem">
+            <span class="nav-menu-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2v4m4-4v4M4 6h8v2a4 4 0 0 1-8 0Z"/><path d="M8 12v2"/></svg></span>
+            <span class="nav-menu-text"><span class="nav-menu-title">MCP 接入</span><span class="nav-menu-desc">工具化 Agent 接口</span></span>
+          </button>
+          <button class="nav-menu-item" type="button" data-feature="position" role="menuitem">
+            <span class="nav-menu-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="5" width="11" height="8" rx="2"/><path d="M6 5V3.5h4V5M2.5 8h11"/></svg></span>
+            <span class="nav-menu-text"><span class="nav-menu-title">仓位管理</span><span class="nav-menu-desc">组合、持仓与风控</span></span>
+          </button>
+          <button class="nav-menu-item" type="button" data-feature="acquisition" role="menuitem">
+            <span class="nav-menu-icon"><svg viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="3.6" rx="4.8" ry="1.9"/><path d="M3.2 3.6v4.1c0 1.05 2.15 1.9 4.8 1.9s4.8-.85 4.8-1.9V3.6"/><path d="M3.2 7.7v4.1c0 1.05 2.15 1.9 4.8 1.9s4.8-.85 4.8-1.9V7.7"/></svg></span>
+            <span class="nav-menu-text"><span class="nav-menu-title">数据采编</span><span class="nav-menu-desc">增量同步与数据边界</span></span>
+          </button>
+        </div>
+      </div>
       <div class="nav-drop" id="exploreNav">
         <button class="nav-item nav-trigger" type="button" data-dropdown="explore" aria-haspopup="true" aria-expanded="false">探索</button>
         <div class="nav-menu" role="menu" aria-label="探索子页面">
@@ -1159,6 +1272,149 @@
       </div>
     </section>
 </section>
+
+
+  <!-- ============ MINING ============ -->
+  <section class="view" id="view-mining">
+    <div class="wrap fp-page">
+      <div class="fp-hero">
+        <div class="fp-kicker mono">FACTOR LAB / DSH RESEARCH LOOP</div>
+        <h1>因子挖掘</h1>
+        <p class="fp-lede">把研究命题交给一支可审计的 Agent 队伍：PathFinder 提出假设，Runner 经 data_interface 取数并完成实验，FactorBuilder 固化因子 artifact，Evaluator 与 Supervisor 决定下一轮。</p>
+        <div class="fp-metrics">
+          <div class="fp-metric"><b>7</b><span>RESEARCH ROLES</span></div>
+          <div class="fp-metric"><b>≤ 5</b><span>ROUNDS / CAMPAIGN</span></div>
+          <div class="fp-metric"><b>¥3,000</b><span>MONTHLY BUDGET</span></div>
+          <div class="fp-metric"><b>150GB</b><span>DISK QUOTA</span></div>
+        </div>
+      </div>
+      <div class="fp-section">
+        <div class="fp-sec-head"><div><div class="fp-label mono">01 / ROLES</div><h2>一支可审计的研究队伍</h2><p>每个角色只做一件事，并通过 artifact 契约衔接；失败也进入账本，而不是被静默丢弃。</p></div><span class="fp-tag">7 AGENTS</span></div>
+        <div class="fp-grid">
+          <div class="fp-card"><div class="idx mono">01 / PATHFINDER</div><h3>PathFinder</h3><p>围绕 research question 发起多轮 campaign；生成因子 / ML idea，决定继续、换轴或停止。</p><div class="who mono">LLM · CAMPAIGN DRIVER</div></div>
+          <div class="fp-card"><div class="idx mono">02 / WEB GATEWAY</div><h3>Web Gateway</h3><p>自主扩展搜索、追踪引用、聚类机制，输出 discovery map；只给证据，不替 PathFinder 做判断。</p><div class="who mono">LLM · DISCOVERY</div></div>
+          <div class="fp-card"><div class="idx mono">03 / FACTOR BUILDER</div><h3>FactorBuilder</h3><p>把 idea 变成版本化、可 import 的 Lab factor artifact；直接写 Lab 库，不碰生产 registry。</p><div class="who mono">CODE + RUNTIME</div></div>
+          <div class="fp-card"><div class="idx mono">04 / RUNNER</div><h3>Runner</h3><p>只接 factor artifact；经 data_interface 取数、组装 data_bundle、装载 Adapter 并执行研究模块。</p><div class="who mono">LLM · NO DIRECT DB</div></div>
+          <div class="fp-card"><div class="idx mono">05 / ML ENGINE</div><h3>ML Engine</h3><p>非深度学习实验：模型 / 特征 / 时间序列 CV；OOS 不参与调参，结果与模型卡全部落盘。</p><div class="who mono">PLANNER + RUNTIME</div></div>
+          <div class="fp-card"><div class="idx mono">06 / EVALUATOR</div><h3>Evaluator</h3><p>解释 Gate 结论，写清 failure mode、caveats 与 next action；不能改写 Gate verdict。</p><div class="who mono">LLM · REVIEW</div></div>
+          <div class="fp-card"><div class="idx mono">07 / SUPERVISOR</div><h3>Supervisor</h3><p>控制轮次、预算、readiness 与子 Agent 回收；环境不满足时输出 blocker_feedback。</p><div class="who mono">LLM · ORCHESTRATION</div></div>
+        </div>
+      </div>
+      <div class="fp-section">
+        <div class="fp-sec-head"><div><div class="fp-label mono">02 / LOOP</div><h2>一轮研究如何发生</h2><p>多轮不等于无限试错。每轮必须带来新假设、新证据或新输入，campaign 有硬轮次与预算上限。</p></div><span class="fp-tag">ROUND TRACE</span></div>
+        <div class="fp-flow">
+          <div class="fp-step"><div class="n mono">01</div><b>Research Question</b><span>Human 指定目标、约束与已知死路。</span></div>
+          <div class="fp-step"><div class="n mono">02</div><b>Idea</b><span>PathFinder 生成 factor idea 或 ML idea。</span></div>
+          <div class="fp-step"><div class="n mono">03</div><b>Data Bundle</b><span>Runner 经 data_interface 取数，检查 PIT 与覆盖。</span></div>
+          <div class="fp-step"><div class="n mono">04</div><b>Experiment</b><span>Research Module 或 ML Engine 产出结果。</span></div>
+          <div class="fp-step"><div class="n mono">05</div><b>Gate + Review</b><span>硬 Gate 判定；Evaluator 解释风险与下一步。</span></div>
+          <div class="fp-step"><div class="n mono">06</div><b>History</b><span>摘要、失败模式与预算回流到下一轮。</span></div>
+        </div>
+      </div>
+      <div class="fp-section fp-split">
+        <div class="fp-copy"><div class="fp-label mono">03 / DSH RELATION</div><h2>Factor Lab 跑在 DSH 里</h2><p>Factor Lab 不是另一个孤立服务，而是 DSH 工作区内的一套研究运行时。DSH 负责会话、Agent 与工具接入；Factor Lab 负责研究契约、artifact、预算和 Gate。</p><ul class="fp-list"><li><b>AGENTS.md / FACTOR_LAB.md</b> 定义入口、命令与边界，新会话先读 workspace contract。</li><li>新会话从 <b>session_brief.json</b> 恢复当前状态，不依赖旧上下文。</li><li>研究角色以 DSH Agent 运行；Supervisor 控制轮次、预算与安全回收。</li><li>因子、报告与实验记录全部落在 <b>output/factor_lab</b>，可跨会话复现。</li></ul><div class="fp-chip-row"><span class="fp-chip">DSH WORKSPACE</span><span class="fp-chip">AGENTS</span><span class="fp-chip">SESSION BRIEF</span><span class="fp-chip">PORTABLE</span></div></div>
+        <div class="fp-terminal"><div class="fp-terminal-bar"><i></i><i></i><i></i><span>factor_lab / bootstrap</span></div><pre class="fp-code"><code><span class="p">$</span> python -m factor_lab doctor
+<span class="p">$</span> python -m factor_lab campaign start --objective "研究因子"
+
+<span class="c"># 环境不满足时返回 blocker_feedback</span>
+<span class="c"># 不在上一轮会话里猜状态</span></code></pre></div>
+      </div>
+      <div class="fp-section">
+        <div class="fp-sec-head"><div><div class="fp-label mono">04 / BOUNDARY</div><h2>边界不让步</h2></div></div>
+        <div class="fp-grid">
+          <div class="fp-card"><div class="idx mono">DATA</div><h3>唯一数据边界</h3><p>Runner 只调用 data_interface；不直连 QuestDB、不写 SQL，未暴露字段转成 data gap。</p></div>
+          <div class="fp-card"><div class="idx mono">BUDGET</div><h3>预算与轮次硬上限</h3><p>月度预算、campaign 预算、wall-clock、停滞检测与安全垫共同约束探索。</p></div>
+          <div class="fp-card"><div class="idx mono">HUMAN</div><h3>promote 必须 G4</h3><p>放开研究自由度，不放开上线权限；因子晋升仍需 Human 确认。</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EVALUATION ============ -->
+  <section class="view" id="view-evaluation">
+    <div class="wrap fp-page">
+      <div class="fp-hero"><div class="fp-kicker mono">FACTOR EVALUATION / STANDARD REPORT</div><h1>因子评估</h1><p class="fp-lede">同一套口径回答三个问题：因子是否有信息、信息是否稳定、结论是否经得起样本与时间的复核。报告与评分逻辑同源，可直接归档。</p><div class="fp-metrics"><div class="fp-metric"><b>Rank IC</b><span>INFORMATION</span></div><div class="fp-metric"><b>ICIR</b><span>STABILITY</span></div><div class="fp-metric"><b>5D</b><span>SCORING</span></div><div class="fp-metric"><b>HTML</b><span>REPORT</span></div></div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">01 / SECTIONS</div><h2>一份标准报告包含</h2><p>从收益风险到样本敏感性，全部按固定章节生成，避免“这次换个角度讲”的选择性叙事。</p></div><span class="fp-tag">SAMPLE</span></div><div class="fp-grid">
+        <div class="fp-card"><div class="idx mono">01</div><h3>收益与风险</h3><p>多空组合、年化、波动、最大回撤、换手与胜率，统一交易日口径。</p></div>
+        <div class="fp-card"><div class="idx mono">02</div><h3>IC / ICIR</h3><p>Rank IC 时序、IC 衰减、IC 胜率；按频率与因子方向统一符号。</p></div>
+        <div class="fp-card"><div class="idx mono">03</div><h3>分层 IC</h3><p>流动性、市值、行业分层，检查信息是否集中在某个子样本。</p></div>
+        <div class="fp-card"><div class="idx mono">04</div><h3>分月稳定性</h3><p>分月 IC 与收益热力，定位失效窗口，而不是只看全样本均值。</p></div>
+        <div class="fp-card"><div class="idx mono">05</div><h3>样本敏感性</h3><p>ALL / EX_BSE / INVESTABLE / HIGH_LIQ 四组样本，结论随样本如何变化。</p></div>
+        <div class="fp-card"><div class="idx mono">06</div><h3>结论与归因</h3><p>五维评分、failure mode、caveats 与 next action 一并归档。</p></div>
+      </div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">02 / REPORT SAMPLE</div><h2>评估报告样例</h2></div><span class="fp-tag">ILLUSTRATIVE DATA</span></div><div class="fp-report"><div class="fp-report-head"><div><div class="k">FACTOR REPORT</div><h3>momentum_20d</h3><p>ALL · 2018-01-01 → 2026-11-06 · v1.3</p></div><span class="fp-tag">PASS / REVIEW</span></div><div class="fp-report-metrics"><div class="fp-report-metric"><span>RANK IC</span><b>0.041</b></div><div class="fp-report-metric"><span>ICIR</span><b>0.57</b></div><div class="fp-report-metric"><span>LONG-SHORT</span><b>+12.8%</b></div><div class="fp-report-metric"><span>COVERAGE</span><b>96.2%</b></div></div><div class="fp-bars"><div class="fp-bar-row"><span>流动性分层</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:78%"></i></span><span>0.031</span></div><div class="fp-bar-row"><span>市值分层</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:64%"></i></span><span>0.025</span></div><div class="fp-bar-row"><span>行业稳健性</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:83%"></i></span><span>0.036</span></div><div class="fp-bar-row"><span>分月胜率</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:61%"></i></span><span>58.0%</span></div></div><div class="fp-note">示例数值，仅用于展示版式；真实报告由 research.report 生成。</div></div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">03 / CAPABILITY</div><h2>评估能力</h2></div></div><div class="fp-grid"><div class="fp-card"><div class="idx mono">REPRODUCIBLE</div><h3>报告可复核</h3><p>章节、指标与评分同源；同输入可重跑，HTML 可直接归档或分享。</p></div><div class="fp-card"><div class="idx mono">GATE</div><h3>硬门禁不被改写</h3><p>Evaluator 只解释 Gate，不把 fail 改成 pass，也不重算指标。</p></div><div class="fp-card"><div class="idx mono">CACHE</div><h3>Panel 复用</h3><p>行情与因子面板缓存复用，报告重跑不必重新拉取全量数据。</p></div></div></div>
+    </div>
+  </section>
+
+  <!-- ============ BACKTEST ============ -->
+  <section class="view" id="view-backtest">
+    <div class="wrap fp-page">
+      <div class="fp-hero"><div class="fp-kicker mono">STRATEGY BACKTEST / A-SHARE RULES</div><h1>策略回测</h1><p class="fp-lede">用一套内置 A 股规则的账本验证策略：T+1、整手、涨跌停、停牌、佣金与印花税全部进入成交与资金曲线，而不是留在假设里。</p><div class="fp-metrics"><div class="fp-metric"><b>T+1</b><span>SETTLEMENT</span></div><div class="fp-metric"><b>LEDGER</b><span>TRADE TRUTH</span></div><div class="fp-metric"><b>RUN_ID</b><span>REPRODUCIBLE</span></div><div class="fp-metric"><b>1 / N</b><span>SINGLE / CROSS</span></div></div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">01 / RULES</div><h2>规则内置，不是注释</h2></div></div><div class="fp-grid">
+        <div class="fp-card"><div class="idx mono">T+1</div><h3>当日买入不可卖</h3><p>按交易日推进，持仓与可用数量分开维护。</p></div>
+        <div class="fp-card"><div class="idx mono">LOT</div><h3>整手与零股</h3><p>买入按 100 股整手；卖出允许零股，资金与持仓同时记账。</p></div>
+        <div class="fp-card"><div class="idx mono">LIMIT</div><h3>涨跌停与停牌</h3><p>不可成交订单不会悄悄穿透；停牌期间不能假装换手。</p></div>
+        <div class="fp-card"><div class="idx mono">COST</div><h3>佣金与印花税</h3><p>双边费用进入现金流，净值和换手都扣费后计算。</p></div>
+        <div class="fp-card"><div class="idx mono">WEIGHT</div><h3>权重与再平衡</h3><p>等权、因子权重、目标权重共用同一套换仓逻辑。</p></div>
+        <div class="fp-card"><div class="idx mono">RUN</div><h3>run_id 可复现</h3><p>策略、参数、数据快照与规则固化；同输入可重跑对照。</p></div>
+      </div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">02 / SAMPLE</div><h2>回测结果样例</h2></div><span class="fp-tag">ILLUSTRATIVE DATA</span></div><div class="fp-report"><div class="fp-report-head"><div><div class="k">BACKTEST RESULT</div><h3>cross_section_momentum</h3><p>run_id: bt_20261109_0417 · 2018-01-02 → 2026-11-06</p></div><span class="fp-tag">T+1 / NET</span></div><div class="fp-report-metrics"><div class="fp-report-metric"><span>ANNUAL</span><b>+18.4%</b></div><div class="fp-report-metric"><span>SHARPE</span><b>1.12</b></div><div class="fp-report-metric"><span>MAX DD</span><b>-9.6%</b></div><div class="fp-report-metric"><span>WIN RATE</span><b>63.0%</b></div></div><svg viewBox="0 0 600 120" preserveAspectRatio="none" style="display:block;width:100%;height:120px"><defs><linearGradient id="eqf" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c9ff5a" stop-opacity=".25"/><stop offset="1" stop-color="#c9ff5a" stop-opacity="0"/></linearGradient></defs><path d="M0 96 C60 92 90 80 130 82 S210 64 260 58 S330 64 380 42 S470 30 520 20 S580 25 600 12 L600 120 L0 120 Z" fill="url(#eqf)"/><path d="M0 96 C60 92 90 80 130 82 S210 64 260 58 S330 64 380 42 S470 30 520 20 S580 25 600 12" fill="none" stroke="#c9ff5a" stroke-width="1.8"/></svg><div class="fp-note">示例曲线，仅用于展示版式；真实结果由 backtest 运行产生。</div></div></div>
+      <div class="fp-section fp-split"><div class="fp-copy"><div class="fp-label mono">03 / RUN</div><h2>从策略到账本</h2><p>单标的与横截面共用一套账本；成交、费用与持仓变化都从同一份交易记录推导。</p><ul class="fp-list"><li>策略输出目标权重或单标的信号，回测器只负责执行。</li><li>成交价、可卖数量、停牌与涨跌停状态逐日检查。</li><li>每日净值、持仓、成交与费用可导出对照。</li></ul></div><div class="fp-terminal"><div class="fp-terminal-bar"><i></i><i></i><i></i><span>backtest / run</span></div><pre class="fp-code"><code><span class="p">$</span> python -m backtest
+<span class="c"># 选择策略 / 权重 / 区间与成本假设</span>
+<span class="c"># 输出现金曲线、交易台账与报告</span></code></pre></div></div>
+    </div>
+  </section>
+
+  <!-- ============ MCP ============ -->
+  <section class="view" id="view-mcp">
+    <div class="wrap fp-page">
+      <div class="fp-hero"><div class="fp-kicker mono">MCP SERVER / AGENT INTERFACE</div><h1>MCP 接入</h1><p class="fp-lede">把行情、财务、因子、选股、持仓与同步能力注册为 MCP 工具。AI Agent 不需要知道数据库在哪里，只需要调用稳定的工具名。</p><div class="fp-metrics"><div class="fp-metric"><b>HTTP / stdio</b><span>TRANSPORT</span></div><div class="fp-metric"><b>10</b><span>TOOL FAMILIES</span></div><div class="fp-metric"><b>JSON</b><span>SERIALIZABLE</span></div><div class="fp-metric"><b>FastMCP</b><span>RUNTIME</span></div></div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">01 / TOOLS</div><h2>能力分类</h2><p>工具只做入口，不承载业务逻辑；返回值必须 JSON 可序列化。</p></div></div><div class="fp-grid">
+        <div class="fp-card"><div class="idx mono">MARKET</div><h3>行情工具</h3><p>OHLCV、交易日历、股票基础信息与市场快照。</p></div>
+        <div class="fp-card"><div class="idx mono">FINANCIAL</div><h3>财务工具</h3><p>利润表、资产负债表、现金流与估值数据读取。</p></div>
+        <div class="fp-card"><div class="idx mono">FLOW</div><h3>资金工具</h3><p>资金流、两融、龙虎榜与大宗交易。</p></div>
+        <div class="fp-card"><div class="idx mono">FACTOR</div><h3>因子工具</h3><p>因子列表、latest 值、长表读取与因子元数据。</p></div>
+        <div class="fp-card"><div class="idx mono">SCREENER</div><h3>选股工具</h3><p>ScreenSpec 构建、覆盖率检查与选股结果。</p></div>
+        <div class="fp-card"><div class="idx mono">POSITION</div><h3>持仓工具</h3><p>组合、持仓、交易、盈亏与 ATR / GRID 模式。</p></div>
+      </div></div>
+      <div class="fp-section fp-split"><div class="fp-copy"><div class="fp-label mono">02 / PRINCIPLES</div><h2>工具层不藏业务</h2><ul class="fp-list"><li><b>稳定命名：</b>工具名与参数是 Agent 的公开契约，变更要兼容。</li><li><b>任务提交：</b>同步类工具优先“提交任务”，而不是阻塞等待全量数据。</li><li><b>单一入口：</b>MCPserver 只注册工具，业务逻辑仍在各模块。</li><li><b>可审计：</b>返回值 JSON 可序列化，调用与结果进入会话记录。</li></ul><div class="fp-chip-row"><span class="fp-chip">MCP NATIVE</span><span class="fp-chip">READ-ONLY TOOLS</span><span class="fp-chip">AGENT READY</span></div></div><div class="fp-terminal"><div class="fp-terminal-bar"><i></i><i></i><i></i><span>mcp / tools/call</span></div><pre class="fp-code"><code>{
+  "name": "get_factor_values",
+  "arguments": {
+    "factor_id": "momentum_20d",
+    "universe": "ALL"
+  }
+}</code></pre></div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">03 / CONNECT</div><h2>接入方式</h2></div></div><div class="fp-boxrow"><div class="fp-box"><b>HTTP</b><span>远程 Agent、工作流与后端服务通过 HTTP 调用。</span></div><div class="fp-box"><b>stdio</b><span>本地 Agent / DSH 子进程通过 stdio 连接，无需暴露端口。</span></div><div class="fp-box"><b>工具边界</b><span>只暴露能力，不暴露 QuestDB；数据读取仍经 data_interface。</span></div></div></div>
+    </div>
+  </section>
+
+  <!-- ============ POSITION ============ -->
+  <section class="view" id="view-position">
+    <div class="wrap fp-page">
+      <div class="fp-hero"><div class="fp-kicker mono">POSITION / PORTFOLIO / RISK</div><h1>仓位管理</h1><p class="fp-lede">组合、持仓与交易流水是同一本账。仓位模块负责把成交写实、成本刷新、盈亏汇总与 ATR / GRID 风控串起来。</p><div class="fp-metrics"><div class="fp-metric"><b>3</b><span>CORE TABLES</span></div><div class="fp-metric"><b>ATR / GRID</b><span>MODES</span></div><div class="fp-metric"><b>逐笔</b><span>TRADE LEDGER</span></div><div class="fp-metric"><b>PM_*</b><span>MCP TOOLS</span></div></div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">01 / MODEL</div><h2>一本可追溯的账</h2></div></div><div class="fp-grid">
+        <div class="fp-card"><div class="idx mono">PORTFOLIO</div><h3>组合</h3><p>现金、总资产、市值与策略归属；组合是持仓的聚合根。</p></div>
+        <div class="fp-card"><div class="idx mono">POSITION</div><h3>持仓</h3><p>标的、数量、成本、可用数量与止损位；模式决定加减仓规则。</p></div>
+        <div class="fp-card"><div class="idx mono">TRADE</div><h3>逐笔成交</h3><p>买卖方向、数量、价格与费用；交易记录才是台账真相来源。</p></div>
+      </div></div>
+      <div class="fp-section fp-split"><div class="fp-copy"><div class="fp-label mono">02 / REFRESH</div><h2>行情刷新与风险位</h2><p>按最新行情刷新市值、成本与盈亏，再根据模式更新 ATR 止损或 GRID 网格。</p><ul class="fp-list"><li>组合汇总：总资产、现金、市值、当日盈亏。</li><li>单标的盈亏：成本、浮动盈亏、收益率与仓位占比。</li><li>止损位：ATR 模式按波动更新；GRID 模式按网格价位执行。</li><li>所有变更可通过 MCP <b>pm_*</b> 工具查询或提交。</li></ul></div><div class="fp-terminal"><div class="fp-terminal-bar"><i></i><i></i><i></i><span>position / mcp tools</span></div><pre class="fp-code"><code><span class="p">›</span> pm_create_portfolio
+<span class="p">›</span> pm_execute_trade
+<span class="p">›</span> pm_refresh_positions
+<span class="p">›</span> pm_portfolio_summary</code></pre></div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">03 / MODES</div><h2>两种执行模式</h2></div></div><div class="fp-boxrow"><div class="fp-box"><b>ATR 模式</b><span>按波动率调整风险预算与止损距离，适合趋势 / 波段持仓。</span></div><div class="fp-box"><b>GRID 模式</b><span>按价格网格分批成交，记录每一格的数量与成本。</span></div><div class="fp-box"><b>人工确认</b><span>组合创建与执行可由 Human 审批；Agent 只准备交易意图。</span></div></div></div>
+    </div>
+  </section>
+
+  <!-- ============ ACQUISITION ============ -->
+  <section class="view" id="view-acquisition">
+    <div class="wrap fp-page">
+      <div class="fp-hero"><div class="fp-kicker mono">DATA ACQUISITION / SINGLE WRITER</div><h1>数据采编</h1><p class="fp-lede">把外部数据源变成可审计的 QuestDB 表：增量同步、断点续跑、快照调度与 DataWritten 事件，一次只经过一个写入口。</p><div class="fp-metrics"><div class="fp-metric"><b>7+</b><span>DATA INTERFACES</span></div><div class="fp-metric"><b>增量</b><span>SYNC MODE</span></div><div class="fp-metric"><b>断点续跑</b><span>CHECKPOINT</span></div><div class="fp-metric"><b>WAL</b><span>DEDUP UPSERT</span></div></div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">01 / PIPELINE</div><h2>从接口到唯一事实源</h2><p>采集层负责增量与重试；data_interface 负责归一化与业务语义；数据库只接受幂等写入。</p></div></div><div class="fp-flow"><div class="fp-step"><div class="n mono">01</div><b>Scope</b><span>市场、日期、频率与数据集范围。</span></div><div class="fp-step"><div class="n mono">02</div><b>Orchestrator</b><span>调用 REAL_SYNCERS 与快照调度。</span></div><div class="fp-step"><div class="n mono">03</div><b>Sync</b><span>增量拉取、断点续跑、失败重试。</span></div><div class="fp-step"><div class="n mono">04</div><b>DataWritten</b><span>写入事件触发下游派生。</span></div><div class="fp-step"><div class="n mono">05</div><b>Normalize</b><span>字段归一、复权、PIT 对齐。</span></div><div class="fp-step"><div class="n mono">06</div><b>QuestDB</b><span>唯一事实源，WAL + DEDUP UPSERT。</span></div></div></div>
+      <div class="fp-section fp-split"><div class="fp-copy"><div class="fp-label mono">02 / SOURCES</div><h2>多源接入</h2><p>外部接口不是系统内部契约。采集层把不同供应商的字段、频率与异常统一成可消费的数据集。</p><div class="fp-chip-row"><span class="fp-chip">Tushare Pro</span><span class="fp-chip">BaoStock</span><span class="fp-chip">东方财富</span><span class="fp-chip">同花顺</span><span class="fp-chip">腾讯财经</span><span class="fp-chip">新浪财经</span><span class="fp-chip">zzshare</span></div></div><div class="fp-copy"><div class="fp-label mono">03 / GUARANTEES</div><h2>数据边界</h2><ul class="fp-list"><li>所有 raw 表只有采集 + data_interface 写入口。</li><li>Runner 只能读 data_interface，不直接连数据库。</li><li>缺失字段与覆盖不足转成 data gap，不硬取。</li><li>快照与 checkpoint 保证长任务可恢复。</li></ul></div></div>
+      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">04 / DOMAINS</div><h2>核心数据域</h2></div></div><div class="fp-grid"><div class="fp-card"><div class="idx mono">MARKET</div><h3>行情</h3><p>ohlcv_1d / ohlcv_1m / trading_days / stock_basic_info</p></div><div class="fp-card"><div class="idx mono">FINANCIAL</div><h3>财务</h3><p>利润表 / 资产负债表 / 现金流 / 估值</p></div><div class="fp-card"><div class="idx mono">FLOW</div><h3>资金</h3><p>资金流 / 两融 / 龙虎榜 / 大宗交易</p></div><div class="fp-card"><div class="idx mono">CONCEPT</div><h3>板块</h3><p>概念目录 / 板块日线 / 成分快照</p></div><div class="fp-card"><div class="idx mono">FACTOR</div><h3>因子</h3><p>factor_registry / factor_value_daily / factor_daily_wide</p></div><div class="fp-card"><div class="idx mono">POSITION</div><h3>组合与状态</h3><p>portfolios / positions / trade_records / screener_build_state</p></div></div></div>
+    </div>
+  </section>
 
   <!-- ============ ARCHITECTURE ============ -->
   <section class="view" id="view-architecture">
@@ -3089,6 +3345,33 @@ if (exploreNav) {
   }));
 }
 
+const featureNav = $('#featureNav');
+if (featureNav) {
+  const trigger = featureNav.querySelector('.nav-trigger');
+  const closeFeatures = () => {
+    featureNav.classList.remove('open');
+    trigger.setAttribute('aria-expanded', 'false');
+  };
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    const open = featureNav.classList.toggle('open');
+    trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.addEventListener('click', e => {
+    if (!featureNav.contains(e.target)) closeFeatures();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeFeatures();
+  });
+  $$('.feature-menu .nav-menu-item').forEach(btn => btn.addEventListener('click', () => {
+    const target = btn.dataset.feature;
+    closeFeatures();
+    history.replaceState(null, '', '#' + target);
+    switchView(target);
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }));
+}
+
 $$('.nav-item:not([data-dropdown])').forEach(b => b.addEventListener('click', () => {
   const target = b.dataset.nav;
   if (target === 'features') {
@@ -3139,7 +3422,7 @@ if (copyStart) {
 function routeFromHash() {
   const raw = location.hash.replace(/^#\/?/, '');
   const [view, table] = raw.split('/');
-  if (['overview', 'architecture', 'modules', 'model'].includes(view)) switchView(view);
+  if (['overview', 'architecture', 'modules', 'model', 'mining', 'evaluation', 'backtest', 'mcp', 'position', 'acquisition'].includes(view)) switchView(view);
   if (table) setTimeout(() => goTable(table), 160);
 }
 window.addEventListener('hashchange', routeFromHash);
