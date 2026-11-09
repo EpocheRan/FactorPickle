@@ -807,7 +807,18 @@
   .fp-sec-head p{margin:8px 0 0;font-size:13px;line-height:1.7;color:#8fa2b4;max-width:680px}
   .fp-tag{font-family:var(--mono);font-size:8px;letter-spacing:.14em;color:#6d8275;white-space:nowrap;border:1px solid var(--line);padding:5px 8px;border-radius:2px}
   .fp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
-  .fp-card{padding:20px 19px;border:1px solid var(--line);border-radius:8px;background:linear-gradient(180deg,rgba(11,19,18,.8),rgba(6,10,9,.72))}
+  .fp-card{position:relative;padding:20px 19px;border:1px solid var(--line);border-radius:8px;background:linear-gradient(180deg,rgba(11,19,18,.8),rgba(6,10,9,.72))}
+  .fp-card .fp-icon{
+    width:36px;height:36px;border-radius:9px;display:grid;place-items:center;margin-bottom:14px;
+    color:#c9ff5a;background:color-mix(in srgb,currentColor 8%,transparent);
+    border:1px solid color-mix(in srgb,currentColor 26%,transparent);
+  }
+  .fp-card .fp-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round}
+  #view-evaluation .fp-icon{color:#7ef0c7}
+  #view-backtest .fp-icon{color:#fbbf24}
+  #view-mcp .fp-icon{color:#c4b5fd}
+  #view-position .fp-icon{color:#f9a8d4}
+  #view-acquisition .fp-icon{color:#67e8f9}
   .fp-card .idx{font-family:var(--mono);font-size:8px;letter-spacing:.12em;color:#c9ff5a;margin-bottom:12px}
   .fp-card h3{margin:0 0 8px;font-size:16px;line-height:1.3;letter-spacing:-.01em;font-weight:550;color:#edf4fa}
   .fp-card p{margin:0;font-size:12px;line-height:1.7;color:#91a4b4}
@@ -3334,11 +3345,63 @@ function initPinScene() {
 }
 
 /* ============================================================
+   FEATURE PAGE ICONS
+   ============================================================ */
+function initFeatureIcons() {
+  const icons = {
+    search: '<circle cx="7" cy="7" r="3.6"/><path d="m10 10 3 3"/>',
+    globe: '<circle cx="8" cy="8" r="5.6"/><path d="M2.4 8h11.2M8 2.4c2.1 2.1 2.1 9.1 0 11.2M8 2.4c-2.1 2.1-2.1 9.1 0 11.2"/>',
+    code: '<path d="m6 4-3 4 3 4m4-8 3 4-3 4"/>',
+    play: '<path d="m5 3 8 5-8 5V3Z"/>',
+    chart: '<path d="M3 13V4m5 9V6m5 7V2"/>',
+    check: '<path d="M8 2 3 4v4c0 3 2.2 5.2 5 6 2.8-.8 5-3 5-6V4Z"/><path d="m5.8 8 1.5 1.5L10.7 6"/>',
+    clock: '<circle cx="8" cy="8" r="5.6"/><path d="M8 4.4V8l2.6 1.6"/>',
+    pulse: '<path d="M2 8h3l1.5-4 3 8L11 8h3"/>',
+    layers: '<path d="M8 2 2 5l6 3 6-3-6-3Z"/><path d="m2 8 6 3 6-3m-12 3 6 3 6-3"/>',
+    calendar: '<rect x="3" y="4" width="10" height="9" rx="1.5"/><path d="M5 2v4m6-4v4M3 7h10"/>',
+    grid: '<rect x="2.5" y="2.5" width="4.3" height="4.3" rx="1"/><rect x="9.2" y="2.5" width="4.3" height="4.3" rx="1"/><rect x="2.5" y="9.2" width="4.3" height="4.3" rx="1"/><rect x="9.2" y="9.2" width="4.3" height="4.3" rx="1"/>',
+    file: '<path d="M4 2h6l3 3v9H4z"/><path d="M7 10V7m3 3V5m3 5V8"/>',
+    box: '<rect x="2.5" y="4.5" width="11" height="8" rx="1.5"/><path d="M5 4.5V2.5h6v2M2.5 7.5h11"/>',
+    shield: '<path d="M8 2 3 4v4c0 3 2.2 5.2 5 6 2.8-.8 5-3 5-6V4Z"/>',
+    coins: '<ellipse cx="8" cy="4.2" rx="4.6" ry="1.8"/><path d="M3.4 4.2v3.2c0 1 2.1 1.8 4.6 1.8s4.6-.8 4.6-1.8V4.2"/><path d="M3.4 7.4v3.2c0 1 2.1 1.8 4.6 1.8s4.6-.8 4.6-1.8V7.4"/>',
+    scale: '<path d="M8 2v12M4 4h8M4 4 2 9h4L4 4Zm8 0-2 5h4l-2-5Z"/><path d="M5 13h6"/>',
+    finger: '<path d="M5.5 7.5V5a2.5 2.5 0 0 1 5 0v2.5M8 7.5V4.8M5.5 8.5A6 6 0 0 0 7 13M10.5 8.5a6 6 0 0 1-1.3 4.5"/>',
+    doc: '<path d="M4 2h6l3 3v9H4z"/><path d="M6 7h5M6 10h5M6 13h3"/>',
+    drop: '<path d="M8 2.2S4 6.6 4 9a4 4 0 0 0 8 0c0-2.4-4-6.8-4-6.8Z"/>',
+    fn: '<path d="M10.5 3H8.8C7.3 3 6.6 4 6.6 5.5V7H4.8m0 0h4v6M4.8 7H10"/>',
+    filter: '<path d="M2.5 3h11l-4.2 5v4.5L6.7 14v-6L2.5 3Z"/>',
+    pipeline: '<path d="M2 5h3v6H2zM6.5 8h3M13.5 5h.5v6h-3"/><path d="m11 7 2.5 1L11 9"/>',
+    lock: '<rect x="3.5" y="7" width="9" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>',
+    pin: '<path d="M8 14s4-4.2 4-7.2a4 4 0 0 0-8 0C4 9.8 8 14 8 14Z"/><circle cx="8" cy="6.8" r="1.4"/>',
+    receipt: '<path d="M4 2.5h8v12l-2-1.5-2 1.5-2-1.5-2 1.5V2.5Z"/><path d="M6 6h4M6 9h4"/>',
+  };
+  const sets = {
+    'view-mining': ['search','globe','code','play','chart','check','layers'],
+    'view-evaluation': ['chart','pulse','layers','calendar','grid','file','check','box','shield'],
+    'view-backtest': ['clock','box','shield','coins','scale','finger','check','chart','play'],
+    'view-mcp': ['chart','doc','drop','fn','filter','box','globe','shield','layers'],
+    'view-position': ['box','pin','receipt','coins','scale','chart'],
+    'view-acquisition': ['pipeline','globe','lock','chart','doc','drop','layers','fn','box'],
+  };
+  const generic = ['box','chart','layers','check'];
+  $$('.view .fp-page .fp-card').forEach((card) => {
+    if (card.querySelector('.fp-icon')) return;
+    const view = card.closest('.view');
+    const list = sets[view?.id] || generic;
+    const cards = $$('.fp-card', view || document);
+    const i = cards.indexOf(card);
+    const key = list[i % list.length] || 'box';
+    card.insertAdjacentHTML('afterbegin', `<span class="fp-icon"><svg viewBox="0 0 16 16" aria-hidden="true">${icons[key] || icons.box}</svg></span>`);
+  });
+}
+
+/* ============================================================
    BOOT
    ============================================================ */
 buildOverview();
 initHeader();
 initPinScene();
+initFeatureIcons();
 buildModules();
 buildMarkers();
 buildChips();
