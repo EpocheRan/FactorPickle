@@ -25,7 +25,7 @@ config.local.json
 
 # --- 本地缓存 ---
 /.mplconfig/
-/finbridge-mpl/
+/factorpickle-mpl/
 
 # --- 本地策略（不提交）---
 /strategies/private/

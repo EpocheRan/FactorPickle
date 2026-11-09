@@ -1,4 +1,4 @@
-"""RQAlpha Mod：把 FinBridge 的数据源与费用模型注入引擎。"""
+"""RQAlpha Mod：把 FactorPickle 的数据源与费用模型注入引擎。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from rqalpha.interface import AbstractMod
 from .runtime import get_runtime
 
 
-class FinBridgeMod(AbstractMod):
+class FactorPickleMod(AbstractMod):
     def start_up(self, env, mod_config):
         runtime = get_runtime()
         env.set_data_source(runtime.source)
@@ -19,4 +19,4 @@ class FinBridgeMod(AbstractMod):
 
 
 def load_mod():
-    return FinBridgeMod()
+    return FactorPickleMod()

@@ -134,7 +134,7 @@ def _default_type(column: str) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="FinBridge QuestDB 迁移脚本")
+    parser = argparse.ArgumentParser(description="FactorPickle QuestDB 迁移脚本")
     parser.add_argument("--check", action="store_true", help="只体检（默认行为）")
     parser.add_argument("--apply", action="store_true", help="执行加列/重建表")
     parser.add_argument(

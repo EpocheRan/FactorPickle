@@ -1,4 +1,4 @@
-"""FinBridge MCP Server。
+"""FactorPickle MCP Server。
 
 职责边界：
 - 只负责组装 MCP 工具与启动服务。

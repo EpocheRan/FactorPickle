@@ -1,7 +1,7 @@
 [project]
 name = "quantproject"
 version = "0.2.0"
-description = "FinBridge MCP - market, financial and position data interface for AI agents"
+description = "FactorPickle MCP - market, financial and position data interface for AI agents"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

@@ -1,4 +1,4 @@
-"""In-process staging for factors that are not in FinBridge's registry yet.
+"""In-process staging for factors that are not in FactorPickle's registry yet.
 
 P0 deliberately does not write ``factors/ops/price_factors.py``.  A staged
 factor is injected into ``EXTRA_FACTORS`` inside the current Python process and
@@ -50,7 +50,7 @@ def stage_price_factor(
 def ensure_staged(factor_id: str) -> StagedFactor | None:
     """Return staging metadata when the factor is a known lab factor.
 
-    If the factor already resolves in FinBridge, return ``None`` (nothing to
+    If the factor already resolves in FactorPickle, return ``None`` (nothing to
     stage).  If it is unknown, raise a clear error instead of silently running a
     different factor.
     """

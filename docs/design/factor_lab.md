@@ -1,6 +1,6 @@
 # Factor Lab
 
-Factor Lab 是 FinBridge 上的自主因子研究运行时。目标是让研究循环由机制约束、
+Factor Lab 是 FactorPickle 上的自主因子研究运行时。目标是让研究循环由机制约束、
 可审计、可中断，同时不改变生产研究与数据模块的语义。
 
 ## 1. 边界

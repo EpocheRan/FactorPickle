@@ -1,6 +1,6 @@
-"""Factor Lab: reproducible experiment plumbing for FinBridge.
+"""Factor Lab: reproducible experiment plumbing for FactorPickle.
 
-The package is intentionally additive.  It reads FinBridge's existing research
+The package is intentionally additive.  It reads FactorPickle's existing research
 pipeline and writes lab artifacts under ``output/factor_lab``; it never edits
 production modules or the factor registry during P0.
 """

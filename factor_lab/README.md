@@ -1,6 +1,6 @@
 # Factor Lab
 
-`factor_lab` 是 FinBridge 的自主因子研究运行时。它把数据、因子构建、执行、评估、
+`factor_lab` 是 FactorPickle 的自主因子研究运行时。它把数据、因子构建、执行、评估、
 评分和预算约束组织成可审计的闭环，研究状态全部写入 `output/factor_lab/`。
 
 ## 边界

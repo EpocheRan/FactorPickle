@@ -67,7 +67,7 @@ BacktestRunner.run(strategy_path)
 | `RQAlphaEngine` | `run(request) -> BacktestResult` | `EnginePort` 实现 |
 | `RQAlphaDataSource` | `get_bar/history_bars/is_suspended/...` | DataBundle → RQAlpha |
 | `StrategyAdapter` | `init/open_auction/handle_bar/after_trading` | 策略回调与订单排队 |
-| `FinBridgeCostDecider` | `calc(args) -> TransactionCost` | 佣金/印花税/过户费 |
+| `FactorPickleCostDecider` | `calc(args) -> TransactionCost` | 佣金/印花税/过户费 |
 | `PortfolioLedger` | 持仓、现金、成交 | 多标的账本 |
 
 关键默认值：`fill="next_open"`、`rebalance="weekly"`、`warmup_min_bars=260`、
@@ -125,7 +125,7 @@ T+1 由 RQAlpha 股票账户（`market_tplus=1` + `stock_t1=True`）强制执行
 ### 2.5 结果口径
 
 - `equity` / `metrics` 来自 RQAlpha 组合；`metrics_source="engine"`；
-- `orders` / `trades` 来自 RQAlpha 成交，转换为 FinBridge 列名；
+- `orders` / `trades` 来自 RQAlpha 成交，转换为 FactorPickle 列名；
 - `meta["ledger_reconciliation"]` 是诊断项：账本 vs RQAlpha 组合的相对误差；
   2024Q1 横截面实测 `max_rel_diff ≈ 4.7e-11`；长区间因退市股约 1.9%，不影响报告口径。
 - `meta["ledger_reconciliation_common"]` 只比较两边都持有的 `(date, symbol)`，

@@ -1,4 +1,4 @@
-"""FinBridge 策略 → RQAlpha 回调适配。
+"""FactorPickle 策略 → RQAlpha 回调适配。
 
 时序：
 - T 日 ``handle_bar``：看 T 日收盘，算信号/止损，只**排队**订单；

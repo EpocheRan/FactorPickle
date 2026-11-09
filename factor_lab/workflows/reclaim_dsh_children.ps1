@@ -1,7 +1,11 @@
 param(
     [switch]$Apply,
-    [string]$Workspace = "D:\FinBridge"
+    [string]$Workspace = ""
 )
+
+if (-not $Workspace) {
+    $Workspace = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+}
 
 # DSH has no public "close subagent" tool.  Workflow children are stored as
 # non-"session-*" directories; archive them outside the sessions tree.

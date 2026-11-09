@@ -37,7 +37,7 @@ codes = sorted(c for c in codes if c not in done)
 print(f"already done: {len(done)}, remaining: {len(codes)}")
 print(f"codes: {len(codes)}, batch={BATCH}")
 
-sys.path.insert(0, r"D:\FinBridge")
+sys.path.insert(0, r"D:\FactorPickle")
 from factor_engine.service import FactorEngineService  # noqa: E402
 
 service = FactorEngineService()

@@ -1,4 +1,4 @@
-"""Serialize FinBridge's in-memory ``FactorReport`` without changing FinBridge."""
+"""Serialize FactorPickle's in-memory ``FactorReport`` without changing FactorPickle."""
 
 from __future__ import annotations
 

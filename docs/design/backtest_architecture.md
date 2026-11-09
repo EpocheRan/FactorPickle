@@ -4,7 +4,7 @@
 
 ## 1. 目标与边界
 
-**目标**：给 FinBridge 的策略提供一条可复现的 A 股回测链路，满足：
+**目标**：给 FactorPickle 的策略提供一条可复现的 A 股回测链路，满足：
 
 - T+1、涨跌停、整手、停牌、佣金/印花税/过户费；
 - 单股 `on_bar` 与横截面 `rank/weights` 两种策略；
@@ -21,9 +21,9 @@ BacktestRunner（application）
   └─ EnginePort
         └─ RQAlphaEngine（infrastructure/engine/rqalpha）
               ├─ RQAlphaDataSource   DataBundle → 日线 bars
-              ├─ StrategyAdapter     FinBridge 策略 → RQAlpha 回调
-              ├─ FinBridgeCostDecider FeeModel → RQAlpha 费用
-              └─ FinBridgeMod       把数据源/费用注入 RQAlpha
+              ├─ StrategyAdapter     FactorPickle 策略 → RQAlpha 回调
+              ├─ FactorPickleCostDecider FeeModel → RQAlpha 费用
+              └─ FactorPickleMod       把数据源/费用注入 RQAlpha
 ```
 
 依赖方向：
@@ -65,7 +65,7 @@ T+1 由 RQAlpha 股票账户强制执行：`Instrument.market_tplus=1` +
 | 涨跌停 | `RQAlphaDataSource.limit_up/down` + `sys_simulation.price_limit` | 按前收与板块规则算，拒单 |
 | 整手 | `Instrument.round_lot` + `order_shares` | 主板/创业板 100；科创板 1（200 起由下单层保证） |
 | 停牌 | `sys_simulation.inactive_limit` + `is_suspended` | 成交量为 0 不成交 |
-| 佣金/印花税/过户费 | `FinBridgeCostDecider` | 复用 `FeeModel`，印花税按日期切换 |
+| 佣金/印花税/过户费 | `FactorPickleCostDecider` | 复用 `FeeModel`，印花税按日期切换 |
 | 滑点 | `sys_simulation.slippage=0` | 暂不计；后续可配 |
 | 成交量上限 | 关闭 | QuestDB `volume` 单位待校准 |
 
@@ -90,7 +90,7 @@ limit_up limit_down prev_close hfq_close settlement open_interest
 
 ## 6. 策略 API
 
-| FinBridge | RQAlpha 侧 | 说明 |
+| FactorPickle | RQAlpha 侧 | 说明 |
 |---|---|---|
 | `SingleSymbolStrategy.on_bar(ctx)` | `handle_bar` 里逐 bar 调用 | `ctx` 为 `StrategyContext` |
 | `ctx.target_weight` | 排队买单/卖单，T+1 开盘 `order_shares` | 目标权重 × 权益 / close |

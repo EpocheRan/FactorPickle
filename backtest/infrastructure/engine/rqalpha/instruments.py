@@ -1,4 +1,4 @@
-"""FinBridge 代码 → RQAlpha Instrument。"""
+"""FactorPickle 代码 → RQAlpha Instrument。"""
 
 from __future__ import annotations
 

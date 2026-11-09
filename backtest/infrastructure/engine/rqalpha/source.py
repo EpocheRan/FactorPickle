@@ -1,7 +1,7 @@
-"""RQAlpha 日线数据源：把 FinBridge DataBundle 适配成 RQAlpha 接口。
+"""RQAlpha 日线数据源：把 FactorPickle DataBundle 适配成 RQAlpha 接口。
 
 设计口径：
-- 信号与因子由 FinBridge 在 RQAlpha 之外计算；这里只提供**原始价**，
+- 信号与因子由 FactorPickle 在 RQAlpha 之外计算；这里只提供**原始价**，
   用于撮合、涨跌停、估值。
 - 复权、分红、拆股暂不在这里处理（v1 已知边界，见文档）。
 """

@@ -139,7 +139,7 @@ STRATEGY = RankMom20
 | `rules` | `ExecutionRules` | T+1、涨跌停、费率、印花税 |
 
 RQAlpha 侧配置在 `rqalpha/engine.py::_config`：`sys_simulation` 开启涨跌停/停牌限制，
-`sys_transaction_cost` 关闭并由 `FinBridgeCostDecider` 接管，`sys_analyser` 只收集结果不画图。
+`sys_transaction_cost` 关闭并由 `FactorPickleCostDecider` 接管，`sys_analyser` 只收集结果不画图。
 
 ## 输出
 

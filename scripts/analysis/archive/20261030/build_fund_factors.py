@@ -9,7 +9,7 @@ import time
 import pandas as pd
 import requests
 
-sys.path.insert(0, r"D:\FinBridge")
+sys.path.insert(0, r"D:\FactorPickle")
 
 BASE = "http://127.0.0.1:9000"
 END = "2026-10-29"

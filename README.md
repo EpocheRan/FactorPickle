@@ -1,10 +1,10 @@
-# FinBridge
+# FactorPickle
 
 > 面向 AI Agent 的 A 股量化研究基础设施：数据采集、因子物化、研究、选股、回测与报告，收进一条可复现的链路。
 
-**[在线系统图谱](https://epocheran.github.io/FinBridge/)** · [文档索引](docs/README.md) · [模块文档](docs/modules/) · [设计文档](docs/design/) · [使用指南](docs/guides/)
+**[在线系统图谱](https://epocheran.github.io/FactorPickle/)** · [文档索引](docs/README.md) · [模块文档](docs/modules/) · [设计文档](docs/design/) · [使用指南](docs/guides/)
 
-## 为什么是 FinBridge
+## 为什么是 FactorPickle
 
 - **端到端**：多源同步 → 因子注册与物化 → 选股 / 回测 → HTML 研究报告。
 - **因子是资产**：`FactorDef` 声明、registry 注册、长表 / latest 物化，方向、单位、版本可追溯。
@@ -118,7 +118,7 @@ python -m acquisition run --datasets ohlcv_1d,factors,screener
 
 | 入口 | 内容 |
 |---|---|
-| [在线系统图谱](https://epocheran.github.io/FinBridge/) | 模块职责、核心函数、数据域与表关系 |
+| [在线系统图谱](https://epocheran.github.io/FactorPickle/) | 模块职责、核心函数、数据域与表关系 |
 | [docs/README.md](docs/README.md) | 文档总索引、依赖关系、AI 阅读顺序 |
 | [docs/modules/](docs/modules/) | 11 个模块的架构与核心类/方法 |
 | [docs/design/](docs/design/) | 当前架构、因子库、回测、数据管线与 Factor Lab |

@@ -1,4 +1,4 @@
-"""把 FinBridge 的 A 股费用模型接入 RQAlpha。"""
+"""把 FactorPickle 的 A 股费用模型接入 RQAlpha。"""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from rqalpha.interface import (
 from backtest.infrastructure.execution.a_share import FeeModel
 
 
-class FinBridgeCostDecider(AbstractTransactionCostDecider):
+class FactorPickleCostDecider(AbstractTransactionCostDecider):
     def __init__(self, rules):
         self.rules = rules
         self.fee_model = FeeModel(rules)

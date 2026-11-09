@@ -1,4 +1,4 @@
-"""Run one pre-registered hypothesis through FinBridge's report generator."""
+"""Run one pre-registered hypothesis through FactorPickle's report generator."""
 
 from __future__ import annotations
 
