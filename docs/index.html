@@ -138,7 +138,7 @@
   .pickle-scan::before{
     content:"";position:absolute;top:-20%;bottom:-20%;left:-70%;width:45%;pointer-events:none;
     background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),rgba(232,255,180,.72),rgba(255,255,255,.3),transparent);
-    filter:blur(9px);animation:pickleScanBg 2.2s cubic-bezier(.45,0,.55,1) infinite;
+    filter:blur(9px);animation:pickleScanBg 10s cubic-bezier(.45,0,.55,1) infinite;
   }
   .hero-spark{
     position:absolute;z-index:4;width:5px;height:5px;border-radius:50%;pointer-events:none;
@@ -149,7 +149,7 @@
   .hero-spark.s2{left:80%;top:58%;width:3px;height:3px;animation-delay:-5.5s}
   .hero-spark.s3{left:73%;top:74%;width:4px;height:4px;animation-delay:-7s}
   @keyframes pickleFloat{from{transform:translateY(-8px) scale(1.035)}to{transform:translateY(10px) scale(1.045)}}
-  @keyframes pickleScanBg{0%,4%{left:-70%;opacity:0}12%{opacity:.85}55%{left:120%;opacity:.85}56%,100%{left:120%;opacity:0}}
+  @keyframes pickleScanBg{0%,5%{left:-70%;opacity:0}8%{opacity:.85}18%{left:120%;opacity:.85}19%,100%{left:120%;opacity:0}}
   @keyframes heroPulse{from{filter:drop-shadow(0 0 14px rgba(185,255,63,.03))}to{filter:drop-shadow(0 0 36px rgba(185,255,63,.08))}}
   @keyframes heroAura{from{transform:scale(.9);opacity:.35}to{transform:scale(1.08);opacity:.75}}
   @keyframes heroSpark{0%,100%{transform:translate3d(0,0,0);opacity:.22}50%{transform:translate3d(-22px,-34px,0);opacity:1}}
