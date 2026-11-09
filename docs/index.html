@@ -469,16 +469,24 @@
   .pickle-axis b{font-weight:500;color:#c9ff5a;letter-spacing:.1em}
   .pin-cards{position:absolute;inset:0;z-index:3;pointer-events:none}
   .pin-card{
-    position:absolute;top:50%;right:max(4.5vw,calc(50% - 570px));width:min(480px,39vw);min-height:clamp(290px,36vh,350px);
-    padding:27px 29px 29px;pointer-events:none;display:flex;flex-direction:column;
+    position:absolute;top:50%;right:max(4.5vw,calc(50% - 410px));width:min(480px,39vw);min-height:clamp(290px,36vh,350px);
+    padding:27px 29px 29px;pointer-events:none;display:flex;flex-direction:column;overflow:hidden;
     border:1px solid rgba(255,255,255,.48);border-radius:18px;
-    background:linear-gradient(145deg,#efffd9 0%,#d2ff97 34%,#aef266 68%,#88da45 100%);
-    box-shadow:0 30px 80px -28px rgba(0,0,0,.92),0 0 0 1px rgba(24,56,10,.05),inset 0 1px 0 rgba(255,255,255,.7);
+    background:
+      radial-gradient(120% 90% at 8% -12%,rgba(255,255,255,.92) 0%,rgba(255,255,255,0) 54%),
+      radial-gradient(100% 80% at 102% 104%,rgba(63,138,24,.34) 0%,rgba(63,138,24,0) 62%),
+      linear-gradient(155deg,#f4ffe7 0%,#dcffb4 28%,#bdf67d 60%,#93df52 100%);
+    box-shadow:0 30px 80px -28px rgba(0,0,0,.92),0 0 0 1px rgba(24,56,10,.05),inset 0 1px 0 rgba(255,255,255,.72);
     opacity:0;transform:translate(120px,-50%) scale(.95);
     transition:opacity .5s ease,transform .75s cubic-bezier(.22,.61,.36,1);
     will-change:opacity,transform;
   }
-  .pin-card::before{content:"";position:absolute;left:29px;top:0;width:52px;height:2px;background:#315d19;opacity:.6}
+  .pin-card::before{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;
+    background-image:url(assets/grain.svg);background-size:180px 180px;
+    opacity:.2;mix-blend-mode:multiply;
+  }
+  .pin-card > *{position:relative;z-index:1}
   .pin-card::after{
     content:"";position:absolute;left:29px;right:29px;bottom:22px;height:1px;
     background:linear-gradient(90deg,rgba(31,67,15,.24),rgba(31,67,15,.06) 60%,transparent);
