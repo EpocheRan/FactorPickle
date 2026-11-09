@@ -377,6 +377,114 @@
   .why-card-meta{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:#6f8299}
   .why-card h3{margin:0;font-size:19px;line-height:1.25;letter-spacing:-.02em;font-weight:500;color:#eef4fb}
   .why-card p{margin:0;font-size:12px;line-height:1.65;color:#93a5ba}
+
+  /* ---------- pinned pickle principle scene ---------- */
+  .pin-scene{
+    position:relative;height:420vh;background:#04070d;border-top:1px solid var(--line);
+    isolation:isolate;
+  }
+  .pin-sticky{
+    position:sticky;top:0;height:100vh;overflow:hidden;
+    background:
+      radial-gradient(880px 540px at 50% 47%,rgba(185,255,63,.065),transparent 66%),
+      radial-gradient(1200px 800px at 50% 100%,rgba(34,211,238,.035),transparent 70%),
+      linear-gradient(180deg,#04070d,#05090e);
+  }
+  .pin-grid{
+    position:absolute;inset:0;pointer-events:none;opacity:.42;
+    background-image:
+      linear-gradient(rgba(148,163,184,.055) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(148,163,184,.055) 1px,transparent 1px);
+    background-size:58px 58px;
+    -webkit-mask-image:radial-gradient(ellipse at center,#000 0%,rgba(0,0,0,.82) 52%,transparent 82%);
+    mask-image:radial-gradient(ellipse at center,#000 0%,rgba(0,0,0,.82) 52%,transparent 82%);
+  }
+  .pin-head{
+    position:absolute;z-index:4;top:calc(var(--header-h,80px) + 24px);left:50%;
+    width:min(720px,90vw);transform:translateX(-50%);text-align:center;
+  }
+  .pin-kicker{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:#c9ff5a;text-transform:uppercase}
+  .pin-kicker span{color:#5f7288;padding:0 5px}
+  .pin-head h2{margin:12px 0 8px;font-size:clamp(25px,2.8vw,40px);line-height:1.12;letter-spacing:-.035em;font-weight:600;color:#eef5fb}
+  .pin-head p{margin:0;font-size:13px;line-height:1.65;color:#8295a8}
+  .pin-frame{
+    position:absolute;z-index:1;pointer-events:none;
+    inset:clamp(150px,20vh,215px) clamp(24px,7vw,120px) clamp(74px,12vh,120px);
+    border:1px solid rgba(201,255,90,.12);
+  }
+  .pin-cross{position:absolute;width:13px;height:13px;color:#7d9b50;opacity:.8}
+  .pin-cross::before,.pin-cross::after{content:"";position:absolute;background:currentColor}
+  .pin-cross::before{left:6px;top:0;width:1px;height:13px}
+  .pin-cross::after{left:0;top:6px;width:13px;height:1px}
+  .pin-cross.tl{left:-7px;top:-7px}.pin-cross.tr{right:-7px;top:-7px}
+  .pin-cross.bl{left:-7px;bottom:-7px}.pin-cross.br{right:-7px;bottom:-7px}
+  .pin-pickle-wrap{
+    position:absolute;z-index:2;left:50%;top:48%;transform:translate(-50%,-50%);
+    width:min(470px,40vw);height:min(70vh,700px);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .pickle-glow{
+    position:absolute;width:74%;height:74%;border-radius:50%;z-index:0;
+    background:radial-gradient(circle,rgba(185,255,63,.2),rgba(185,255,63,.045) 44%,transparent 70%);
+    filter:blur(14px);animation:pinGlow 6s ease-in-out infinite alternate;
+  }
+  .pickle-fallback{
+    position:absolute;width:56%;height:72%;object-fit:contain;z-index:1;
+    filter:drop-shadow(0 24px 46px rgba(0,0,0,.55)) drop-shadow(0 0 34px rgba(185,255,63,.2));
+  }
+  .pin-pickle-wrap.has-3d .pickle-fallback{opacity:0}
+  #pickleCanvas{position:relative;z-index:2;display:block;width:100%;height:100%}
+  .pickle-axis{
+    position:absolute;z-index:4;left:50%;bottom:1%;transform:translateX(-50%);
+    display:flex;align-items:center;gap:9px;white-space:nowrap;
+    font-size:8px;letter-spacing:.18em;color:#5f7288;
+  }
+  .pickle-axis b{font-weight:500;color:#c9ff5a;letter-spacing:.1em}
+  .pin-cards{position:absolute;inset:0;z-index:3;pointer-events:none}
+  .pin-card{
+    position:absolute;top:52%;width:min(300px,22.5vw);padding:19px 20px 20px;pointer-events:none;
+    border:1px solid rgba(255,255,255,.1);border-radius:13px;
+    background:linear-gradient(180deg,rgba(17,21,21,.83),rgba(6,9,9,.88));
+    backdrop-filter:blur(16px) saturate(130%);-webkit-backdrop-filter:blur(16px) saturate(130%);
+    box-shadow:0 26px 70px -30px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.07);
+    opacity:0;transition:opacity .55s ease,transform .7s cubic-bezier(.22,.61,.36,1);
+    will-change:opacity,transform;
+  }
+  .pin-card::before{content:"";position:absolute;left:20px;top:0;width:38px;height:1px;background:#c9ff5a;opacity:.8}
+  .pin-card.left{left:max(3.5vw,calc(50% - 610px));transform:translate(-80px,-50%)}
+  .pin-card.right{right:max(3.5vw,calc(50% - 610px));transform:translate(80px,-50%)}
+  .pin-card.is-active{opacity:1;transform:translate(0,-50%)}
+  .pin-card-num{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:#c9ff5a;margin-bottom:10px}
+  .pin-card h3{margin:0 0 8px;font-size:19px;line-height:1.25;letter-spacing:-.025em;font-weight:550;color:#eef5fb}
+  .pin-card p{margin:0;font-size:12.5px;line-height:1.7;color:#9cafc0}
+  .pin-foot{
+    position:absolute;z-index:4;left:max(4vw,calc(50% - 610px));right:max(4vw,calc(50% - 610px));bottom:26px;
+    display:flex;justify-content:space-between;align-items:center;pointer-events:none;
+    font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:#5f7288;
+  }
+  .pin-progress{display:flex;align-items:center;gap:10px}
+  .pin-progress i{display:block;width:112px;height:1px;background:rgba(148,163,184,.2);overflow:hidden}
+  .pin-progress b{display:block;height:100%;background:#c9ff5a;transform:scaleX(0);transform-origin:left;transition:transform .12s linear}
+  .pin-hint span{color:#c9ff5a;padding-left:3px}
+  @keyframes pinGlow{from{transform:scale(.9);opacity:.45}to{transform:scale(1.08);opacity:.85}}
+
+  @media (max-width:900px){
+    .pin-scene{height:auto}
+    .pin-sticky{position:relative;top:auto;height:auto;min-height:0;padding:calc(var(--header-h,80px) + 30px) 0 46px;overflow:hidden}
+    .pin-head{position:relative;top:auto;left:auto;transform:none;margin:0 auto 12px}
+    .pin-frame{position:relative;inset:auto;width:min(470px,90vw);height:min(58vh,470px);margin:0 auto;border:0}
+    .pin-cross{display:none}
+    .pin-pickle-wrap{width:min(340px,76vw);height:100%;left:50%;top:50%}
+    .pin-cards{position:relative;inset:auto;display:grid;gap:12px;width:min(440px,90vw);margin:18px auto 0;pointer-events:auto}
+    .pin-card,.pin-card.left,.pin-card.right{position:relative;top:auto;left:auto;right:auto;width:auto;transform:none!important;opacity:1;pointer-events:auto}
+    .pin-card{width:auto;padding:17px 18px}
+    .pin-card h3{font-size:17px}
+    .pin-card p{font-size:12px}
+    .pin-foot{position:relative;left:auto;right:auto;bottom:auto;width:min(440px,90vw);margin:18px auto 0}
+    .pin-hint{display:none}
+  }
+
+  .bars{display:flex;flex-direction:column;gap:11px}
   .bars{display:flex;flex-direction:column;gap:11px}
   .bar-row{display:grid;grid-template-columns:170px 1fr 84px;align-items:center;gap:12px}
   .bar-name{font-family:var(--mono);font-size:11.5px;color:#b9c7da;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -760,69 +868,61 @@
       </div>
     </div>
 
-    <div class="wrap">
-
-
-            <div class="section" id="features">
-        <div class="sec-head">
-          <div>
-            <h2 class="sec-title">为什么是 FactorPickle</h2>
-            <p class="sec-desc">不是又一个数据管道：把「研究结论可复现」写进模块边界、因子资产与报告口径。</p>
-          </div>
-          <span class="sec-tag">WHY FACTORPICKLE</span>
+    <div class="pin-scene" id="features">
+      <div class="pin-sticky">
+        <div class="pin-grid" aria-hidden="true"></div>
+        <div class="pin-head">
+          <div class="pin-kicker mono">WHY FACTORPICKLE <span>/</span> 06 PRINCIPLES</div>
+          <h2>为什么是 FactorPickle</h2>
+          <p>不是又一个数据管道：把「研究结论可复现」写进模块边界、因子资产与报告口径。</p>
         </div>
-
-        <div class="why-grid">
-          <article class="why-card">
-            <div class="why-card-art" data-art="0"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">01 / PIPELINE</div>
-              <h3>一条链路，四层边界</h3>
-              <p>采集、数据访问、因子计算与应用分层；单向依赖让每层可以独立替换与测试。</p>
-            </div>
-          </article>
-          <article class="why-card">
-            <div class="why-card-art" data-art="1"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">02 / FACTOR</div>
-              <h3>因子是资产，不是脚本</h3>
-              <p>声明式 FactorDef → registry → 长表 / latest；方向、单位、版本与依赖全部可追溯。</p>
-            </div>
-          </article>
-          <article class="why-card">
-            <div class="why-card-art" data-art="2"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">03 / RESEARCH</div>
-              <h3>报告经得起复核</h3>
-              <p>profile 章节、分层 IC（流动性/市值/行业）、五维评分、ALL/EX_BSE/INVESTABLE/HIGH_LIQ 样本敏感性、分月 IC 与失效归因；HTML 报告与评分逻辑同源，Panel 缓存可复用。</p>
-            </div>
-          </article>
-          <article class="why-card">
-            <div class="why-card-art" data-art="3"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">04 / BACKTEST</div>
-              <h3>A 股规则内置</h3>
-              <p>T+1、整手、涨跌停、停牌、佣金与印花税；单标的与横截面共用一套账本。</p>
-            </div>
-          </article>
-          <article class="why-card">
-            <div class="why-card-art" data-art="4"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">05 / MCP</div>
-              <h3>MCP 原生</h3>
-              <p>行情、财务、因子、选股、持仓与同步统一暴露为工具，AI Agent 可直接调用。</p>
-            </div>
-          </article>
-          <article class="why-card">
-            <div class="why-card-art" data-art="5"></div>
-            <div class="why-card-body">
-              <div class="why-card-meta">06 / REPRODUCIBLE</div>
-              <h3>可复现的运行</h3>
-              <p>run_id 固化策略、参数、数据快照与执行规则；同输入可重跑，结论可对照。</p>
-            </div>
-          </article>
+        <div class="pin-frame" aria-hidden="true">
+          <span class="pin-cross tl"></span><span class="pin-cross tr"></span><span class="pin-cross bl"></span><span class="pin-cross br"></span>
+          <div class="pin-pickle-wrap" id="pickleWrap">
+            <div class="pickle-glow"></div>
+            <img class="pickle-fallback" src="assets/logo-factorpickle.svg" alt="">
+            <canvas id="pickleCanvas" aria-label="随滚动旋转的 3D Pickle"></canvas>
+            <div class="pickle-axis mono"><span>ROTATION</span><b id="pickleDeg">000°</b></div>
+          </div>
+        </div>
+        <div class="pin-cards" id="pinCards">
+      <article class="pin-card left is-active" data-stage="0" aria-hidden="false">
+        <div class="pin-card-num mono">01 / PIPELINE</div>
+        <h3>一条链路，四层边界</h3>
+        <p>采集、数据访问、因子计算与应用分层；单向依赖让每层可以独立替换与测试。</p>
+      </article>
+      <article class="pin-card right is-active" data-stage="0" aria-hidden="false">
+        <div class="pin-card-num mono">02 / FACTOR</div>
+        <h3>因子是资产，不是脚本</h3>
+        <p>声明式 FactorDef → registry → 长表 / latest；方向、单位、版本与依赖全部可追溯。</p>
+      </article>
+      <article class="pin-card left" data-stage="1" aria-hidden="true">
+        <div class="pin-card-num mono">03 / RESEARCH</div>
+        <h3>报告经得起复核</h3>
+        <p>profile 章节、分层 IC、五维评分、样本敏感性与分月 IC；HTML 报告与评分逻辑同源。</p>
+      </article>
+      <article class="pin-card right" data-stage="1" aria-hidden="true">
+        <div class="pin-card-num mono">04 / BACKTEST</div>
+        <h3>A 股规则内置</h3>
+        <p>T+1、整手、涨跌停、停牌、佣金与印花税；单标的与横截面共用一套账本。</p>
+      </article>
+      <article class="pin-card left" data-stage="2" aria-hidden="true">
+        <div class="pin-card-num mono">05 / MCP</div>
+        <h3>MCP 原生</h3>
+        <p>行情、财务、因子、选股、持仓与同步统一暴露为工具，AI Agent 可直接调用。</p>
+      </article>
+      <article class="pin-card right" data-stage="2" aria-hidden="true">
+        <div class="pin-card-num mono">06 / REPRODUCIBLE</div>
+        <h3>可复现的运行</h3>
+        <p>run_id 固化策略、参数、数据快照与执行规则；同输入可重跑，结论可对照。</p>
+      </article>
+        </div>
+        <div class="pin-foot">
+          <div class="pin-progress mono"><span id="pinStage">01</span><i><b id="pinBar"></b></i><span>03</span></div>
+          <div class="pin-hint mono">SCROLL TO ROTATE <span>↓</span></div>
         </div>
       </div>
+    </div>
 </section>
 
   <!-- ============ ARCHITECTURE ============ -->
@@ -1111,6 +1211,7 @@
   <div class="dw-body" id="dwBody"></div>
 </aside>
 
+<script src="assets/three.min.js"></script>
 <script>
 /* ============================================================
    DATA
@@ -2414,12 +2515,177 @@ function switchView(name) {
 }
 
 /* ============================================================
+   PINNED 3D PICKLE / WHY SECTION
+   ============================================================ */
+function initPickle3D() {
+  const canvas = $('#pickleCanvas');
+  const wrap = $('#pickleWrap');
+  if (!canvas || !wrap || !window.THREE) return null;
+
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true, powerPreference: 'high-performance'});
+  } catch (err) {
+    return null;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x000000, 0);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = .98;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(33, 1, .1, 100);
+  camera.position.set(0, 0, 13.5);
+
+  const group = new THREE.Group();
+  group.rotation.z = -.34;
+  group.scale.setScalar(.82);
+  scene.add(group);
+
+  const bodyMat = new THREE.MeshPhysicalMaterial({
+    color: 0x82cd38, roughness: .38, metalness: .03,
+    clearcoat: .8, clearcoatRoughness: .32
+  });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(1.5, 3.8, 32, 64), bodyMat);
+  body.scale.set(.94, 1, .94);
+  group.add(body);
+
+  const stemCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 3.25, 0),
+    new THREE.Vector3(.03, 3.55, .02),
+    new THREE.Vector3(.24, 3.92, 0),
+    new THREE.Vector3(.52, 4.06, 0)
+  ]);
+  const stem = new THREE.Mesh(
+    new THREE.TubeGeometry(stemCurve, 28, .11, 10, false),
+    new THREE.MeshStandardMaterial({color: 0x5b8138, roughness: .7, metalness: .02})
+  );
+  group.add(stem);
+
+  const bumpMat = new THREE.MeshStandardMaterial({color: 0x447622, roughness: .92, metalness: 0});
+  const bumpGeo = new THREE.SphereGeometry(1, 24, 16);
+  const bumpRows = [-1.45, -1.02, -.55, -.08, .4, .88, 1.35, 1.72];
+  bumpRows.forEach((y, i) => {
+    const theta = i % 2 ? .38 : -.42;
+    const bump = new THREE.Mesh(bumpGeo, bumpMat);
+    bump.position.set(Math.sin(theta) * 1.39, y, Math.cos(theta) * 1.39);
+    bump.rotation.y = theta;
+    bump.scale.set(.2, .28, .075);
+    group.add(bump);
+  });
+  [-1.25, -.82, -.36, .12, .58, 1.05, 1.48].forEach((y, i) => {
+    const theta = Math.PI + (i % 2 ? .34 : -.38);
+    const bump = new THREE.Mesh(bumpGeo, bumpMat);
+    bump.position.set(Math.sin(theta) * 1.39, y, Math.cos(theta) * 1.39);
+    bump.rotation.y = theta;
+    bump.scale.set(.18, .25, .07);
+    group.add(bump);
+  });
+
+  scene.add(new THREE.HemisphereLight(0xc9ff96, 0x06110b, 1.7));
+  const key = new THREE.DirectionalLight(0xf0ffc8, 2.7);
+  key.position.set(-5, 6, 8);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x7ef0c7, 2.2);
+  rim.position.set(6, 2, -6);
+  scene.add(rim);
+  const fill = new THREE.PointLight(0x9be33f, 1.8, 30);
+  fill.position.set(0, -3, 5);
+  scene.add(fill);
+
+  let width = 0, height = 0;
+  const resize = () => {
+    const rect = wrap.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    if (w === width && h === height) return;
+    width = w;
+    height = h;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+  };
+  if ('ResizeObserver' in window) new ResizeObserver(resize).observe(wrap);
+  else window.addEventListener('resize', resize);
+  resize();
+  wrap.classList.add('has-3d');
+
+  return {
+    resize,
+    render(progress, time) {
+      group.rotation.y = -.4 + progress * Math.PI * 2.3;
+      group.rotation.x = .03 + Math.sin(progress * Math.PI * 2.1) * .1;
+      group.position.y = Math.sin(time * .0007) * .075;
+      renderer.render(scene, camera);
+    }
+  };
+}
+
+function initPinScene() {
+  const scene = $('#features');
+  const cards = $$('.pin-card');
+  const stageEl = $('#pinStage');
+  const barEl = $('#pinBar');
+  const degEl = $('#pickleDeg');
+  if (!scene || !cards.length) return;
+
+  const three = initPickle3D();
+  let target = 0;
+  let display = 0;
+  let activeStage = -1;
+  let ticking = false;
+
+  const setStage = (stage) => {
+    if (stage === activeStage) return;
+    activeStage = stage;
+    cards.forEach((card) => {
+      const on = Number(card.dataset.stage) === stage;
+      card.classList.toggle('is-active', on);
+      card.setAttribute('aria-hidden', on ? 'false' : 'true');
+    });
+    if (stageEl) stageEl.textContent = String(stage + 1).padStart(2, '0');
+  };
+
+  const update = () => {
+    ticking = false;
+    const rect = scene.getBoundingClientRect();
+    const total = Math.max(1, scene.offsetHeight - window.innerHeight);
+    target = clamp((-rect.top) / total, 0, 1);
+    setStage(Math.min(2, Math.floor(target * 2.999)));
+    if (barEl) barEl.style.transform = `scaleX(${target})`;
+  };
+
+  const requestUpdate = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(update);
+  };
+
+  window.addEventListener('scroll', requestUpdate, {passive: true});
+  window.addEventListener('resize', () => {
+    if (three) three.resize();
+    requestUpdate();
+  });
+  update();
+
+  const loop = (time) => {
+    display += (target - display) * .075;
+    const rect = scene.getBoundingClientRect();
+    const visible = rect.bottom > -80 && rect.top < window.innerHeight + 80;
+    if (three && visible) three.render(display, time);
+    if (degEl) degEl.textContent = String(Math.round(((display * 2.3 * 180) / Math.PI + 360) % 360)).padStart(3, '0') + '°';
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
+/* ============================================================
    BOOT
    ============================================================ */
-buildWhyArt();
 buildOverview();
 initHeader();
-initWhy();
+initPinScene();
 buildModules();
 buildMarkers();
 buildChips();
