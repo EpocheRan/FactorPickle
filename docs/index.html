@@ -57,18 +57,18 @@
   .topbar-in{
     display:flex;align-items:center;gap:16px;height:54px;width:fit-content;max-width:calc(100vw - 40px);
     margin:0 auto;padding:6px 8px 6px 14px;position:relative;
-    border:1px solid rgba(255,255,255,.16);border-radius:999px;
-    background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.025));
+    border:1px solid rgba(255,255,255,.13);border-radius:999px;
+    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.018));
     backdrop-filter:blur(24px) saturate(165%);-webkit-backdrop-filter:blur(24px) saturate(165%);
-    box-shadow:0 18px 50px -24px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.14);
+    box-shadow:0 18px 50px -24px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.11);
     transition:background .25s,box-shadow .25s;
   }
   .topbar-in::before{
     content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
-    background:radial-gradient(420px 90px at 10% -20%,rgba(255,255,255,.1),transparent 68%);
+    background:radial-gradient(420px 90px at 10% -20%,rgba(255,255,255,.08),transparent 68%);
   }
   .topbar-in > *{position:relative;z-index:1}
-  .topbar.scrolled .topbar-in{background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));box-shadow:0 18px 55px -22px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.16)}
+  .topbar.scrolled .topbar-in{background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.03));box-shadow:0 18px 55px -22px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.13)}
   .top-fade{
     position:fixed;top:0;left:0;right:0;height:calc(var(--header-h, 80px) + 28px);z-index:49;
     pointer-events:none;opacity:0;transition:opacity .22s ease;
