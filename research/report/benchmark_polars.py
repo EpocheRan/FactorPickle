@@ -72,9 +72,11 @@ def benchmark(
 ) -> dict[str, Any]:
     started = time.perf_counter()
     panel = load_panel(None, None, start, end, universe=universe, use_cache=True)
+    panel_load_sec = time.perf_counter() - started
     factor = price_factor_panel(factor_id, panel)
     forward = metrics.forward_returns(panel.close, panel.open, (horizon,))[horizon]
-    load_sec = time.perf_counter() - started
+    prepare_sec = time.perf_counter() - started
+    load_sec = prepare_sec
 
     pandas_ic, pandas_ic_sec = _time(lambda: metrics._rank_ic_frame(factor, forward), repeat)
     polars_ic, polars_ic_sec = _time(lambda: rank_ic_frame(factor, forward), repeat)
@@ -108,6 +110,8 @@ def benchmark(
         "horizon": horizon,
         "shape": {"rows": int(factor.shape[0]), "symbols": int(factor.shape[1])},
         "load_sec": round(load_sec, 3),
+        "panel_load_sec": round(panel_load_sec, 3),
+        "prepare_sec": round(prepare_sec, 3),
         "rank_ic": {
             "pandas_sec": round(pandas_ic_sec, 4),
             "polars_sec": round(polars_ic_sec, 4),
