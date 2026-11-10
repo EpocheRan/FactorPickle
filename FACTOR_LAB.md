@@ -86,6 +86,9 @@ python -m factor_lab discovery ingest --result gateway_result.json
   the repository; they are not portable design assets.
 - Portable design is limited to code, contracts, `factor_lab/team/roles.json`,
   and `factor_lab/sources/catalog.json`. Never duplicate runtime state into Git.
+- The data axis is chosen by PathFinder from campaign-scoped `data_capabilities`.
+  Do not pre-narrow a round to `ohlcv_1d` or prohibit financial/moneyflow/margin.
+  Unverified services require a readiness probe.
 
 ## State
 

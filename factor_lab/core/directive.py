@@ -11,7 +11,7 @@ from factor_lab.core.store import read_json, sha256_json, write_json_atomic
 def default_directive() -> dict[str, Any]:
     return {
         "schema_version": "factor_lab.directive.v1",
-        "theme": "aligned fixed pool: price/volume",
+        "theme": "open factor research: choose the data axis from campaign capabilities",
         "universe": "pool:2022-01-04:200",
         "horizon": 5,
         "groups": 5,
@@ -22,7 +22,7 @@ def default_directive() -> dict[str, Any]:
         "max_trials_per_day": 12,
         "avoid_families": [],
         "family_id": "F-aligned-pool",
-        "notes": "Fixed pool selected on 2022-01-04; evaluation starts on the same date to avoid look-ahead pool selection.",
+        "notes": "Fixed 200-code pool; data axis is chosen per campaign from data capabilities, not preset here.",
         "updated_at": now_iso(),
     }
 

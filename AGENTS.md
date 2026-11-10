@@ -32,6 +32,9 @@ Rules:
   the repository; they are not portable design assets.
 - Portable design is limited to code, contracts, `factor_lab/team/roles.json`,
   and `factor_lab/sources/catalog.json`. Never duplicate runtime state into Git.
+- Data axis is chosen by PathFinder from the campaign-scoped `data_capabilities`.
+  Do not write "ohlcv_1d only" / "no financial/moneyflow/margin" into a round
+  directive. Unverified services require a readiness probe, not a prohibition.
 - If the environment or data is not ready, report `blocker_feedback` and wait; do not fabricate results.
 - Web discovery: DSH subagents inherit tools by default. The `web_gateway.js` child may call `web_search` directly, or the main session may search and pass results in; then run
   `python -m factor_lab discovery ingest --result <gateway-result.json>`. The Gateway LLM must keep URLs and citations.

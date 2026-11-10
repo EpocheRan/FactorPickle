@@ -106,9 +106,28 @@ def _capabilities() -> dict[str, Any]:
         services = list(DataInterfaceGateway().status().get("services") or [])
     except Exception:
         services = []
+    coverage = _coverage()
+    verified_axes = list(coverage.get("available_axes") or [])
+    verified_services = ["market"] if "market" in services else []
+    unverified_services = [name for name in services if name not in verified_services]
     return {
         "services": services,
-        "policy": "verified axes are those present in data coverage; unverified services may require a readiness probe",
+        "service_state": {
+            name: {
+                "available": True,
+                "verified": name in verified_services,
+                "requires_readiness_probe": name in unverified_services,
+            }
+            for name in services
+        },
+        "verified_axes": verified_axes,
+        "unverified_services": unverified_services,
+        "data_axis_policy": (
+            "The research direction chooses the data axis from this capability map. "
+            "Verified axes are executable now. An unverified service is not prohibited: "
+            "request a readiness probe, then use it if the probe passes."
+        ),
+        "policy": "Do not pre-narrow the round to one implicit axis; only the campaign-scoped context may define available data.",
     }
 
 
