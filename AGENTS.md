@@ -1,5 +1,14 @@
 # Factor Lab workspace
 
+## Documentation contract
+
+All README and documentation files describe only the current implementation.
+Never add or preserve historical versions, migration records, old plans,
+deleted content, changelogs, superseded designs, or intermediate states.
+Git history carries changes. When editing docs, rewrite the current truth
+instead of appending "changed", "removed", "old" or "legacy" narratives.
+This applies to every README in the repository.
+
 This workspace is a Factor Lab research environment. If the user asks to
 research factors:
 

@@ -1,5 +1,9 @@
 # FactorPickle
 
+> **项目文档纲领：所有 README 只描述当前实现。**
+> 不保留历史版本、迁移记录、旧方案、已删除内容、变更日志或中间状态。
+> 变更由 Git 提交承载；README 不做考古，也不为兼容旧叙述而保留任何内容。
+
 > 面向 AI Agent 的 A 股量化研究基础设施：数据采集、因子物化、研究、选股、回测与报告，收进一条可复现的链路。
 
 **[在线系统图谱](https://epocheran.github.io/FactorPickle/)** · [文档索引](docs/README.md) · [模块文档](docs/modules/) · [设计文档](docs/design/) · [使用指南](docs/guides/)
@@ -115,8 +119,6 @@ python -m acquisition run --datasets ohlcv_1d,factors,screener
 完整字段、分区与迁移说明见 [docs/design/](docs/design/) 与 [docs/data/coverage.md](docs/data/coverage.md)。
 
 ## 文档
-
-> 约定：README 与文档只描述当前实现；不保留历史版本、迁移记录、旧方案或中间状态。变更由代码提交承载。
 
 | 入口 | 内容 |
 |---|---|
