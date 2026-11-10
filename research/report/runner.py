@@ -379,7 +379,7 @@ def generate(
         )
     except Exception:  # noqa: BLE001 - 附加层失败不影响主报告正文
         report.extra = None
-    score = rating_mod.rate(report)
+    score = rating_mod.rate(report, primary_h=horizon)
     logger.info("generate: rating done, rendering")
 
     run_hash = hashlib.sha1(

@@ -146,6 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     ortho_parser.add_argument("--experiment", required=True)
     context_parser = sub.add_parser("research-context", help="build/show the structured research context")
     context_parser.add_argument("action", choices=["build", "show"], nargs="?", default="build")
+    context_parser.add_argument("--campaign", default="")
 
     evaluate_parser = sub.add_parser("evaluate", help="derive or finalize one experiment evaluation")
     evaluate_parser.add_argument("--experiment", required=True)
@@ -520,9 +521,10 @@ def main(argv: list[str] | None = None) -> int:
         from .research_context import build_context
 
         if args.action == "build":
-            _print(build_context())
+            _print(build_context(args.campaign or None))
         else:
-            _print(read_json(config.LAB_ROOT / "research_context.json") or {"error": "not built"})
+            target = (config.LAB_ROOT / "campaigns" / args.campaign / "research_context.json") if args.campaign else (config.LAB_ROOT / "research_context.json")
+            _print(read_json(target) or {"error": "not built"})
         return 0
 
     if args.command == "evaluate":

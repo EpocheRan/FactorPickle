@@ -230,6 +230,46 @@ class CampaignRunner:
         return state.to_dict()
 
 
+def record_experiment(
+    campaign_id: str,
+    *,
+    exp_id: str,
+    factor_id: str,
+    family_id: str | None = None,
+    decision: str | None = None,
+    root: Path | None = None,
+) -> dict[str, Any] | None:
+    """Append one experiment to the campaign trace and keep the counter honest."""
+    base = Path(root or CAMPAIGN_DIR)
+    path = base / campaign_id / "campaign.json"
+    state = read_json(path)
+    if not isinstance(state, dict):
+        return None
+    state["rounds"] = max(1, int(state.get("rounds", 0) or 0))
+    experiments = state.setdefault("experiments", [])
+    if not isinstance(experiments, list):
+        experiments = []
+        state["experiments"] = experiments
+    if not any(str(item.get("exp_id")) == exp_id for item in experiments if isinstance(item, dict)):
+        experiments.append(
+            {
+                "exp_id": exp_id,
+                "factor_id": factor_id,
+                "family_id": family_id,
+                "decision": decision,
+                "recorded_at": config.now_iso(),
+            }
+        )
+    state["status"] = "running"
+    state["updated_at"] = config.now_iso()
+    write_json_atomic(path, state)
+    trace = base / campaign_id / "campaign_trace.jsonl"
+    trace.parent.mkdir(parents=True, exist_ok=True)
+    with trace.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"at": config.now_iso(), "event": "experiment_recorded", "exp_id": exp_id, "factor_id": factor_id, "family_id": family_id}, ensure_ascii=False) + "\n")
+    return state
+
+
 def create_campaign(
     objective: str,
     *,

@@ -68,9 +68,9 @@ def _clip01(value: float) -> float:
     return float(max(0.0, min(1.0, value)))
 
 
-def _rolling_sign_ratio(report, ic_mean: float) -> float:
+def _rolling_sign_ratio(report, ic_mean: float, primary_h: int | None = None) -> float:
     """滚动 12 个月 IC 均值与全样本同号的比例（#19）。"""
-    series = report.ic.get(5)
+    series = report.ic.get(primary_h if primary_h is not None else 5)
     if series is None or len(series) < 260 or not np.isfinite(ic_mean):
         return float("nan")
     rolled = series.rolling(252, min_periods=126).mean().dropna()
@@ -81,9 +81,12 @@ def _rolling_sign_ratio(report, ic_mean: float) -> float:
     return float((rolled < 0).mean())
 
 
-def rate(report) -> dict:
+def rate(report, primary_h: int | None = None) -> dict:
     stats = report.ic_stats
-    primary_h = 5 if 5 in stats.index else (stats.index[0] if len(stats) else None)
+    if primary_h is None:
+        primary_h = 5 if 5 in stats.index else (stats.index[0] if len(stats) else None)
+    elif primary_h not in stats.index:
+        primary_h = stats.index[0] if len(stats) else None
     ic_mean = float(stats.loc[primary_h, "mean"]) if primary_h is not None else float("nan")
     icir = float(stats.loc[primary_h, "ir"]) if primary_h is not None else float("nan")
     nw_t = float(stats.loc[primary_h, "t"]) if primary_h is not None else float("nan")
@@ -118,7 +121,7 @@ def rate(report) -> dict:
         frame = report.regime_stats.drop(index="牛市−熊市", errors="ignore").dropna(subset=["ci_lo", "ci_hi"])
         if len(frame):
             regime_ci_ratio = float(((frame["ci_lo"] > 0) | (frame["ci_hi"] < 0)).mean())
-    rolling_ratio = _rolling_sign_ratio(report, ic_mean)
+    rolling_ratio = _rolling_sign_ratio(report, ic_mean, primary_h)
     prior_sign_ratio = float("nan")
     if report.ic_by_year is not None and len(report.ic_by_year.dropna()):
         # 分析信号已经乘过 direction；先验期望的 IC 符号因此恒为 +1。
@@ -223,8 +226,9 @@ def rate(report) -> dict:
     # IC 隐含价差：等权五分组的两端密度约 2.5σ，σ 取 5 日截面收益标准差
     _sigma = float(getattr(report, "sigma_5d", getattr(report, "cross_section_std", float("nan"))))
     _gross = float((report.spread_gross or {}).get("mean", float("nan")))
-    _expected = abs(ic_mean) * diag.QUINTILE_SPREAD_MULTIPLIER * _sigma if np.isfinite(_sigma) else float("nan")
-    _ratio = _gross / _expected if np.isfinite(_expected) and _expected > 1e-12 else float("nan")
+    _expected = ic_mean * diag.QUINTILE_SPREAD_MULTIPLIER * _sigma if np.isfinite(_sigma) else float("nan")
+    _abs_expected = abs(_expected) if np.isfinite(_expected) else float("nan")
+    _ratio = _gross / _expected if np.isfinite(_expected) and abs(_expected) > 1e-12 else float("nan")
     ic_spread_ratio = float(_ratio)
     ic_spread_triggered = bool(np.isfinite(_ratio) and not (0.5 <= _ratio <= 1.5))
     ic_spread_actual = (
@@ -442,8 +446,8 @@ def rate(report) -> dict:
     _ratio = float(ic_spread_ratio) if np.isfinite(ic_spread_ratio) else float("nan")
     # 兑现：方向错时按反向毛价差 + |IC| 计算，避免与「方向错」重复扣分。
     realization_basis = "registered"
-    if direction_bad and np.isfinite(_gross) and np.isfinite(_expected) and _expected > 1e-12:
-        _real_ratio = (-_gross) / _expected
+    if direction_bad and np.isfinite(_gross) and np.isfinite(_abs_expected) and _abs_expected > 1e-12:
+        _real_ratio = (-_gross) / _abs_expected
         realization = 100.0 * _clip01(_real_ratio / 0.8)
         realization_basis = "reverse"
     else:
@@ -660,6 +664,7 @@ def rate(report) -> dict:
         "usage": quadrant[1],
         "attribution": attribution,
         "scorecard_version": SCORECARD_VERSION,
+        "rating_horizon": primary_h,
         "scorecard_changelog": list(SCORECARD_CHANGELOG),
         "detail": {
             "icir": icir,

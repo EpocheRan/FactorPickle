@@ -93,9 +93,28 @@ def _ml_results() -> list[dict[str, Any]]:
     return results[-20:]
 
 
-def build_context() -> dict[str, Any]:
+def _capabilities() -> dict[str, Any]:
+    services: list[str] = []
+    try:
+        from .data_interface_adapter import DataInterfaceGateway
+
+        services = list(DataInterfaceGateway().status().get("services") or [])
+    except Exception:
+        services = []
+    return {
+        "services": services,
+        "policy": "verified axes are those present in data coverage; unverified services may require a readiness probe",
+    }
+
+
+def build_context(campaign_id: str | None = None) -> dict[str, Any]:
     experiment_roots = [path for path in sorted(config.EXPERIMENTS_DIR.iterdir()) if path.is_dir()] if config.EXPERIMENTS_DIR.exists() else []
-    experiments = [_experiment(path) for path in experiment_roots]
+    experiments = []
+    for path in experiment_roots:
+        manifest = read_json(path / "manifest.json") or {}
+        if campaign_id and str(manifest.get("campaign_id") or "") != str(campaign_id):
+            continue
+        experiments.append(_experiment(path))
     failed = [
         {
             "experiment": item["id"],
@@ -121,5 +140,8 @@ def build_context() -> dict[str, Any]:
         ],
         "failed_families": sorted({str(item.get("factor_id", "")).split(".")[0] for item in failed if item.get("factor_id")}),
     }
-    write_json_atomic(CONTEXT_PATH, contexts)
+    contexts["campaign_id"] = campaign_id
+    contexts["data_capabilities"] = _capabilities()
+    target = (config.LAB_ROOT / "campaigns" / campaign_id / "research_context.json") if campaign_id else CONTEXT_PATH
+    write_json_atomic(target, contexts)
     return contexts

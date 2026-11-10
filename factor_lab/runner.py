@@ -169,4 +169,14 @@ class FactorRunner:
             )
         result["data_manifest"] = str(manifest_path)
         result["data_interface_status"] = status
+        if hypothesis.campaign_id:
+            from .campaign import record_experiment
+
+            record_experiment(
+                hypothesis.campaign_id,
+                exp_id=str(result.get("exp_id") or ""),
+                factor_id=hypothesis.factor_id,
+                family_id=hypothesis.family_id,
+                decision=result.get("decision_value"),
+            )
         return result

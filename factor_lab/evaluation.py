@@ -23,20 +23,44 @@ def _number(value: Any) -> float | None:
     return number if number == number else None
 
 
-def _kill_checks(hypothesis: dict[str, Any], audit: dict[str, Any]) -> list[str]:
+def _kill_checks(hypothesis: dict[str, Any], audit: dict[str, Any], report: dict[str, Any]) -> list[str]:
     metrics = audit.get("metrics") or {}
-    triggered: list[str] = []
+    triggers: list[str] = []
+    incrementality = report.get("incrementality") or {}
+    data_quality = report.get("data_quality") or {}
     for rule in hypothesis.get("kill_criteria") or []:
         text = str(rule).lower().replace(" ", "")
-        if "turnover>0.6" in text or "turnover>60" in text or "turnover>0.60" in text:
+        if "turnover>" in text:
+            threshold = 0.6
             turnover = _number(metrics.get("turnover"))
-            if turnover is not None and turnover > 0.6:
-                triggered.append(str(rule))
-        if "incremental<30" in text or "增量保留<30" in text:
-            # The evaluator's report is the source for the exact residual ratio;
-            # a missing value is itself a repair item, not a pass.
-            continue
-    return triggered
+            if turnover is not None and turnover > threshold:
+                triggers.append(str(rule))
+        elif "incremental<" in text or "增量保留<" in text:
+            ratio = _number(incrementality.get("effective_ratio"))
+            if ratio is None:
+                ratio = _number(incrementality.get("ratio"))
+            # ratio may be a fraction or percent depending on report writer.
+            if ratio is not None and abs(ratio) <= 1.0 and ratio < 0.3:
+                triggers.append(str(rule))
+            elif ratio is not None and abs(ratio) > 1.0 and ratio < 30:
+                triggers.append(str(rule))
+        elif "coverage<" in text:
+            coverage = _number(data_quality.get("coverage"))
+            if coverage is not None and coverage < 0.7:
+                triggers.append(str(rule))
+        elif "netspread<=0" in text or "net spread<=0" in text:
+            net = _number(metrics.get("spread_net"))
+            if net is not None and net <= 0:
+                triggers.append(str(rule))
+        elif "audithardfail" in text or "audit hard fail" in str(rule).lower():
+            if str(audit.get("verdict")) == "fail":
+                triggers.append(str(rule))
+        elif "direction" in text:
+            ic = _number(metrics.get("ic"))
+            sign = int(hypothesis.get("expected_sign", 1) or 1)
+            if ic is not None and ic * sign < 0:
+                triggers.append(str(rule))
+    return triggers
 
 
 def derive(root: Path) -> dict[str, Any]:
@@ -56,7 +80,7 @@ def derive(root: Path) -> dict[str, Any]:
     grade = str(rating.get("grade") or "")
     checks = list(audit.get("checks") or []) + list(audit.get("g3_checks") or [])
     orthogonality = next((item for item in checks if item.get("check_id") == "orthogonality"), None)
-    kill_triggered = _kill_checks(hypothesis, audit)
+    kill_triggered = _kill_checks(hypothesis, audit, report)
     evidence: list[str] = []
 
     if manifest.get("status") == "failed":

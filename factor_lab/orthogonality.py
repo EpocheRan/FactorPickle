@@ -32,6 +32,8 @@ LIBRARY_FACTORS: tuple[str, ...] = (
     "liquidity.absret_amount_20d",
     "momentum.ret_21d",
     "momentum.ret_63d",
+    "momentum.ret_126d",
+    "momentum.alpha_125d_csi300",
     "risk.vol_21d",
     "risk.high_low_21d",
     "reversal.zjfz",

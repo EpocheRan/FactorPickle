@@ -22,6 +22,22 @@ from .staging import ensure_staged
 from .store import write_json_atomic
 
 
+def _git_dirty() -> bool:
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(config.PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return bool(out.stdout.strip())
+    except Exception:
+        return True
+
+
 def run_experiment(
     hypothesis: Hypothesis,
     *,
@@ -82,6 +98,7 @@ def run_experiment(
         "hypothesis_id": hypothesis.hypothesis_id,
         "trial_id": trial,
         "family_id": hypothesis.family_id,
+        "campaign_id": hypothesis.campaign_id,
         "development_window": hypothesis.development_window,
         "outcome": outcome.to_dict(),
         "params": {
@@ -96,6 +113,7 @@ def run_experiment(
             "cost_bps": outcome.cost_bps,
         },
         "git_commit": config.git_commit(),
+        "git_dirty": _git_dirty(),
         "policy": {"version": policy["version"], "sha256": policy["sha256"]},
         "evaluator": RESEARCH.source,
         "data_path": "runner_panel" if panel is not None else "research_loader",

@@ -68,6 +68,7 @@ class Hypothesis:
     end: str | None = None
     created_at: str = field(default_factory=now_iso)
     notes: str = ""
+    campaign_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.outcomes:
@@ -106,6 +107,7 @@ class Hypothesis:
             "end": self.end,
             "created_at": self.created_at,
             "notes": self.notes,
+            "campaign_id": self.campaign_id,
         }
 
     @classmethod
@@ -130,6 +132,7 @@ class Hypothesis:
             end=data.get("end"),
             created_at=str(data.get("created_at", now_iso())),
             notes=str(data.get("notes", "")),
+            campaign_id=data.get("campaign_id"),
         )
 
 
