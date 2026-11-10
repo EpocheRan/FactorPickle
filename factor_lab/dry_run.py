@@ -39,8 +39,8 @@ def run_dry_run() -> dict[str, Any]:
         blockers.append("hardcoded catalog still present")
     if not code_ready:
         blockers.append("no experiment uses 200 codes")
-    if any(item.get("status") in {"needs_fix", "blocked", "failed"} for item in evaluations):
-        blockers.append("evaluation is not settled")
+    if any(item.get("status") in {"draft", "running", "failed"} for item in evaluations):
+        blockers.append("evaluation has no canonical outcome")
     return {
         "schema_version": "factor_lab.dry_run.v1",
         "ok": not missing and len(evaluations) > 0 and code_ready and not blockers,

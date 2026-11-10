@@ -40,12 +40,14 @@ def _kill_checks(hypothesis: dict[str, Any], audit: dict[str, Any], report: dict
             if ratio is None:
                 ratio = _number(incrementality.get("ratio"))
             # ratio may be a fraction or percent depending on report writer.
-            if ratio is not None and abs(ratio) <= 1.0 and ratio < 0.3:
-                triggers.append(str(rule))
-            elif ratio is not None and abs(ratio) > 1.0 and ratio < 30:
+            # effective_ratio is a fraction: 2.45 means 245%, not 2.45%.
+            if ratio is not None and ratio < 0.3:
                 triggers.append(str(rule))
         elif "coverage<" in text:
-            coverage = _number(data_quality.get("coverage"))
+            raw_coverage = data_quality.get("coverage")
+            if isinstance(raw_coverage, dict):
+                raw_coverage = raw_coverage.get("coverage") or raw_coverage.get("valid_obs")
+            coverage = _number(raw_coverage)
             if coverage is not None and coverage < 0.7:
                 triggers.append(str(rule))
         elif "netspread<=0" in text or "net spread<=0" in text:
