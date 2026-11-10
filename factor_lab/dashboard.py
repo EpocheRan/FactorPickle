@@ -213,6 +213,23 @@ def _attention(experiments: list[dict[str, Any]], ledger_verification: dict[str,
     return items[:12]
 
 
+def _load_governance() -> dict[str, Any]:
+    """Load PathFinder / Supervisor / Builder audit records.
+
+    These records are deliberately separate from experiment artifacts: they
+    explain whether an LLM subagent, a deterministic adapter, or a human made
+    the decision.  Missing file is a valid state (older labs do not have one).
+    """
+    path = config.LAB_ROOT / "governance" / "trace.json"
+    payload = _read(path)
+    if not payload:
+        return {"schema_version": "factor_lab.governance_trace.v1", "records": [], "missing": str(path)}
+    records = payload.get("records")
+    if not isinstance(records, list):
+        records = []
+    return {"schema_version": payload.get("schema_version"), "records": records, "source_note": payload.get("source_note", "")}
+
+
 def build_dashboard_data() -> dict[str, Any]:
     policy = load_policy()
     ledger = Ledger()
@@ -365,6 +382,7 @@ def build_dashboard_data() -> dict[str, Any]:
         "directive": read_json(config.DIRECTIVE_PATH),
         "quarantine": read_json(config.QUARANTINE_PATH),
         "ledger": summary,
+        "governance": _load_governance(),
     }
 
 

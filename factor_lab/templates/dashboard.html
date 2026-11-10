@@ -159,6 +159,21 @@
 
   <section class="kpis" id="kpis"></section>
 
+  <section class="grid3">
+    <div class="panel">
+      <div class="panel-head"><h2>PathFinder 记录</h2><span class="sub" id="gov-pf-count">—</span></div>
+      <div class="stack" id="pathfinder"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>Supervisor 记录</h2><span class="sub" id="gov-sv-count">—</span></div>
+      <div class="stack" id="supervisor"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>FactorBuilder 状态</h2><span class="sub" id="gov-fb-count">—</span></div>
+      <div class="stack" id="builder"></div>
+    </div>
+  </section>
+
   <section class="grid">
     <div class="panel">
       <div class="panel-head">
@@ -324,6 +339,35 @@
     $('kpis').innerHTML = (DATA.kpis || []).map(k => `<div class="kpi"><div class="k">${esc(k.label)}</div><div class="v ${esc(k.tone || '')}">${esc(k.value)}</div><div class="s">${esc(k.sub)}</div></div>`).join('');
   }
 
+  function renderGovernance(){
+    const governance = DATA.governance || {};
+    const records = governance.records || [];
+    const gate = (r) => r.actor === 'Supervisor' ? (r.verdict === 'blocked' ? 'fail' : r.verdict === 'watch' ? 'warn' : 'pass') : (r.status === 'not_invoked' ? 'muted' : 'gold');
+    const card = (r) => {
+      const meta = [r.mode, r.status, r.verdict, r.next].filter(Boolean).map(esc).join(' · ');
+      const detail = r.thought || r.reason || '';
+      const evidence = (r.evidence || []).slice(0, 3).map(esc).join(' · ');
+      const details = (r.details || []).slice(0, 5).map(item => `<div class="d">• ${esc(item)}</div>`).join('');
+      return `<div class="att ${r.actor === 'Supervisor' && r.verdict === 'watch' ? 'yellow' : ''}">
+        <div class="h"><span class="badge ${gate(r)}">${esc(r.actor || 'Agent')}</span><b>${esc(r.id || '')}</b><span class="muted mono" style="margin-left:auto">${esc(r.round || '')}</span></div>
+        <div class="d">${esc(detail)}</div>
+        ${details}
+        ${meta ? `<div class="d mono">${meta}</div>` : ''}
+        ${evidence ? `<div class="d mono">evidence: ${evidence}</div>` : ''}
+      </div>`;
+    };
+    const render = (id, countId, predicate) => {
+      const rows = records.filter(predicate);
+      const el = $(id);
+      if (el) el.innerHTML = rows.length ? rows.map(card).join('') : `<div class="empty">暂无记录</div>`;
+      const count = $(countId);
+      if (count) count.textContent = `${rows.length} 条`;
+    };
+    render('pathfinder', 'gov-pf-count', r => r.actor === 'PathFinder');
+    render('supervisor', 'gov-sv-count', r => r.actor === 'Supervisor');
+    render('builder', 'gov-fb-count', r => r.actor === 'FactorBuilder');
+  }
+
   function renderTable(){
     const q = ($('q').value || '').toLowerCase();
     const status = $('f-status').value;
@@ -468,7 +512,7 @@
     else if (key === 'findings') renderFindings();
   });
 
-  renderHeader(); renderKpis(); initBets(); renderTable(); renderAttention(); renderFunnel(); renderTrials(); renderBets(); renderFindings(); renderCoverage(); renderStorage();
+  renderHeader(); renderKpis(); renderGovernance(); initBets(); renderTable(); renderAttention(); renderFunnel(); renderTrials(); renderBets(); renderFindings(); renderCoverage(); renderStorage();
 })();
 </script>
 </body>
