@@ -909,6 +909,65 @@
   .fp-page .er-toolbar{background:rgba(7,12,11,.8);border-bottom-color:var(--line-soft)}
   .fp-page .er-canvas{background:#050a08}
 
+  /* ---------- backtest expandable report ---------- */
+  .fp-curve-wrap{margin-top:16px}
+  .fp-curve{display:block;width:100%;height:150px}
+  .fp-curve-legend{display:flex;align-items:center;gap:16px;margin-top:9px;font-family:var(--mono);font-size:8px;letter-spacing:.08em;color:#718477}
+  .fp-curve-legend span{display:inline-flex;align-items:center;gap:6px}
+  .fp-curve-legend i{display:block;width:15px;height:2px;flex:none}
+  .fp-curve-legend i.s{background:#c9ff5a}
+  .fp-curve-legend i.b{background:rgba(235,245,235,.3)}
+  .fp-curve-legend .fp-curve-note{margin-left:auto;color:#596c60}
+  .fp-report-strip{display:flex;flex-wrap:wrap;gap:8px 22px;padding-top:14px;border-top:1px solid var(--line-soft);font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:#74877a}
+  .fp-report-strip b{color:#d9e6d7;font-weight:400;margin-left:5px}
+  .fp-report-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;padding-top:13px;border-top:1px solid var(--line-soft)}
+  .fp-check{font-size:7.5px;letter-spacing:.1em;color:#687b6e}
+  .fp-report-toggle{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(201,255,90,.25);border-radius:4px;background:rgba(201,255,90,.05);color:#c9ff5a;padding:7px 10px;font-family:var(--mono);font-size:8px;letter-spacing:.08em;cursor:pointer;transition:.2s}
+  .fp-report-toggle:hover{background:rgba(201,255,90,.1);border-color:rgba(201,255,90,.5)}
+  .fp-report-toggle svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round;transition:transform .22s}
+  .fp-report-toggle .label-expanded{display:none}
+  .fp-report.is-open .fp-report-toggle .label-collapsed{display:none}
+  .fp-report.is-open .fp-report-toggle .label-expanded{display:inline}
+  .fp-report.is-open .fp-report-toggle svg{transform:rotate(180deg)}
+  .fp-report-more{display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--line-soft)}
+  .fp-report.is-open .fp-report-more{display:block;animation:reportMore .28s ease both}
+  @keyframes reportMore{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+  .fp-report-more-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .fp-report-more-grid:first-child{margin-top:0}
+  .fp-report-panel{margin-top:10px;padding:15px;border:1px solid var(--line-soft);border-radius:7px;background:rgba(5,10,8,.5)}
+  .fp-report-more-grid .fp-report-panel{margin-top:0}
+  .fp-report-panel h4{margin:0 0 12px;font-family:var(--mono);font-size:8px;letter-spacing:.13em;color:#c9ff5a;font-weight:400}
+  .fp-report-kv{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px}
+  .fp-report-kv div{min-width:0;padding-bottom:7px;border-bottom:1px solid rgba(148,163,184,.06)}
+  .fp-report-kv span{display:block;font-family:var(--mono);font-size:7px;letter-spacing:.05em;color:#62766a;margin-bottom:3px}
+  .fp-report-kv b{display:block;font-family:var(--mono);font-size:12px;font-weight:400;color:#dce9d9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fp-report-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:8px;color:#b1c3b4}
+  .fp-report-table th{padding:6px 5px;text-align:left;font-weight:400;color:#667b6e;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+  .fp-report-table td{padding:7px 5px;border-bottom:1px solid rgba(148,163,184,.06);white-space:nowrap}
+  .fp-report-table td:first-child{color:#d8e7d6}
+  .fp-report-table td.neg{color:#ff9a8d}
+  .fp-cost-list{display:flex;flex-direction:column;gap:9px}
+  .fp-cost-row{display:grid;grid-template-columns:52px 1fr 48px;align-items:center;gap:8px;font-family:var(--mono);font-size:8px;color:#8ea294}
+  .fp-cost-track{height:3px;background:rgba(148,163,184,.12);overflow:hidden}
+  .fp-cost-track i{display:block;height:100%;background:linear-gradient(90deg,#7d9a50,#c9ff5a)}
+  .fp-cost-row b{font-weight:400;color:#dce9d9;text-align:right}
+  .fp-run-tags{display:flex;flex-wrap:wrap;gap:5px}
+  .fp-run-tags span{font-family:var(--mono);font-size:7.5px;color:#879b8c;border:1px solid var(--line-soft);padding:4px 6px;border-radius:2px}
+  .fp-run-tags b{color:#d6e6d3;font-weight:400}
+  .fp-run-factors{margin-top:10px;font-family:var(--mono);font-size:7.5px;line-height:1.7;color:#596e61;word-break:break-word}
+  .fp-report .fp-note{margin-top:10px}
+  @media(max-width:900px){
+    .fp-report{padding:17px}
+    .fp-report-metrics{grid-template-columns:1fr 1fr}
+    .fp-report-metric b{font-size:15px}
+    .fp-curve{height:120px}
+    .fp-report-more-grid{grid-template-columns:1fr}
+    .fp-report-toggle-row{align-items:flex-start;flex-direction:column;gap:10px}
+    .fp-report-kv{grid-template-columns:1fr 1fr}
+    .fp-curve-legend .fp-curve-note{display:none}
+    .fp-report-table{font-size:7.5px}
+  }
+
   /* ---------- start / deploy ---------- */
   .start-cta{
     position:relative;padding:112px 0 104px;overflow:hidden;
@@ -1636,7 +1695,118 @@ h1 .hl{
         <div class="fp-card"><div class="idx mono">WEIGHT</div><h3>权重与再平衡</h3><p>等权、因子权重、目标权重共用同一套换仓逻辑。</p></div>
         <div class="fp-card"><div class="idx mono">RUN</div><h3>run_id 可复现</h3><p>策略、参数、数据快照与规则固化；同输入可重跑对照。</p></div>
       </div></div>
-      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">02 / SAMPLE</div><h2>回测结果样例</h2></div><span class="fp-tag">ILLUSTRATIVE DATA</span></div><div class="fp-report"><div class="fp-report-head"><div><div class="k">BACKTEST RESULT</div><h3>cross_section_momentum</h3><p>run_id: bt_20261109_0417 · 2018-01-02 → 2026-11-06</p></div><span class="fp-tag">T+1 / NET</span></div><div class="fp-report-metrics"><div class="fp-report-metric"><span>ANNUAL</span><b>+18.4%</b></div><div class="fp-report-metric"><span>SHARPE</span><b>1.12</b></div><div class="fp-report-metric"><span>MAX DD</span><b>-9.6%</b></div><div class="fp-report-metric"><span>WIN RATE</span><b>63.0%</b></div></div><svg viewBox="0 0 600 120" preserveAspectRatio="none" style="display:block;width:100%;height:120px"><defs><linearGradient id="eqf" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c9ff5a" stop-opacity=".25"/><stop offset="1" stop-color="#c9ff5a" stop-opacity="0"/></linearGradient></defs><path d="M0 96 C60 92 90 80 130 82 S210 64 260 58 S330 64 380 42 S470 30 520 20 S580 25 600 12 L600 120 L0 120 Z" fill="url(#eqf)"/><path d="M0 96 C60 92 90 80 130 82 S210 64 260 58 S330 64 380 42 S470 30 520 20 S580 25 600 12" fill="none" stroke="#c9ff5a" stroke-width="1.8"/></svg><div class="fp-note">示例曲线，仅用于展示版式；真实结果由 backtest 运行产生。</div></div></div>
+      <div class="fp-section">
+        <div class="fp-sec-head">
+          <div><div class="fp-label mono">02 / SAMPLE</div><h2>回测结果样例</h2></div>
+          <span class="fp-tag">REAL RUN / SAMPLE</span>
+        </div>
+        <div class="fp-report" id="backtestReport">
+          <div class="fp-report-head">
+            <div><div class="k">BACKTEST RESULT</div><h3>zscore_combo_5</h3><p>run_id: 0e283e9cb5cc1ced · 2017-01-01 → 2026-11-01 · 000300</p></div>
+            <span class="fp-tag">T+1 / NET</span>
+          </div>
+          <div class="fp-report-metrics">
+            <div class="fp-report-metric"><span>累计收益</span><b>+146.67%</b></div>
+            <div class="fp-report-metric"><span>年化收益</span><b>+10.02%</b></div>
+            <div class="fp-report-metric"><span>最大回撤</span><b>-32.16%</b></div>
+            <div class="fp-report-metric"><span>SHARPE</span><b>0.63</b></div>
+          </div>
+          <div class="fp-curve-wrap">
+            <svg class="fp-curve" viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="btArea" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c9ff5a" stop-opacity=".24"/><stop offset="1" stop-color="#c9ff5a" stop-opacity="0"/></linearGradient></defs>
+              <path d="M 0.0 108.5 L 6.7 106.1 L 13.5 102.7 L 20.2 106.4 L 27.0 102.4 L 33.7 99.7 L 40.4 95.3 L 47.2 89.8 L 53.9 84.9 L 60.7 88.7 L 67.4 81.3 L 74.2 77.4 L 80.9 82.4 L 87.6 81.3 L 94.4 91.4 L 101.1 93.1 L 107.9 94.8 L 114.6 93.9 L 121.3 97.2 L 128.1 96.2 L 134.8 75.1 L 141.6 71.9 L 148.3 78.4 L 155.1 72.7 L 161.8 76.3 L 168.5 75.9 L 175.3 78.9 L 182.0 73.6 L 188.8 80.0 L 195.5 79.0 L 202.2 78.9 L 209.0 77.2 L 215.7 68.6 L 222.5 70.8 L 229.2 72.1 L 236.0 68.8 L 242.7 69.5 L 249.4 69.6 L 256.2 69.1 L 262.9 66.1 L 269.7 66.5 L 276.4 70.7 L 283.1 74.6 L 289.9 69.7 L 296.6 68.5 L 303.4 55.4 L 310.1 55.1 L 316.9 61.2 L 323.6 60.1 L 330.3 60.3 L 337.1 53.9 L 343.8 59.0 L 350.6 60.5 L 357.3 55.6 L 364.0 49.9 L 370.8 46.2 L 377.5 43.8 L 384.3 43.6 L 391.0 46.2 L 397.8 46.8 L 404.5 45.4 L 411.2 51.5 L 418.0 55.7 L 424.7 61.1 L 431.5 66.6 L 438.2 59.3 L 444.9 59.0 L 451.7 52.4 L 458.4 63.4 L 465.2 62.4 L 471.9 69.2 L 478.7 39.2 L 485.4 25.5 L 492.1 27.4 L 498.9 23.9 L 505.6 23.7 L 512.4 19.6 L 519.1 17.1 L 525.8 7.8 L 532.6 8.4 L 539.3 6.6 L 546.1 7.4 L 552.8 6.0 L 559.6 12.9 L 566.3 7.6 L 573.0 13.9 L 579.8 22.4 L 586.5 11.6 L 593.3 10.1 L 600.0 20.2 L 600 120 L 0 120 Z" fill="url(#btArea)"/>
+              <path d="M 0.0 108.5 L 6.7 106.7 L 13.5 106.1 L 20.2 107.8 L 27.0 105.2 L 33.7 101.3 L 40.4 99.7 L 47.2 98.2 L 53.9 94.1 L 60.7 96.8 L 67.4 91.7 L 74.2 95.6 L 80.9 100.9 L 87.6 100.6 L 94.4 106.9 L 101.1 108.8 L 107.9 109.5 L 114.6 110.3 L 121.3 114.0 L 128.1 110.2 L 134.8 99.7 L 141.6 97.7 L 148.3 104.5 L 155.1 100.2 L 161.8 100.4 L 168.5 100.0 L 175.3 98.5 L 182.0 96.4 L 188.8 98.5 L 195.5 98.6 L 202.2 99.6 L 209.0 97.0 L 215.7 82.1 L 222.5 84.4 L 229.2 86.4 L 236.0 80.4 L 242.7 78.7 L 249.4 69.1 L 256.2 76.3 L 262.9 77.2 L 269.7 72.5 L 276.4 77.4 L 283.1 81.6 L 289.9 81.4 L 296.6 81.4 L 303.4 78.0 L 310.1 84.4 L 316.9 92.6 L 323.6 94.2 L 330.3 95.0 L 337.1 88.9 L 343.8 93.5 L 350.6 99.0 L 357.3 100.7 L 364.0 97.5 L 370.8 93.0 L 377.5 95.8 L 384.3 95.0 L 391.0 99.4 L 397.8 99.5 L 404.5 99.3 L 411.2 101.7 L 418.0 104.2 L 424.7 107.0 L 431.5 109.8 L 438.2 104.5 L 444.9 104.8 L 451.7 103.2 L 458.4 106.7 L 465.2 108.7 L 471.9 111.2 L 478.7 97.7 L 485.4 96.9 L 492.1 99.7 L 498.9 98.4 L 505.6 101.0 L 512.4 99.2 L 519.1 97.2 L 525.8 94.8 L 532.6 87.2 L 539.3 85.1 L 546.1 85.9 L 552.8 83.4 L 559.6 85.8 L 566.3 85.0 L 573.0 80.1 L 579.8 82.0 L 586.5 84.2 L 593.3 88.6 L 600.0 96.9" fill="none" stroke="rgba(235,245,235,.3)" stroke-width="1.2"/>
+              <path d="M 0.0 108.5 L 6.7 106.1 L 13.5 102.7 L 20.2 106.4 L 27.0 102.4 L 33.7 99.7 L 40.4 95.3 L 47.2 89.8 L 53.9 84.9 L 60.7 88.7 L 67.4 81.3 L 74.2 77.4 L 80.9 82.4 L 87.6 81.3 L 94.4 91.4 L 101.1 93.1 L 107.9 94.8 L 114.6 93.9 L 121.3 97.2 L 128.1 96.2 L 134.8 75.1 L 141.6 71.9 L 148.3 78.4 L 155.1 72.7 L 161.8 76.3 L 168.5 75.9 L 175.3 78.9 L 182.0 73.6 L 188.8 80.0 L 195.5 79.0 L 202.2 78.9 L 209.0 77.2 L 215.7 68.6 L 222.5 70.8 L 229.2 72.1 L 236.0 68.8 L 242.7 69.5 L 249.4 69.6 L 256.2 69.1 L 262.9 66.1 L 269.7 66.5 L 276.4 70.7 L 283.1 74.6 L 289.9 69.7 L 296.6 68.5 L 303.4 55.4 L 310.1 55.1 L 316.9 61.2 L 323.6 60.1 L 330.3 60.3 L 337.1 53.9 L 343.8 59.0 L 350.6 60.5 L 357.3 55.6 L 364.0 49.9 L 370.8 46.2 L 377.5 43.8 L 384.3 43.6 L 391.0 46.2 L 397.8 46.8 L 404.5 45.4 L 411.2 51.5 L 418.0 55.7 L 424.7 61.1 L 431.5 66.6 L 438.2 59.3 L 444.9 59.0 L 451.7 52.4 L 458.4 63.4 L 465.2 62.4 L 471.9 69.2 L 478.7 39.2 L 485.4 25.5 L 492.1 27.4 L 498.9 23.9 L 505.6 23.7 L 512.4 19.6 L 519.1 17.1 L 525.8 7.8 L 532.6 8.4 L 539.3 6.6 L 546.1 7.4 L 552.8 6.0 L 559.6 12.9 L 566.3 7.6 L 573.0 13.9 L 579.8 22.4 L 586.5 11.6 L 593.3 10.1 L 600.0 20.2" fill="none" stroke="#c9ff5a" stroke-width="1.7"/>
+            </svg>
+            <div class="fp-curve-legend"><span><i class="s"></i>策略</span><span><i class="b"></i>基准 000300</span><span class="fp-curve-note">净值起点 = 100</span></div>
+          </div>
+          <div class="fp-report-strip">
+            <span>回合胜率 <b>54.5%</b></span>
+            <span>信息比率 <b>0.59</b></span>
+            <span>年化单边换手 <b>846.6%</b></span>
+            <span>回测区间 <b>2017—2026</b></span>
+          </div>
+          <div class="fp-report-toggle-row">
+            <span class="fp-check mono">CHECK 13 PASS / 1 WARN / 1 FAIL</span>
+            <button class="fp-report-toggle" type="button" aria-expanded="false" aria-controls="backtestMore">
+              <span class="label-collapsed">展开完整结果</span><span class="label-expanded">收起完整结果</span>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+            </button>
+          </div>
+          <div class="fp-report-more" id="backtestMore">
+            <div class="fp-report-more-grid">
+              <div class="fp-report-panel">
+                <h4>核心指标</h4>
+                <div class="fp-report-kv">
+                  <div><span>年化波动</span><b>+17.74%</b></div>
+                  <div><span>Alpha（年化）</span><b>+8.54%</b></div>
+                  <div><span>Beta</span><b>0.72</b></div>
+                  <div><span>R²</span><b>0.57</b></div>
+                  <div><span>Sortino</span><b>0.89</b></div>
+                  <div><span>Calmar</span><b>0.31</b></div>
+                  <div><span>月度胜率</span><b>57.6%</b></div>
+                  <div><span>总费用</span><b>188,975</b></div>
+                </div>
+              </div>
+              <div class="fp-report-panel">
+                <h4>交易摘要</h4>
+                <div class="fp-report-kv">
+                  <div><span>回合数</span><b>1,905</b></div>
+                  <div><span>胜率</span><b>54.5%</b></div>
+                  <div><span>Profit Factor</span><b>1.36</b></div>
+                  <div><span>平均盈亏比</span><b>1.24</b></div>
+                  <div><span>平均持仓</span><b>44.0 天</b></div>
+                  <div><span>期望收益</span><b>+1.58%</b></div>
+                  <div><span>期末权益</span><b>2,466,737</b></div>
+                  <div><span>平均仓位</span><b>94.4%</b></div>
+                </div>
+              </div>
+            </div>
+            <div class="fp-report-panel">
+              <h4>样本内 / 样本外（70/30）</h4>
+              <table class="fp-report-table">
+                <thead><tr><th>区间</th><th>样本数</th><th>累计</th><th>年化</th><th>Sharpe</th><th>MaxDD</th></tr></thead>
+                <tbody>
+                  <tr><td>样本内</td><td>1,667</td><td>+87.36%</td><td>+9.96%</td><td>0.56</td><td>-32.16%</td></tr>
+                  <tr><td>样本外</td><td>715</td><td>+30.72%</td><td>+9.90%</td><td>0.56</td><td>-19.27%</td></tr>
+                </tbody>
+              </table>
+              <div class="fp-note">样本切分：2023-11-15 · 样本外仍有正收益，回撤显著收敛。</div>
+            </div>
+            <div class="fp-report-more-grid">
+              <div class="fp-report-panel">
+                <h4>主要回撤</h4>
+                <table class="fp-report-table">
+                  <thead><tr><th>开始</th><th>最低</th><th>修复</th><th>深度</th></tr></thead>
+                  <tbody>
+                    <tr><td>2018-03-13</td><td>2018-10-18</td><td>2019-03-19</td><td class="neg">-32.16%</td></tr>
+                    <tr><td>2023-08-02</td><td>2024-02-05</td><td>2024-10-31</td><td class="neg">-28.73%</td></tr>
+                    <tr><td>2022-01-19</td><td>2022-04-26</td><td>2022-11-29</td><td class="neg">-17.91%</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="fp-report-panel">
+                <h4>成本敏感性</h4>
+                <div class="fp-cost-list">
+                  <div class="fp-cost-row"><span>0 bps</span><span class="fp-cost-track"><i style="width:0%"></i></span><b>-0.00%</b></div>
+                  <div class="fp-cost-row"><span>10 bps</span><span class="fp-cost-track"><i style="width:34%"></i></span><b>-0.85%</b></div>
+                  <div class="fp-cost-row"><span>20 bps</span><span class="fp-cost-track"><i style="width:67%"></i></span><b>-1.69%</b></div>
+                  <div class="fp-cost-row"><span>30 bps</span><span class="fp-cost-track"><i style="width:100%"></i></span><b>-2.54%</b></div>
+                </div>
+                <div class="fp-note">当前单边换手 846.6%；额外成本按年化拖累估算。</div>
+              </div>
+            </div>
+            <div class="fp-report-panel">
+              <h4>运行信息</h4>
+              <div class="fp-run-tags">
+                <span>mode <b>cross</b></span><span>freq <b>1d</b></span><span>rebalance <b>monthly</b></span><span>TopN <b>20</b></span><span>benchmark <b>000300</b></span><span>engine <b>rqalpha</b></span><span>data <b>questdb</b></span><span>commit <b>83ebf27</b></span>
+              </div>
+              <div class="fp-run-factors">liquidity.turnover_std_bias_21_504 · momentum.rsrs · reversal.rsi_14d · risk.vol_63d · sentiment.main_net_buy_20d</div>
+            </div>
+            <div class="fp-note">数据来自 backtest 报告样例 · 报告由 backtest.reporting 同源生成。</div>
+          </div>
+        </div>
+      </div>
       <div class="fp-section fp-split"><div class="fp-copy"><div class="fp-label mono">03 / RUN</div><h2>从策略到账本</h2><p>单标的与横截面共用一套账本；成交、费用与持仓变化都从同一份交易记录推导。</p><ul class="fp-list"><li>策略输出目标权重或单标的信号，回测器只负责执行。</li><li>成交价、可卖数量、停牌与涨跌停状态逐日检查。</li><li>每日净值、持仓、成交与费用可导出对照。</li></ul></div><div class="fp-terminal"><div class="fp-terminal-bar"><i></i><i></i><i></i><span>backtest / run</span></div><pre class="fp-code"><code><span class="p">$</span> python -m backtest
 <span class="c"># 选择策略 / 权重 / 区间与成本假设</span>
 <span class="c"># 输出现金曲线、交易台账与报告</span></code></pre></div></div>
@@ -3955,6 +4125,16 @@ function routeFromHash() {
 }
 window.addEventListener('hashchange', routeFromHash);
 routeFromHash();
+</script>
+<script>
+document.querySelectorAll('.fp-report-toggle').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var report = btn.closest('.fp-report');
+    if (!report) return;
+    var open = report.classList.toggle('is-open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+});
 </script>
 </body>
 </html>
