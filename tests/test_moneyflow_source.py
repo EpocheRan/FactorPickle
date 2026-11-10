@@ -68,7 +68,7 @@ def test_normalizes_units_codes_and_source():
     assert str(row["source"]) == "tushare.moneyflow"
     assert str(row["source_version"]) == "tushare.moneyflow.v1"
     assert pd.Timestamp(row["ts"]) == pd.Timestamp("2026-10-27")
-    assert row["market"] == "MLCN"
+    assert row["market"] == "SSE"
 
 
 def test_fetch_by_code_uses_ts_code():

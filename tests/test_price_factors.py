@@ -132,12 +132,12 @@ def test_turnover_factors():
     bias = _series(house_id("liquidity", "bias_turn_21d_252d"), _frame(days=600))
     assert bias.notna().sum() > 50
 
-def test_benchmark_required_raises():
+def test_benchmark_missing_returns_nan():
     frame = _frame()
     data = frame.copy()
     data["hfq_close"] = data["close"]
-    with pytest.raises(ValueError, match="benchmark"):
-        lookup(house_id("risk", "beta_60d_000300"))[0](data)
+    result = lookup(house_id("risk", "beta_60d_000300"))[0](data)
+    assert result.isna().all()
 
 def test_beta_with_benchmark():
     frame = _frame()

@@ -41,4 +41,4 @@ def test_query_builder_uses_derived_expression_and_codes():
     assert "code IN (%s)" in sql
     assert "close * avg_volume_20d" in sql
     assert "ORDER BY close * avg_volume_20d ASC" in sql
-    assert params[2] == "600519"
+    assert params[1] == "600519"

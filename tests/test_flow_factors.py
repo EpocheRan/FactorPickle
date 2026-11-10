@@ -28,19 +28,21 @@ def test_margin_balance_chg_20d():
     frame = pd.DataFrame({"margin_rzye": rzye})
     result = flow.margin_balance_chg_20d(frame)
     # 线性增长：20 日增速恒定
-    assert result.iloc[:20].isna().all()
-    expected = rzye.iloc[-1] / rzye.iloc[-21] - 1
+    assert result.iloc[:21].isna().all()
+    shifted = rzye.shift(1)
+    expected = shifted.iloc[-1] / shifted.iloc[-21] - 1
     assert result.iloc[-1] == pytest.approx(expected, rel=1e-9)
 
 
 def test_margin_short_ratio_uses_rqye_over_rzye():
     frame = pd.DataFrame(
-        {"margin_rqye": [1.0, 2.0, 3.0], "margin_rzye": [10.0, 10.0, 0.0]}
+        {"margin_rqye": [1.0, 2.0, 3.0, 4.0], "margin_rzye": [10.0, 10.0, 0.0, 10.0]}
     )
     result = flow.margin_short_ratio(frame)
-    assert result.iloc[0] == pytest.approx(0.1)
-    assert result.iloc[1] == pytest.approx(0.2)
-    assert np.isnan(result.iloc[2])  # 分母 0 → NaN，不是 inf
+    assert np.isnan(result.iloc[0])
+    assert result.iloc[1] == pytest.approx(0.1)
+    assert result.iloc[2] == pytest.approx(0.2)
+    assert np.isnan(result.iloc[3])  # 分母 0 → NaN，不是 inf
 
 
 def test_flow_large_net_ratio_uses_amount_units():

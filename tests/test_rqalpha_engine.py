@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+pytest.importorskip("rqalpha")
+
 from backtest.bootstrap import build_runner
 from backtest.config import BacktestSettings
 from backtest.infrastructure.data.memory import MemoryDataSource

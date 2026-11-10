@@ -102,5 +102,5 @@ svc.ensure(codes=["600519"], as_of="2026-10-28", factor_ids=["quality.roe_ttm"])
 | **`factor_value_daily` 巨大** | 查询必须带 `ts` 范围或 `factor_id`，否则全表扫 |
 | **写后读要重试** | WAL 异步，`upsert` 后立即 `read` 可能为空 |
 | **`register_all()` 幂等** | 重复调用安全；但新增 spec 后必须调用才会进 registry |
-| **方向是设计先验** | `FactorSpec.direction` 是经济假设，不是实测结论；实测校准见 `scripts/calibrate_directions.py` |
+| **方向是设计先验** | `FactorSpec.direction` 是经济假设，不是实测结论；实测方向复核见 `python -m research.report` 的「方向复核」章节 |
 | **宽表与长表要一致** | `wide.py` 的 56 列如果和 `legacy_specs()` 对不上，`LEGACY_COLUMNS` 会 KeyError |

@@ -190,7 +190,8 @@ def main_net_persistence_20d(frame: pd.DataFrame) -> pd.Series:
     """主力净买入持续性：过去 20 日净买入天数占比，方向 +1。"""
     net = (_col(frame, "mf_buy_lg") + _col(frame, "mf_buy_elg")
            - _col(frame, "mf_sell_lg") - _col(frame, "mf_sell_elg"))
-    return (net > 0).astype(float).rolling(20, min_periods=10).mean()
+    hit = (net > 0).astype(float).where(net.notna())
+    return hit.rolling(20, min_periods=10).mean()
 
 # 新因子在文件末尾定义，注册需放在定义之后
 FLOW_FACTORS.update({

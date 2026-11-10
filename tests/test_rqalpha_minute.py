@@ -7,6 +7,8 @@ from datetime import date
 import pandas as pd
 import pytest
 
+pytest.importorskip("rqalpha")
+
 from backtest.application.ports import EngineRequest
 from backtest.domain.models import (
     DataBundle,

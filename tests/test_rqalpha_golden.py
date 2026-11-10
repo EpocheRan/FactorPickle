@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("rqalpha")
+
 from tests.test_rqalpha_engine import _frame, _runner
 
 GOLDEN = Path(__file__).resolve().parent / "golden" / "rqalpha"

@@ -5,6 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 
+import pytest
+
+pytest.importorskip("fastmcp")
+
 from fastmcp import FastMCP
 
 from factor_engine.api import register_factor_tools

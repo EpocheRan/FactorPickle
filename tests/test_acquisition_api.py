@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
+pytest.importorskip("fastmcp")
+
 from fastmcp import FastMCP
 
 from acquisition.api import register_acquisition_tools
