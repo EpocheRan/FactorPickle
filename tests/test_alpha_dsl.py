@@ -68,6 +68,8 @@ def test_evaluator_and_red_team() -> None:
     metrics = evaluate_factor(forward, context.close, horizon=5, cost_bps=20.0)
     assert metrics["n_dates"] > 5
     assert metrics["ic_mean"] > 0.5
+    assert metrics["capacity_target_aum"] == 50_000_000.0
+    assert "winsorized_net_spread" in metrics
     review = red_team_review(forward, context.close, metrics, horizon=5, permutations=8)
     assert "checks" in review
     assert review["permutation_p"] <= 1.0

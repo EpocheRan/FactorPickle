@@ -63,6 +63,10 @@ class AlphaMetrics:
     groups: int
     cost_bps: float
     entry_rule: str = "next_open"
+    capacity_target_aum: float = 50_000_000.0
+    capacity_participation: float = 0.10
+    winsorized_net_spread: float = float("nan")
+    trimmed_net_spread: float = float("nan")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -84,6 +88,10 @@ class AlphaMetrics:
             "monotonicity": round(float(self.monotonicity), 4),
             "group_means": [round(float(x), 6) for x in self.group_means],
             "capacity_multiple": None if self.capacity_multiple is None else round(float(self.capacity_multiple), 4),
+            "capacity_target_aum": float(self.capacity_target_aum),
+            "capacity_participation": float(self.capacity_participation),
+            "winsorized_net_spread": round(float(self.winsorized_net_spread), 6),
+            "trimmed_net_spread": round(float(self.trimmed_net_spread), 6),
             "horizon": int(self.horizon),
             "rebalance": int(self.rebalance),
             "entry_rule": self.entry_rule,
@@ -131,6 +139,8 @@ def evaluate_factor(
     accepted_dates: list[pd.Timestamp] = []
     long_weights: dict[pd.Timestamp, pd.Series] = {}
     short_weights: dict[pd.Timestamp, pd.Series] = {}
+    winsor_spreads: list[float] = []
+    trimmed_spreads: list[float] = []
 
     for date in dates:
         if date not in forward.index:
@@ -151,6 +161,18 @@ def evaluate_factor(
         if len(means) < groups:
             continue
         group_series.append([float(means.get(i, np.nan)) for i in range(groups)])
+        # Cross-sectional tail diagnostics: clipped and trimmed return spreads.
+        w_returns = valid["r"].clip(
+            valid["r"].quantile(0.01),
+            valid["r"].quantile(0.99),
+        )
+        w_means = w_returns.groupby(labels).mean()
+        winsor_spreads.append(float(w_means.get(groups - 1, np.nan) - w_means.get(0, np.nan)))
+        trimmed = valid[(valid["r"] >= valid["r"].quantile(0.01)) & (valid["r"] <= valid["r"].quantile(0.99))]
+        if len(trimmed) >= min_names:
+            t_means = trimmed.groupby(labels.loc[trimmed.index])["r"].mean()
+            if len(t_means) >= groups:
+                trimmed_spreads.append(float(t_means.get(groups - 1, np.nan) - t_means.get(0, np.nan)))
         accepted_dates.append(date)
         top_names = valid.index[labels == groups - 1]
         bottom_names = valid.index[labels == 0]
@@ -164,6 +186,8 @@ def evaluate_factor(
     group_means = group_matrix.mean(axis=0)
     gross = group_means.iloc[-1] - group_means.iloc[0]
     gross_series = group_matrix.iloc[:, -1] - group_matrix.iloc[:, 0]
+    winsor_series = pd.Series(winsor_spreads, dtype=float).dropna()
+    trimmed_series = pd.Series(trimmed_spreads, dtype=float).dropna()
 
     turnover = 0.0
     if len(long_weights) >= 2:
@@ -179,6 +203,8 @@ def evaluate_factor(
     cost_per_period = turnover * 2.0 * float(cost_bps) / 10000.0
     net_series = gross_series - cost_per_period
     net = float(net_series.mean())
+    winsor_net = float(winsor_series.mean() - cost_per_period) if len(winsor_series) else float("nan")
+    trimmed_net = float(trimmed_series.mean() - cost_per_period) if len(trimmed_series) else float("nan")
     ic_series = pd.Series(ic_values, dtype=float)
     std = float(ic_series.std(ddof=1)) if len(ic_series) > 2 else float("nan")
     icir = float(ic_series.mean() / std) if np.isfinite(std) and std > 0 else float("nan")
@@ -195,8 +221,12 @@ def evaluate_factor(
                 if names:
                     cap_values.append(float(amount.loc[date, names].median()))
         if cap_values:
-            # Capacity proxy: top-quintile median traded value relative to ¥100m.
-            capacity = float(np.nanmedian(cap_values) / 1e8)
+            # Deployable capacity at 10% participation over the holding horizon,
+            # relative to a ¥50m target AUM.  This is an explicit, auditable
+            # assumption; it is not a claim about realized market impact.
+            capacity = float(
+                0.10 * np.nanmedian(cap_values) * float(horizon) / 50_000_000.0
+            )
 
     factor_valid = factor.notna()
     metrics = AlphaMetrics(
@@ -223,6 +253,8 @@ def evaluate_factor(
         groups=groups,
         cost_bps=float(cost_bps),
         entry_rule=entry_rule,
+        winsorized_net_spread=winsor_net,
+        trimmed_net_spread=trimmed_net,
     )
     return metrics.to_dict()
 

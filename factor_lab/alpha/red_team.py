@@ -59,6 +59,9 @@ def red_team_review(
     capacity = metrics.get("capacity_multiple")
     add("capacity", capacity is not None and float(capacity) >= min_capacity, capacity)
     add("ic_magnitude", np.isfinite(actual_ic) and abs(actual_ic) >= min_ic, actual_ic)
+    w_net = float(metrics.get("winsorized_net_spread", float("nan")))
+    t_net = float(metrics.get("trimmed_net_spread", float("nan")))
+    add("tail_robustness", np.isfinite(w_net) and np.isfinite(t_net) and w_net > 0.0 and t_net > 0.0, {"winsorized": w_net, "trimmed": t_net})
 
     # Split-half sign consistency, evaluated independently.
     mid = len(factor.index) // 2

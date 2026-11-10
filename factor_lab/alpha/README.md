@@ -86,7 +86,17 @@ output/factor_lab/alpha/
   trials.jsonl
   benchmark/<benchmark_id>.json
   search/<search_id>.json
+  confirm/<search_id>.json
 ```
 
 `search` 文件包含 top 候选、FDR、Red Team 与数据 manifest。  
 holdout 只用于最终确认，不参与候选生成或参数选择。
+
+## 评估口径
+
+- 入场：信号日 t 的因子值，t+1 开盘成交。
+- 持有：`horizon` 个交易日，非重叠 rebalance。
+- 成本：换手 × 双边成本。
+- 容量：`10% × 顶组成交额中位数 × horizon / ¥50m`，是显式假设，不是实盘容量承诺。
+- 净价差：主指标；同时输出 winsorized / trimmed 净价差作为尾部稳健性检查。
+- 净价差、容量、换手、尾部稳健性都进入 Red Team。
