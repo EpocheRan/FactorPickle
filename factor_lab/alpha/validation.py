@@ -128,8 +128,8 @@ def validate(
                     issues.append(f"{name} needs a positive integer window as its last argument")
                 else:
                     window = _literal_int(node.args[-1])
-                    if window is None or window < 2:
-                        issues.append(f"{name} window must be an integer >= 2")
+                    if window is None or window < 1:
+                        issues.append(f"{name} window must be an integer >= 1")
                     elif window > 2520:
                         warnings.append(f"{name} window {window} exceeds 10 years of daily bars")
 

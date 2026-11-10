@@ -127,4 +127,4 @@ def test_where_scalar_and_window_validation() -> None:
     factor = compile_expression("where(sign(close), 1, close)", context)[0]
     assert factor.notna().any().any()
     report = validate("ts_mean(close, 1)", known_fields=context.field_names)
-    assert not report.ok
+    assert report.ok
