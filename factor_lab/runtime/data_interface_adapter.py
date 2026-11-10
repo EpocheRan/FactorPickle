@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 import os
 from typing import Any, Callable
 
+import numpy as np
 import pandas as pd
 
 
@@ -440,7 +441,10 @@ class DataInterfaceGateway:
             mapping = {
                 name: name
                 for name in VALUATION_COLUMNS
-                if name not in {"ts", "code", "period_end", "publish_date"}
+                if name not in {
+                    "ts", "code", "period_end", "publish_date",
+                    "source", "formula_version", "ingested_at", "unit",
+                }
             }
         except Exception:
             mapping = {"market_cap": "total_mv", "float_market_cap": "float_mv"}
@@ -454,6 +458,81 @@ class DataInterfaceGateway:
             start=start,
             end=end,
         )
+
+    def financial_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
+        """PIT date x symbol matrices from financial statements.
+
+        The statement service exposes ``publish_date`` (the date the market could
+        know the report); we index by that date and forward-fill across the
+        panel in the compiler.  Auto-sync is disabled here: research must not
+        silently mutate the financial database during a factor run.
+        """
+        service = self._get("financial")
+        getter = getattr(service, "get_statements", None)
+        if getter is None:
+            raise DataGap("financial service does not expose get_statements")
+        numeric_fields = {
+            "revenue", "net_income", "net_income_attributable_to_parent",
+            "gross_profit", "operating_profit", "ebit", "ebitda",
+            "total_assets", "current_assets", "total_liabilities",
+            "current_liabilities", "total_equity", "total_equity_attributable_to_parent",
+            "operating_cash_flow", "free_cash_flow", "basic_eps", "diluted_eps",
+            "research_and_development_expense", "selling_expense",
+            "general_and_admin_expense", "finance_expense",
+        }
+        by_field: dict[str, dict[str, pd.Series]] = {}
+        rows = 0
+        for code in codes:
+            for statement_type in ("IS", "BS", "CF"):
+                try:
+                    data = getter(
+                        str(code),
+                        statement_type,
+                        start_date=start,
+                        end_date=end,
+                        auto_sync=False,
+                    )
+                except Exception:
+                    continue
+                if not isinstance(data, list):
+                    continue
+                for row in data:
+                    if not isinstance(row, dict):
+                        continue
+                    ts = row.get("publish_date") or row.get("period_end")
+                    timestamp = pd.to_datetime(ts, errors="coerce")
+                    if pd.isna(timestamp):
+                        continue
+                    for field in numeric_fields:
+                        value = row.get(field)
+                        try:
+                            number = float(value)
+                        except (TypeError, ValueError):
+                            continue
+                        if not np.isfinite(number):
+                            continue
+                        by_field.setdefault(field, {}).setdefault(str(code), {})[timestamp] = number
+                        rows += 1
+        if not by_field:
+            raise DataGap(f"financial statements returned no usable fields for {len(codes)} codes")
+        frames: dict[str, pd.DataFrame] = {}
+        for field, by_code in by_field.items():
+            frame = pd.DataFrame(by_code).sort_index()
+            frame = frame[~frame.index.duplicated(keep="last")]
+            if frame.notna().any().any():
+                frames[f"fin_{field}"] = frame
+        if not frames:
+            raise DataGap("financial statements produced no numeric matrices")
+        manifest = DataManifest(
+            services=["financial"],
+            fields=sorted(frames),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=rows,
+            data_hash=_frame_hash(frames),
+        )
+        return DataBundle(kind="financial", frames=frames, fields=sorted(frames), manifest=manifest)
 
     def industry_map(self) -> pd.Series:
         frame = self.query_frame(

@@ -71,6 +71,20 @@ python -m factor_lab discovery queries --question "研究问题"
 python -m factor_lab discovery ingest --result gateway_result.json
 ```
 
+## Alpha DSL
+
+```powershell
+python -m factor_lab alpha validate --expression "rank(ts_corr(rank(close), rank(volume), 20))"
+python -m factor_lab alpha holdout --end 2026-11-01 --save
+python -m factor_lab alpha benchmark --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31
+python -m factor_lab alpha search --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --budget 80
+python -m factor_lab alpha confirm --codes output/factor_lab/hypotheses/pool200.txt --search output/factor_lab/alpha/search/ALPHA-....json
+python -m factor_lab alpha trials
+```
+
+Search runs only on the development window. The default holdout is the last
+12 months; `holdout.json` is locked and cannot be silently overwritten.
+
 ## Rules
 
 - One trial = hypothesis × pre-registered outcome.

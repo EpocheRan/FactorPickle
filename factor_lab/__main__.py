@@ -152,6 +152,26 @@ def main(argv: list[str] | None = None) -> int:
     evaluate_parser.add_argument("--experiment", required=True)
     evaluate_parser.add_argument("--finalize", action="store_true")
 
+    alpha_parser = sub.add_parser("alpha", help="Alpha DSL / benchmark / search / red team")
+    alpha_parser.add_argument("action", choices=["validate", "eval", "benchmark", "search", "confirm", "holdout", "trials"], nargs="?", default="holdout")
+    alpha_parser.add_argument("--expression", default="")
+    alpha_parser.add_argument("--codes", default=str(config.HYPOTHESES_DIR / "pool200.txt"))
+    alpha_parser.add_argument("--start", default="2022-10-01")
+    alpha_parser.add_argument("--end", default="2026-11-01")
+    alpha_parser.add_argument("--dev-end", default="")
+    alpha_parser.add_argument("--holdout-start", default="")
+    alpha_parser.add_argument("--holdout-end", default="")
+    alpha_parser.add_argument("--warmup", type=int, default=300)
+    alpha_parser.add_argument("--horizon", type=int, default=5)
+    alpha_parser.add_argument("--cost-bps", type=float, default=20.0)
+    alpha_parser.add_argument("--budget", type=int, default=120)
+    alpha_parser.add_argument("--include-holdout", action="store_true")
+    alpha_parser.add_argument("--save", action="store_true")
+    alpha_parser.add_argument("--out", default="")
+    alpha_parser.add_argument("--search", default="")
+    alpha_parser.add_argument("--seed-file", default="")
+    alpha_parser.add_argument("--seed", type=int, default=11)
+
     web_mode_parser = sub.add_parser("web-mode", help="show discovery mode and cache state")
     web_mode_parser.add_argument("--mode", choices=["exploit", "explore", "deep"], default="exploit")
 
@@ -538,6 +558,134 @@ def main(argv: list[str] | None = None) -> int:
         target = Path(args.experiment)
         _print(finalize(target) if args.finalize else derive(target))
         return 0
+
+    if args.command == "alpha":
+        from factor_lab.alpha import parse_expression
+        from factor_lab.alpha.benchmarks import run_benchmark
+        from factor_lab.alpha.confirm import confirm_search
+        from factor_lab.alpha.data import HoldoutWindow, default_holdout, load_alpha_dataset, load_holdout, save_holdout
+        from factor_lab.alpha.evaluation import evaluate_expression
+        from factor_lab.alpha.search import run_search
+        from factor_lab.alpha.trials import summarize_trials
+        from factor_lab.alpha.validation import validate
+
+        def _codes(value: str) -> list[str]:
+            path = Path(value)
+            if path.exists() and path.is_file():
+                raw = path.read_text(encoding="utf-8")
+            else:
+                raw = value
+            return sorted({part.strip() for part in raw.replace("\n", ",").split(",") if part.strip()})
+
+        if args.action == "validate":
+            if not args.expression:
+                raise SystemExit("alpha validate requires --expression")
+            _print(validate(parse_expression(args.expression)).to_dict())
+            return 0
+        if args.action == "holdout":
+            window = default_holdout(args.end)
+            if args.holdout_start:
+                window.holdout_start = args.holdout_start
+            if args.holdout_end:
+                window.holdout_end = args.holdout_end
+            payload = window.to_dict()
+            payload["path"] = str(save_holdout(window)) if args.save else None
+            _print(payload)
+            return 0
+        if args.action == "trials":
+            _print(summarize_trials())
+            return 0
+        codes = _codes(args.codes)
+        if not codes:
+            raise SystemExit("no codes supplied")
+        try:
+            window = default_holdout(args.end)
+        except ValueError:
+            window = HoldoutWindow(args.start, args.end, args.end, args.end, locked=False)
+        if args.start:
+            window.dev_start = args.start
+        if args.dev_end:
+            window.dev_end = args.dev_end
+        if args.holdout_start:
+            window.holdout_start = args.holdout_start
+        if args.holdout_end:
+            window.holdout_end = args.holdout_end
+        if args.action == "eval":
+            if not args.expression:
+                raise SystemExit("alpha eval requires --expression")
+            dataset = load_alpha_dataset(codes, args.start, args.end, warmup_days=args.warmup)
+            _print(evaluate_expression(args.expression, dataset.context, horizon=args.horizon, cost_bps=args.cost_bps, start=args.start, end=args.end))
+            return 0
+        if args.action == "benchmark":
+            locked = load_holdout()
+            if args.holdout_start or args.holdout_end:
+                bench_window = HoldoutWindow(
+                    dev_start=args.start,
+                    dev_end=args.dev_end or args.end,
+                    holdout_start=args.holdout_start or args.end,
+                    holdout_end=args.holdout_end or args.end,
+                    locked=False,
+                )
+                data_end = args.end
+            elif locked is not None:
+                # Benchmark the development window only; the locked holdout is
+                # not part of the human-baseline comparison unless requested.
+                bench_window = locked
+                data_end = locked.holdout_end if args.include_holdout else locked.dev_end
+            else:
+                bench_window = HoldoutWindow(
+                    dev_start=args.start,
+                    dev_end=args.dev_end or args.end,
+                    holdout_start=args.end,
+                    holdout_end=args.end,
+                    locked=False,
+                )
+                data_end = args.end
+                window = bench_window
+            dataset = load_alpha_dataset(codes, bench_window.dev_start, data_end, warmup_days=args.warmup)
+            payload = run_benchmark(dataset, holdout=bench_window, horizon=args.horizon, cost_bps=args.cost_bps, include_holdout=args.include_holdout, out_path=args.out or None)
+            _print({"benchmark_id": payload["benchmark_id"], "summary": payload["summary"], "path": args.out or str(config.LAB_ROOT / "alpha" / "benchmark")})
+            return 0
+        if args.action == "confirm":
+            if not args.search:
+                raise SystemExit("alpha confirm requires --search")
+            locked = load_holdout()
+            if locked is None:
+                raise SystemExit("no locked holdout; run alpha holdout --save first")
+            dataset = load_alpha_dataset(codes, locked.holdout_start, locked.holdout_end, warmup_days=args.warmup)
+            dataset.start = locked.holdout_start
+            dataset.end = locked.holdout_end
+            payload = confirm_search(args.search, dataset, horizon=args.horizon, cost_bps=args.cost_bps, holdout=locked)
+            _print({
+                "expression": payload["expression"],
+                "passed": payload["passed"],
+                "metrics": {key: payload["metrics"].get(key) for key in ("ic_mean", "net_spread", "turnover", "capacity_multiple")},
+                "red_team_passed": payload["red_team"].get("passed"),
+                "path": payload["path"],
+            })
+            return 0
+        if args.action == "search":
+            save_holdout(window)
+            dataset = load_alpha_dataset(codes, window.dev_start, window.dev_end, warmup_days=args.warmup)
+            seed_expressions = []
+            if args.seed_file:
+                raw = read_json(Path(args.seed_file))
+                if isinstance(raw, list):
+                    seed_expressions = [str(item) for item in raw]
+                elif isinstance(raw, dict):
+                    seed_expressions = [str(item) for item in (raw.get("expressions") or [])]
+            payload = run_search(dataset, budget=args.budget, horizon=args.horizon, cost_bps=args.cost_bps, holdout=window, seed=args.seed, seed_expressions=seed_expressions, out_path=args.out or None)
+            _print({
+                "search_id": payload["search_id"],
+                "n_evaluated": payload["n_evaluated"],
+                "n_ranked": payload["n_ranked"],
+                "fdr": payload["fdr"],
+                "top": [{"expression": item["expression"], "score": item["score"], "net": item["metrics"].get("net_spread"), "ic": item["metrics"].get("ic_mean")} for item in payload["top"][:5]],
+                "confirmed": len([item for item in payload["confirmed"] if item.get("red_team", {}).get("passed")]),
+                "path": args.out or str(config.LAB_ROOT / "alpha" / "search" / f"{payload['search_id']}.json"),
+            })
+            return 0
+        raise SystemExit(f"unknown alpha action: {args.action}")
 
     if args.command == "web-mode":
         from factor_lab.research.web_gateway import resolve_mode

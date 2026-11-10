@@ -150,7 +150,7 @@ def build_factor_panel(
     # Data availability is not a factor-category decision.  Fetch every
     # optional matrix the gateway exposes; a missing service only removes its
     # columns and is recorded in the manifest, never blocks an unrelated factor.
-    for method in ("flow_bundle", "margin_bundle", "valuation_bundle"):
+    for method in ("flow_bundle", "margin_bundle", "valuation_bundle", "financial_bundle"):
         bundle = _safe_bundle(gateway, method, codes, fetch_start, end)
         if bundle is not None:
             extras.update(_pivot_extras(bundle.frames))
