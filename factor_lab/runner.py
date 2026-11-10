@@ -56,7 +56,15 @@ class FactorRunner:
         if not factor_id and not factor_artifact:
             raise RunnerError("factor_artifact or factor_id is required to build a panel")
         self.preflight()
-        return build_factor_panel(self.gateway, artifact, codes, start, end)
+        # Do not fetch a fixed 800-day warmup for every factor: the gateway
+        # otherwise tries to repair years of irrelevant history from external
+        # sources.  Use 3x the factor window plus a small buffer, capped.
+        spec = dict(getattr(artifact, "spec", {}) or {}) if not isinstance(artifact, dict) else dict(artifact.get("spec") or {})
+        window = int(spec.get("window", 20) or 20)
+        warmup_days = max(60, min(800, window + 20))
+        return build_factor_panel(
+            self.gateway, artifact, codes, start, end, warmup_days=warmup_days
+        )
 
     def _build_panel_for_hypothesis(
         self,
