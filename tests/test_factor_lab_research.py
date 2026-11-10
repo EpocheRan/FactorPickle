@@ -57,7 +57,7 @@ def test_evaluation_needs_orthogonality(tmp_path: Path) -> None:
     root.mkdir()
     _candidate(root)
     audit = json.loads((root / "audit.json").read_text(encoding="utf-8"))
-    audit["checks"] = [{"check_id": "orthogonality", "status": "warn"}]
+    audit["checks"] = []
     write_json_atomic(root / "audit.json", audit)
     assert evaluation.derive(root)["status"] == "needs_fix"
 

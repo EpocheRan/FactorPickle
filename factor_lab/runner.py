@@ -95,6 +95,12 @@ class FactorRunner:
     ) -> dict[str, Any]:
         status = self.preflight()
         artifact_meta: dict[str, Any] = {}
+        if factor_artifact is None:
+            from .factor_library import factor_library_lookup
+
+            generated = factor_library_lookup(hypothesis.factor_id)
+            if generated is not None:
+                factor_artifact = generated
         if factor_artifact is not None:
             artifact_factor_id = (
                 getattr(factor_artifact, "factor_id", None)

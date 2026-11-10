@@ -518,7 +518,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "research-context":
         from .research_context import build_context
-        from .store import read_json
 
         if args.action == "build":
             _print(build_context())
@@ -527,7 +526,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "evaluate":
-        from pathlib import Path
         from .evaluation import derive, finalize
 
         target = Path(args.experiment)

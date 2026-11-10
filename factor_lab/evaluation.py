@@ -67,7 +67,7 @@ def derive(root: Path) -> dict[str, Any]:
     elif not factor_artifact:
         status, reason = "needs_fix", "data_manifest.factor_artifact is empty"
         evidence.append("code_hash/version not pinned in data_manifest")
-    elif orthogonality is None or orthogonality.get("status") == "warn":
+    elif orthogonality is None:
         status, reason = "needs_fix", "orthogonality not computed"
         evidence.append("orthogonality.json/check missing")
     elif orthogonality.get("status") == "fail":

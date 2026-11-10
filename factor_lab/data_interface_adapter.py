@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 from dataclasses import dataclass, field
+import os
 from typing import Any, Callable
 
 import pandas as pd
@@ -217,8 +218,9 @@ class DataInterfaceGateway:
         """
 
         try:
+            source_priority = [] if os.environ.get("FACTOR_LAB_LOCAL_ONLY", "1") == "1" else None
             frame = self._get_market().ohlc(
-                codes, start, end, freq=freq, adjust=adjust
+                codes, start, end, freq=freq, adjust=adjust, source_priority=source_priority
             )
         except Exception as exc:  # noqa: BLE001
             raise DataInterfaceUnavailable(
