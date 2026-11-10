@@ -14,10 +14,8 @@ from . import config
 from .audit import audit_experiment
 from .brief import build_brief, write_decision
 from .control import ensure_control, is_running, load_control, set_state
-from .cycle_ideas import CYCLE_SPECS
 from .dashboard import render_dashboard
 from .directive import ensure_directive
-from .ideas import IdeaSpec
 from .ledger import Ledger
 from .orthogonality import compute_batch_orthogonality
 from .policy import init_policy
@@ -28,49 +26,6 @@ from .store import read_json, write_json_atomic
 from .supervisor import Heartbeat, lease, write_cycle
 
 WORKERS = 2
-
-
-def _select_specs(specs: list[IdeaSpec], limit: int) -> list[IdeaSpec]:
-    """Round-robin by bet so one cycle does not repeat the same family shape."""
-    groups: dict[str, list[IdeaSpec]] = {}
-    for spec in specs:
-        groups.setdefault(spec.bet, []).append(spec)
-    selected: list[IdeaSpec] = []
-    keys = sorted(groups)
-    while len(selected) < limit and any(groups.values()):
-        for key in keys:
-            if groups[key] and len(selected) < limit:
-                selected.append(groups[key].pop(0))
-    return selected
-
-
-def _existing_factors() -> set[str]:
-    factors: set[str] = set()
-    if not config.EXPERIMENTS_DIR.exists():
-        return factors
-    for root in config.EXPERIMENTS_DIR.iterdir():
-        manifest = read_json(root / "manifest.json") or {}
-        if manifest.get("factor_id"):
-            factors.add(str(manifest["factor_id"]))
-    return factors
-
-
-def _hypothesis_for(spec: IdeaSpec, directive: dict[str, Any], family_id: str) -> Hypothesis:
-    hypothesis = spec.hypothesis()
-    hypothesis.family_id = family_id
-    hypothesis.development_window = f"{directive.get('start')}:{directive.get('end')}"
-    hypothesis.start = str(directive.get("start") or hypothesis.start)
-    hypothesis.end = directive.get("end") or hypothesis.end
-    hypothesis.outcomes = [
-        OutcomeSpec(
-            universe=str(directive.get("universe") or hypothesis.outcomes[0].universe),
-            horizon=int(directive.get("horizon") or hypothesis.outcomes[0].horizon),
-            direction=int(spec.direction),
-            groups=int(directive.get("groups") or hypothesis.outcomes[0].groups),
-            cost_bps=float(directive.get("cost_bps") or hypothesis.outcomes[0].cost_bps),
-        )
-    ]
-    return hypothesis
 
 
 def _run_one(payload: dict[str, Any], profile: str) -> dict[str, Any]:
@@ -130,7 +85,7 @@ def run_cycle(
     heartbeat_interval: int = 2,
     orthogonality: bool = True,
     family_id: str | None = None,
-    factor_ids: list[str] | None = None,
+    plan: str | Path | None = None,
 ) -> dict[str, Any]:
     config.ensure_dirs()
     init_policy()
@@ -158,18 +113,27 @@ def run_cycle(
         write_cycle(cycle_id="blocked-budget", status="blocked", error=f"budget: {budget_check['reasons']}")
         return {"status": "blocked", "reason": "budget", "budget": budget_check}
 
-    existing = _existing_factors()
-    if factor_ids:
-        by_id = {spec.factor_id: spec for spec in CYCLE_SPECS}
-        specs = [by_id[item] for item in factor_ids if item in by_id and item not in existing]
+    if not plan:
+        return {
+            "status": "empty",
+            "reason": "cycle requires a PathFinder plan; no hardcoded idea catalog is available",
+        }
+    raw = read_json(Path(plan))
+    if isinstance(raw, list):
+        rows = raw
+    elif isinstance(raw, dict):
+        rows = raw.get("hypotheses") or raw.get("plan") or []
+        if isinstance(rows, dict):
+            rows = [rows]
     else:
-        specs = [spec for spec in CYCLE_SPECS if spec.factor_id not in existing]
-        specs = _select_specs(specs, max(1, int(limit)))
-    directive = ensure_directive()
-    family_id = str(family_id or directive.get("family_id") or "F-cycle")
-    hypotheses = [_hypothesis_for(spec, directive, family_id) for spec in specs]
+        rows = []
+    hypotheses = [Hypothesis.from_dict(row) for row in rows[: max(1, int(limit))]]
+    if family_id:
+        for hypothesis in hypotheses:
+            hypothesis.family_id = str(family_id)
+    family_id = str(family_id or (hypotheses[0].family_id if hypotheses else "") or f"F-{config.today_tag()}")
     if not hypotheses:
-        return {"status": "empty", "reason": "no fresh cycle factors"}
+        return {"status": "empty", "reason": "plan contains no hypotheses"}
 
     cycle_id = f"C-{config.today_tag()}-{uuid.uuid4().hex[:6]}"
     started_at = config.now_iso()
@@ -337,16 +301,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--heartbeat-interval", type=int, default=2)
     parser.add_argument("--no-orthogonality", action="store_true")
     parser.add_argument("--family", default=None)
-    parser.add_argument("--factors", default="", help="comma-separated explicit factor ids")
+    parser.add_argument("--plan", required=True, help="PathFinder hypotheses JSON")
     args = parser.parse_args(argv)
-    factor_ids = [item.strip() for item in args.factors.split(",") if item.strip()] or None
     result = run_cycle(
         limit=args.limit,
         profile=args.profile,
         heartbeat_interval=args.heartbeat_interval,
         orthogonality=not args.no_orthogonality,
         family_id=args.family,
-        factor_ids=factor_ids,
+        plan=args.plan,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     return 0

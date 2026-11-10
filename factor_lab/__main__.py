@@ -15,7 +15,7 @@ from .dashboard import render_dashboard
 from .ledger import Ledger
 from .maintenance import clean, inventory
 from .policy import init_policy, load_policy
-from .run import run_experiment, run_pilot
+from .run import run_experiment
 from .schemas import Hypothesis, experiment_dir
 from .store import read_json, write_json_atomic
 
@@ -120,15 +120,13 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--robustness", action="store_true")
     run_parser.add_argument("--no-audit", action="store_true")
 
-    sub.add_parser("pilot", help="run the amount_bias pilot and dashboard")
-
     cycle_parser = sub.add_parser("cycle", help="run one research cycle")
     cycle_parser.add_argument("--limit", type=int, default=4)
     cycle_parser.add_argument("--profile", default="quick")
     cycle_parser.add_argument("--heartbeat-interval", type=int, default=2)
     cycle_parser.add_argument("--no-orthogonality", action="store_true")
     cycle_parser.add_argument("--family", default=None)
-    cycle_parser.add_argument("--factors", default="", help="comma-separated explicit factor ids")
+    cycle_parser.add_argument("--plan", required=True, help="PathFinder hypotheses JSON")
 
     directive_parser = sub.add_parser("directive", help="show or initialize research direction")
     directive_parser.add_argument("action", choices=["show", "init"], nargs="?", default="show")
@@ -137,12 +135,6 @@ def main(argv: list[str] | None = None) -> int:
     supervisor_parser.add_argument("action", choices=["status", "reclaim", "reclaim-all"], nargs="?", default="status")
     supervisor_parser.add_argument("--id", default="")
     supervisor_parser.add_argument("--apply", action="store_true")
-
-    mine_parser = sub.add_parser("mine", help="run the idea batch")
-    mine_parser.add_argument("--limit", type=int, default=23)
-    mine_parser.add_argument("--profile", default="quick")
-    mine_parser.add_argument("--no-orthogonality", action="store_true")
-    mine_parser.add_argument("--include-existing", action="store_true")
 
     audit_parser = sub.add_parser("audit", help="audit one experiment")
     audit_parser.add_argument("--experiment", required=True)
@@ -168,7 +160,6 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "init":
-        from .examples import pilot_coverage
         from .directive import ensure_directive
         from .retention import ensure_policy
         from .supervisor import write_heartbeat
@@ -185,8 +176,6 @@ def main(argv: list[str] | None = None) -> int:
                 config.QUARANTINE_PATH,
                 {"schema_version": "factor_lab.quarantine.v1", "updated_at": config.now_iso(), "items": []},
             )
-        if not config.DATA_COVERAGE_PATH.exists():
-            write_json_atomic(config.DATA_COVERAGE_PATH, pilot_coverage())
         _print({"policy": policy, "control": control, "directive": directive, "retention": retention})
         return 0
 
@@ -434,17 +423,9 @@ def main(argv: list[str] | None = None) -> int:
             _print(set_state(state, reason=args.reason, actor="human"))
         return 0
 
-    if args.command == "pilot":
-        result = run_pilot()
-        dashboard = render_dashboard()
-        result["dashboard"] = str(dashboard)
-        _print(result)
-        return 0
-
     if args.command == "cycle":
         from .cycle import run_cycle
 
-        factor_ids = [item.strip() for item in args.factors.split(",") if item.strip()] or None
         _print(
             run_cycle(
                 limit=args.limit,
@@ -452,7 +433,7 @@ def main(argv: list[str] | None = None) -> int:
                 heartbeat_interval=args.heartbeat_interval,
                 orthogonality=not args.no_orthogonality,
                 family_id=args.family,
-                factor_ids=factor_ids,
+                plan=args.plan,
             )
         )
         return 0
@@ -487,19 +468,6 @@ def main(argv: list[str] | None = None) -> int:
                 "agents": [item.to_dict() for item in agents.list_agents()],
                 "budget": budget.status(),
             }
-        )
-        return 0
-
-    if args.command == "mine":
-        from .batch import run_batch
-
-        _print(
-            run_batch(
-                limit=args.limit,
-                profile=args.profile,
-                orthogonality=not args.no_orthogonality,
-                include_existing=args.include_existing,
-            )
         )
         return 0
 

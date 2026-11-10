@@ -84,6 +84,8 @@ python -m factor_lab campaign start --objective "研究因子"
 
 ## 命令
 
+> 研究入口只接受 PathFinder plan。没有静态 idea 目录，也没有历史因子兼容层。
+
 ```powershell
 python -m factor_lab bootstrap --research
 python -m factor_lab doctor
@@ -96,6 +98,7 @@ python -m factor_lab campaign start --objective "研究因子"
 python -m factor_lab campaign run --dataset data.csv --plan campaign_plan.json --objective "ml smoke"
 
 python -m factor_lab runner --hypothesis output/factor_lab/hypotheses/H.json --codes 600000,000001
+python -m factor_lab cycle --plan output/factor_lab/hypotheses/plan.json
 python -m factor_lab parity --codes "600000,000001,600519,000858,601318" --start 2022-01-04 --end 2026-11-01
 
 python -m factor_lab ml run --dataset data.csv --spec ml_spec.json --out output/factor_lab/ml/demo

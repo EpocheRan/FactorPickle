@@ -203,16 +203,3 @@ def run_experiment(
         )
     ledger.write_summary()
     return result_payload
-
-
-def run_pilot() -> dict[str, Any]:
-    from .examples import pilot_coverage, pilot_hypothesis
-
-    config.ensure_dirs()
-    init_policy()
-    ensure_control()
-    if not config.DATA_COVERAGE_PATH.exists():
-        write_json_atomic(config.DATA_COVERAGE_PATH, pilot_coverage())
-    hypothesis = pilot_hypothesis()
-    write_json_atomic(config.HYPOTHESES_DIR / f"{hypothesis.hypothesis_id}.json", hypothesis.to_dict())
-    return run_experiment(hypothesis)

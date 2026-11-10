@@ -243,7 +243,7 @@ def _attention(experiments: list[dict[str, Any]], ledger_verification: dict[str,
     if not ledger_verification.get("ok"):
         items.append({"level": "red", "title": "账本存在未修复断点", "detail": str(ledger_verification.get("unrepaired")), "exp_id": None})
     if not experiments:
-        items.append({"level": "yellow", "title": "还没有实验", "detail": "先跑 pilot，或放入已有产物", "exp_id": None})
+        items.append({"level": "yellow", "title": "还没有实验", "detail": "先提交一个 PathFinder plan 并执行实验", "exp_id": None})
     order = {"red": 0, "yellow": 1, "green": 2}
     items.sort(key=lambda item: order.get(item["level"], 9))
     return items[:12]

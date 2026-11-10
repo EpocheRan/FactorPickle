@@ -32,14 +32,8 @@ def _ensure_quarantine() -> None:
 
 
 def _ensure_coverage() -> None:
-    if config.DATA_COVERAGE_PATH.exists():
-        return
-    try:
-        from .examples import pilot_coverage
-
-        write_json_atomic(config.DATA_COVERAGE_PATH, pilot_coverage())
-    except Exception:
-        pass
+    if not config.DATA_COVERAGE_PATH.exists():
+        write_json_atomic(config.DATA_COVERAGE_PATH, [])
 
 
 def write_session_brief(*, research: bool = False) -> dict[str, Any]:
