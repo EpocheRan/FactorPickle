@@ -268,6 +268,22 @@
   .arch-shell svg{display:block;width:100%;height:auto}
   .arch-foot{display:flex;flex-wrap:wrap;gap:8px 22px;padding:14px 22px;border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--dim)}
   .arch-foot span{display:inline-flex;align-items:center;gap:7px}
+  .arch-runtime{padding:20px 22px 18px;border-bottom:1px solid var(--line-soft);background:linear-gradient(120deg,rgba(201,255,90,.055),rgba(10,19,15,.35) 58%,transparent)}
+  .arch-runtime-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:15px}
+  .arch-runtime-kicker{font-size:8px;letter-spacing:.16em;color:#c9ff5a}
+  .arch-runtime-head h3{margin:7px 0 0;font-size:19px;line-height:1.2;letter-spacing:-.025em;color:#edf5ea;font-weight:560}
+  .arch-runtime-tag{font-family:var(--mono);font-size:8px;letter-spacing:.12em;color:#9fb58d;border:1px solid rgba(201,255,90,.22);border-radius:2px;padding:5px 7px;white-space:nowrap}
+  .arch-runtime-flow{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-family:var(--mono);font-size:8.5px;letter-spacing:.03em;color:#a6b9a8}
+  .arch-runtime-flow span{border:1px solid rgba(201,255,90,.14);background:rgba(201,255,90,.035);border-radius:3px;padding:5px 7px;white-space:nowrap}
+  .arch-runtime-flow span.flow-api{color:#c9ff5a;border-color:rgba(201,255,90,.36)}
+  .arch-runtime-flow i{font-style:normal;color:#62796a}
+  .arch-runtime-note{margin-top:11px;font-family:var(--mono);font-size:8px;line-height:1.7;color:#647a6d}
+  @media(max-width:900px){
+    .arch-runtime{padding:16px 15px}
+    .arch-runtime-head{flex-direction:column;gap:9px}
+    .arch-runtime-head h3{font-size:17px}
+    .arch-runtime-flow{font-size:7.5px;gap:4px}
+  }
   .lg-line{width:20px;height:0;border-top:1.5px solid #64748b}
   .lg-dash{width:20px;height:0;border-top:1.5px dashed #38bdf8}
 
@@ -2138,10 +2154,20 @@ h1 .hl{
       <div class="hero" style="padding:46px 0 10px">
         <div class="kicker">Architecture · System Map</div>
         <h1 style="font-size:clamp(28px,3.4vw,40px)">系统架构与数据流</h1>
-        <p class="lede">自上而下：数据源 → 采集编排 → 数据访问 → 统一存储 → 计算/应用 → 工具出口。虚线表示事件、派生或无强耦合的读取。</p>
+        <p class="lede">自上而下：数据源 → 采集编排 → 数据访问 → 统一存储 → 计算/应用（含 Factor Lab）→ 工具出口。虚线表示事件、派生或无强耦合的读取。</p>
       </div>
       <div class="section" style="padding-top:16px">
         <div class="arch-shell">
+          <div class="arch-runtime">
+            <div class="arch-runtime-head">
+              <div><div class="arch-runtime-kicker mono">FACTOR LAB / CROSS-LAYER RUNTIME</div><h3>Agent 研究运行时</h3></div>
+              <span class="arch-runtime-tag">DSH NATIVE</span>
+            </div>
+            <div class="arch-runtime-flow">
+              <span>DSH session</span><i>→</i><span>PathFinder</span><i>→</i><span>Runner</span><i>→</i><span class="flow-api">data_interface</span><i>→</i><span>research / backtest</span><i>→</i><span>Evaluator</span><i>→</i><span>Supervisor</span>
+            </div>
+            <div class="arch-runtime-note">PathFinder 发起多轮 campaign；Runner 只经 data_interface 取数；研究状态落在 output/factor_lab；promote 仍需 Human G4。</div>
+          </div>
           <svg viewBox="0 -16 1240 830" role="img" aria-label="FactorPickle 分层架构图">
             <defs>
               <linearGradient id="gBox" x1="0" y1="0" x2="0" y2="1">
@@ -2303,6 +2329,7 @@ h1 .hl{
           <div class="arch-foot">
             <span><i class="lg-line"></i>同步调用</span>
             <span><i class="lg-dash"></i>事件 / 派生 / 弱耦合读取</span>
+            <span>Factor Lab 研究编排横跨应用层，只经 <b class="mono" style="color:#9fb2ca">data_interface</b> 取数</span>
             <span>所有 DB 访问仅限 <b class="mono" style="color:#9fb2ca">data_interface</b> 与 <b class="mono" style="color:#9fb2ca">factor_engine</b></span>
             <span>持仓表非 WAL（支持原地 UPDATE）</span>
           </div>
