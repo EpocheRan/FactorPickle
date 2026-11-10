@@ -101,6 +101,10 @@
   .coverage{display:grid;grid-template-columns:1fr 1fr;gap:7px}
   .coverage .box{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:10.5px}
   .coverage .box .k{font-family:var(--mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
+  .sources{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+  .source{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:7px;padding:5px 8px;background:#fbf6ed;font-size:10px}
+  .source b{font-size:10px;color:var(--ink)}
+  .source span{font-family:var(--mono);font-size:8px;color:var(--muted)}
   @media(max-width:1100px){.funnel{grid-template-columns:repeat(3,1fr)}.funnel-card:nth-child(3):after{display:none}.metric-grid{grid-template-columns:1fr 1fr}}
   @media(max-width:680px){.wrap{padding:14px}.funnel{grid-template-columns:1fr 1fr}.funnel-card:after{display:none}.meta{margin-left:0}.coverage{grid-template-columns:1fr}.drawer{padding:16px}}
 </style>
@@ -302,6 +306,7 @@
       <h4>审计检查</h4>
       <div>${checks.length ? checks.map(c => `<div class="check"><span>${badge(c.status, c.status === 'fail' ? 'fail' : c.status === 'warn' ? 'warn' : 'pass')} ${esc(c.check_id)}</span><span class="actual">${esc(c.actual || '')}${c.expected ? ' · 期望 ' + esc(c.expected) : ''}</span></div>`).join('') : '<div class="empty">无审计检查</div>'}</div>
       <h4>数据覆盖</h4>
+      <div class="sources">${(e.data_sources || []).map(s => `<span class="source"><b>${esc(s.label)}</b><span>${esc((s.fields || []).join(', ') || (s.services || []).join(', ') || '—')}</span></span>`).join('') || '<span class="muted" style="font-size:10px">未标注来源分类</span>'}</div>
       <div class="coverage">
         <div class="box"><div class="k">data_path</div>${esc(dm.data_path || '—')}</div>
         <div class="box"><div class="k">codes</div>${esc((dim.codes || []).length)}</div>

@@ -96,6 +96,39 @@ def _storage_snapshot() -> dict[str, Any]:
     }
 
 
+def _data_sources(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """Map a Runner data manifest to FactorPickle data-domain labels."""
+    dim = manifest.get("data_interface_manifest") or {}
+    services = {str(item) for item in (dim.get("services") or [])}
+    fields = {str(item) for item in (dim.get("fields") or [])}
+    labels: list[dict[str, Any]] = []
+
+    def add(label: str, matched_fields: list[str], matched_services: list[str]) -> None:
+        if not matched_fields and not matched_services:
+            return
+        labels.append({"label": label, "fields": sorted(set(matched_fields)), "services": sorted(set(matched_services))})
+
+    price_fields = sorted(fields & {"open", "high", "low", "close", "volume", "amount", "turnover"})
+    if "market" in services or price_fields:
+        add("行情与基础", price_fields, ["market"] if "market" in services else [])
+
+    valuation_fields = sorted(fields & {"float_mv", "total_mv", "pe_ttm", "pb", "ps_ttm", "dv_ttm"})
+    if "valuation" in services or valuation_fields:
+        add("财务与估值", valuation_fields, ["valuation"] if "valuation" in services else [])
+
+    flow_fields = sorted(fields & {"mf_buy_lg", "mf_buy_elg", "mf_sell_lg", "mf_sell_elg", "margin_rzye", "margin_rqye"})
+    if {"moneyflow", "margin"} & services or flow_fields:
+        add("资金与情绪", flow_fields, sorted({"moneyflow", "margin"} & services))
+
+    if "concept" in services:
+        add("板块与概念", [], ["concept"])
+    if "factor" in services:
+        add("因子资产", [], ["factor"])
+    if labels:
+        return labels
+    return [{"label": "运行状态", "fields": [], "services": sorted(services)}]
+
+
 def _load_experiments() -> list[dict[str, Any]]:
     experiments: list[dict[str, Any]] = []
     if not config.EXPERIMENTS_DIR.exists():
@@ -154,6 +187,7 @@ def _load_experiments() -> list[dict[str, Any]]:
             "gate": brief.get("gate"),
             "agent_trace": _read(root / "agent_trace.json"),
             "data_manifest": _read(root / "data_manifest.json"),
+            "data_sources": _data_sources(_read(root / "data_manifest.json")),
             "detail": {
                 "audit_checks": checks,
                 "brief": brief,
