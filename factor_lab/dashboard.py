@@ -152,6 +152,8 @@ def _load_experiments() -> list[dict[str, Any]]:
             "recommend": brief.get("recommend"),
             "decision": decision.get("decision"),
             "gate": brief.get("gate"),
+            "agent_trace": _read(root / "agent_trace.json"),
+            "data_manifest": _read(root / "data_manifest.json"),
             "detail": {
                 "audit_checks": checks,
                 "brief": brief,
@@ -349,6 +351,34 @@ def build_dashboard_data() -> dict[str, Any]:
     if not isinstance(portfolio, list):
         portfolio = list(bets.values())
 
+    research_funnel = [
+        {
+            "stage": "假设",
+            "count": len({str(exp.get("hypothesis_id")) for exp in experiments if exp.get("hypothesis_id")}),
+            "note": "已注册的研究问题",
+        },
+        {
+            "stage": "因子",
+            "count": len({str(exp.get("factor")) for exp in experiments if exp.get("factor")}),
+            "note": "Builder 落库或被评估的因子",
+        },
+        {
+            "stage": "实验",
+            "count": len(experiments),
+            "note": "一次预注册 outcome",
+        },
+        {
+            "stage": "评估",
+            "count": sum(1 for exp in experiments if exp.get("grade")),
+            "note": "有评级 / 审计结果",
+        },
+        {
+            "stage": "决策",
+            "count": sum(1 for exp in experiments if exp.get("decision")),
+            "note": "park / iterate / promote",
+        },
+    ]
+
     return {
         "meta": {
             "generated_at": config.now_iso(),
@@ -359,23 +389,8 @@ def build_dashboard_data() -> dict[str, Any]:
             "experiment_count": len(experiments),
         },
         "health": {"level": health_level, "reasons": reasons},
-        "kpis": [
-            {"label": "本周新增假设", "value": weekly_hypotheses, "sub": "目标：≥ 3", "tone": "ok" if weekly_hypotheses >= 3 else "warn"},
-            {"label": "本月进入 G3", "value": monthly_g3, "sub": "目标：≥ 1", "tone": "ok" if monthly_g3 >= 1 else "warn"},
-            {"label": "假设 → G3", "value": f"{time_to_g3:.1f} 天" if time_to_g3 is not None else "—", "sub": "目标：≤ 5 个工作日", "tone": "ok" if time_to_g3 is not None and time_to_g3 <= 5 else "warn"},
-            {"label": "去重 trial", "value": summary.get("distinct_trials"), "sub": "trial = 假设 × 预注册口径", "tone": "ok"},
-            {"label": "孤儿 run", "value": orphan_count, "sub": "必须为 0", "tone": "bad" if orphan_count else "ok"},
-            {"label": "审计失败率", "value": f"{audit_fail_rate:.0%}", "sub": f"{fail_count}/{len(experiments) or 0} 个实验", "tone": "bad" if fail_count else "ok"},
-        ],
-        "funnel": funnel,
+        "research_funnel": research_funnel,
         "experiments": experiments,
-        "attention": _attention(experiments, verification),
-        "bets": list(bets.values()),
-        "portfolio": portfolio,
-        "audit_findings": findings[:80],
-        "ledger_points": points,
-        "coverage": coverage,
-        "storage": _storage_snapshot(),
         "control": read_json(config.CONTROL_PATH) or {"state": "not_configured"},
         "heartbeat": read_json(config.HEARTBEAT_PATH),
         "cycle": read_json(config.CYCLE_PATH),

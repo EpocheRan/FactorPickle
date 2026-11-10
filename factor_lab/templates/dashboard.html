@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Factor Lab · 因子实验室控制台</title>
+<title>Factor Lab · 研究记录</title>
 <style>
   :root{
-    --paper:#f6f1e7; --paper2:#fffdf8; --ink:#221c18; --muted:#6d6258;
-    --line:#d9cfc0; --line2:#b9ab97;
-    --burgundy:#7b1e2b; --burgundy2:#a33a45; --burgundy-soft:#f3e4e4;
+    --paper:#f4efe5; --paper2:#fffdf8; --ink:#211b17; --muted:#74685d;
+    --line:#d8cdbd; --line2:#b9a88f;
+    --accent:#7b1e2b; --accent2:#a33a45; --accent-soft:#f3e3e3;
     --gold:#a67c3d; --gold-soft:#f4ead9;
     --green:#2e6a4f; --green-soft:#e6f0e9;
     --amber:#a8641a; --amber-soft:#f7ead8;
@@ -20,237 +20,153 @@
     --shadow:0 10px 30px rgba(52,38,24,.06);
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
-  body{
-    margin:0;color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;
-    background:
-      radial-gradient(1000px 500px at 85% -10%, rgba(166,124,61,.10), transparent 60%),
-      linear-gradient(180deg,#f8f4ec 0%,#f3ede2 100%);
-  }
-  a{color:var(--burgundy);text-decoration:none}
-  .wrap{max-width:1440px;margin:0 auto;padding:22px 26px 60px}
-  .top{display:flex;align-items:center;gap:18px;flex-wrap:wrap;border-bottom:1px solid rgba(185,171,151,.4);padding-bottom:14px;margin-bottom:22px}
-  .brand{font-family:var(--serif);font-size:25px;font-weight:700;letter-spacing:-.02em}
-  .brand span{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--gold);margin-left:10px;vertical-align:middle}
-  .top-meta{margin-left:auto;display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:9.5px;color:var(--muted);letter-spacing:.04em}
-  .top-meta b{color:var(--ink);font-weight:600}
-  .hero{display:grid;grid-template-columns:1.4fr .6fr;gap:16px;margin-bottom:16px}
-  .hero-card{background:rgba(255,253,248,.86);border:1px solid var(--line);border-radius:16px;padding:22px 24px;box-shadow:var(--shadow)}
-  .eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--gold);font-weight:700}
-  .status-line{display:flex;align-items:center;gap:10px;margin:7px 0 4px}
-  .status-dot{width:12px;height:12px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 5px rgba(166,124,61,.12)}
-  .status-dot.green{background:var(--green);box-shadow:0 0 0 5px rgba(46,106,79,.12)}
-  .status-dot.yellow{background:var(--amber);box-shadow:0 0 0 5px rgba(168,100,26,.13)}
-  .status-dot.red{background:var(--red);box-shadow:0 0 0 5px rgba(162,42,42,.12)}
-  .status-line h1{font-family:var(--serif);font-size:30px;line-height:1.1;letter-spacing:-.02em;margin:0}
-  .status-reason{margin:4px 0 0;color:var(--muted);font-size:12.5px;max-width:760px}
-  .hero-side{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .mini-stat{padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,253,248,.7)}
-  .mini-stat b{display:block;font-family:var(--serif);font-size:24px;line-height:1.1;color:var(--burgundy)}
-  .mini-stat span{display:block;margin-top:3px;font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
-  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
-  .kpi{background:rgba(255,253,248,.86);border:1px solid var(--line);border-radius:12px;padding:14px 15px;box-shadow:var(--shadow)}
-  .kpi .k{font-family:var(--mono);font-size:8.5px;letter-spacing:.09em;color:var(--muted);text-transform:uppercase}
-  .kpi .v{font-family:var(--serif);font-size:25px;line-height:1.15;margin:5px 0 2px;color:var(--ink)}
-  .kpi .s{font-size:10.5px;color:var(--muted)}
-  .kpi .v.ok{color:var(--green)} .kpi .v.warn{color:var(--amber)} .kpi .v.bad{color:var(--red)}
-  .grid{display:grid;grid-template-columns:2.15fr .85fr;gap:14px;margin-bottom:14px}
-  .grid3{display:grid;grid-template-columns:1.1fr 1fr .9fr;gap:14px;margin-bottom:14px}
-  .grid2{display:grid;grid-template-columns:1.4fr .6fr;gap:14px;margin-bottom:14px}
-  .panel{background:rgba(255,253,248,.86);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);min-width:0}
-  .panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-  .panel h2{font-family:var(--serif);font-size:18px;letter-spacing:-.01em;margin:0}
-  .panel-head .sub{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.04em}
-  .pager{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:10px;font-family:var(--mono);font-size:9px;color:var(--muted)}
-  .pager .page-info{margin-right:auto}
-  .pager button{border:1px solid var(--line);background:var(--paper2);color:var(--ink);border-radius:5px;padding:3px 7px;cursor:pointer;font:inherit}
-  .pager button:disabled{opacity:.35;cursor:default}
-  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-  .filters input,.filters select{
-    font-family:var(--sans);font-size:11px;padding:6px 8px;border:1px solid var(--line);
-    border-radius:7px;background:var(--paper2);color:var(--ink);outline:none;
-  }
-  .filters input:focus,.filters select:focus{border-color:var(--burgundy2)}
-  .table-wrap{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:10px;background:var(--paper2)}
-  table{width:100%;border-collapse:collapse;min-width:900px}
-  th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:11px;vertical-align:top}
-  th{background:#efe7da;font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;position:sticky;top:0;z-index:2}
-  tbody tr{cursor:pointer} tbody tr:hover{background:rgba(166,124,61,.06)}
-  tr:last-child td{border-bottom:none}
-  .mono{font-family:var(--mono);font-size:10.5px}
+  body{margin:0;background:radial-gradient(1000px 500px at 85% -10%,rgba(166,124,61,.10),transparent 60%),linear-gradient(180deg,#f8f4ec 0%,#f2ece1 100%);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55}
+  .wrap{max-width:1440px;margin:0 auto;padding:22px 26px 56px}
+  .top{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:18px}
+  .brand{font-family:var(--serif);font-size:29px;font-weight:700;letter-spacing:-.03em;line-height:1}
+  .brand span{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--gold);margin-left:10px;text-transform:uppercase}
+  .meta{margin-left:auto;display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.03em}
+  .meta b{color:var(--ink);font-weight:600}
+  .health{display:flex;align-items:center;gap:9px;margin:0 0 14px;font-size:11px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 4px rgba(168,100,26,.12)}
+  .dot.green{background:var(--green);box-shadow:0 0 0 4px rgba(46,106,79,.12)}
+  .dot.red{background:var(--red);box-shadow:0 0 0 4px rgba(162,42,42,.12)}
+  .section-title{display:flex;align-items:center;gap:12px;margin:0 0 10px}
+  .section-title h1{font-family:var(--serif);font-size:22px;letter-spacing:-.02em;margin:0}
+  .section-title .sub{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.05em;margin-left:auto}
+  .funnel{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px}
+  .funnel-card{position:relative;background:var(--paper2);border:1px solid var(--line);border-radius:12px;padding:15px 16px 14px;box-shadow:var(--shadow);min-width:0}
+  .funnel-card:after{content:"→";position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2;background:var(--paper);color:var(--line2);font-family:var(--mono);font-size:14px;line-height:1;padding:2px 2px}
+  .funnel-card:last-child:after{display:none}
+  .funnel-card .k{font-family:var(--mono);font-size:9px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase}
+  .funnel-card .v{font-family:var(--serif);font-size:32px;line-height:1.1;margin:5px 0 2px;color:var(--ink)}
+  .funnel-card .n{font-size:10px;color:var(--muted)}
+  .panel{background:var(--paper2);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .head h2{font-family:var(--serif);font-size:20px;letter-spacing:-.01em;margin:0}
+  .head .sub{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted)}
+  .filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+  .filters input,.filters select{font-family:var(--sans);font-size:11px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--paper2);color:var(--ink);outline:none}
+  .filters input{min-width:230px;flex:1;max-width:380px}
+  .filters input:focus,.filters select:focus{border-color:var(--accent2)}
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--paper2)}
+  table{width:100%;border-collapse:collapse;min-width:880px}
+  th,td{padding:10px 9px;border-bottom:1px solid var(--line);text-align:left;font-size:11px;vertical-align:middle}
+  th{background:#efe7da;font-family:var(--mono);font-size:8px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;position:sticky;top:0;z-index:1}
+  tbody tr{cursor:pointer} tbody tr:hover{background:rgba(166,124,61,.07)} tr:last-child td{border-bottom:none}
+  .mono{font-family:var(--mono);font-size:10px}
   .muted{color:var(--muted)}
-  .badge{display:inline-block;padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:8.5px;letter-spacing:.04em;white-space:nowrap}
+  .badge{display:inline-block;padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:8.5px;letter-spacing:.03em;white-space:nowrap}
   .badge.pass,.badge.green{background:var(--green-soft);color:var(--green)}
-  .badge.warn,.badge.boundary,.badge.yellow{background:var(--amber-soft);color:var(--amber)}
+  .badge.warn,.badge.yellow{background:var(--amber-soft);color:var(--amber)}
   .badge.fail,.badge.red{background:var(--red-soft);color:var(--red)}
-  .badge.pending,.badge.muted{background:#eee7db;color:var(--muted)}
-  .badge.burgundy{background:var(--burgundy-soft);color:var(--burgundy)}
+  .badge.muted{background:#eee7db;color:var(--muted)}
   .badge.gold{background:var(--gold-soft);color:var(--gold)}
-  .stack{display:grid;gap:8px}
-  .att{padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--paper2);cursor:pointer}
-  .att:hover{border-color:var(--line2)}
-  .att .h{display:flex;gap:7px;align-items:center;font-weight:600;font-size:11.5px}
-  .att .d{font-size:10.5px;color:var(--muted);margin-top:2px}
-  .att.red{border-left:3px solid var(--red)} .att.yellow{border-left:3px solid var(--amber)}
-  .bar-row{display:grid;grid-template-columns:42px 1fr 44px;gap:8px;align-items:center;margin:7px 0;font-size:10.5px}
-  .bar{height:8px;border-radius:999px;background:#eee7db;overflow:hidden}
-  .bar i{display:block;height:100%;border-radius:999px;background:var(--burgundy2)}
-  .bar-row .n{text-align:right;font-family:var(--mono);font-size:9.5px;color:var(--muted)}
-  .empty{padding:18px;text-align:center;color:var(--muted);font-size:11.5px;border:1px dashed var(--line2);border-radius:9px}
-  .chart{width:100%;height:170px;display:block}
-  .chart text{font-family:var(--mono);font-size:8px;fill:var(--muted)}
-  .bets{display:grid;gap:8px}
-  .bet{border:1px solid var(--line);border-radius:9px;padding:10px 11px;background:var(--paper2)}
-  .bet .t{display:flex;gap:8px;align-items:center}
-  .bet .t b{font-size:11.5px} .bet .t span{margin-left:auto}
-  .bet .m{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:7px;font-size:9.5px;color:var(--muted)}
-  .bet .m b{display:block;font-family:var(--mono);font-size:11px;color:var(--ink)}
-  .finding{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line);font-size:10.5px}
-  .finding:last-child{border-bottom:none}
-  .finding .id{font-family:var(--mono);font-size:9px;color:var(--muted);min-width:82px}
-  .finding .d{color:var(--muted)}
-  .storage-row{display:grid;grid-template-columns:130px 1fr 74px;gap:8px;align-items:center;margin:6px 0;font-size:10px}
-  .storage-row .n{text-align:right;font-family:var(--mono);font-size:9px;color:var(--muted)}
-  .drawer{position:fixed;top:0;right:0;width:min(560px,96vw);height:100vh;background:var(--paper2);border-left:1px solid var(--line2);box-shadow:-24px 0 60px rgba(34,28,24,.18);z-index:60;transform:translateX(0);overflow:auto;padding:20px 22px 40px}
-  .drawer[hidden]{display:none}
-  .drawer-head{display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px}
-  .drawer-head h3{font-family:var(--serif);font-size:21px;line-height:1.2;margin:0}
-  .drawer-head .x{margin-left:auto;border:0;background:#eee7db;color:var(--ink);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px}
-  .drawer h4{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--gold);text-transform:uppercase;margin:18px 0 7px}
-  .metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-  .metric{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:rgba(255,253,248,.7)}
-  .metric .k{font-family:var(--mono);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-  .metric .v{font-size:12px;margin-top:1px}
-  .check{display:grid;grid-template-columns:92px 1fr;gap:7px;padding:6px 0;border-bottom:1px solid var(--line);font-size:10.5px}
-  .check:last-child{border-bottom:none}
-  .check .id{font-family:var(--mono);font-size:8.5px;color:var(--muted)}
-  .check .a{color:var(--muted)}
-  .paths{display:grid;gap:5px;font-family:var(--mono);font-size:9px;color:var(--muted);word-break:break-all}
-  .overlay{position:fixed;inset:0;background:rgba(34,28,24,.18);z-index:55}
+  .badge.accent{background:var(--accent-soft);color:var(--accent)}
+  .rating{font-family:var(--mono);font-weight:700;font-size:11px}
+  .rating.A{color:var(--green)} .rating.B{color:var(--gold)} .rating.C{color:var(--amber)} .rating.D{color:var(--red)} .rating.na{color:var(--muted)}
+  .pager{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:12px;font-family:var(--mono);font-size:9px;color:var(--muted)}
+  .pager .info{margin-right:auto}
+  .pager button{min-width:27px;height:27px;border:1px solid var(--line);background:var(--paper2);color:var(--ink);border-radius:6px;cursor:pointer;font:inherit;padding:0 7px}
+  .pager button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .pager button:disabled{opacity:.35;cursor:default}
+  .empty{padding:30px;text-align:center;color:var(--muted);font-size:12px}
+  .foot{margin-top:18px;padding-top:12px;border-top:1px solid var(--line);display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:8.5px;color:var(--muted)}
+  .overlay{position:fixed;inset:0;background:rgba(34,28,24,.18);z-index:30}
   .overlay[hidden]{display:none}
-  .foot{margin-top:18px;padding-top:12px;border-top:1px solid var(--line);display:flex;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:8.5px;color:var(--muted)}
-  @media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.grid,.grid3,.grid2,.hero{grid-template-columns:1fr}.hero-side{grid-template-columns:repeat(4,1fr)}}
-  @media (max-width:680px){.wrap{padding:14px}.kpis{grid-template-columns:1fr 1fr}.hero-side{grid-template-columns:1fr 1fr}.top-meta{margin-left:0}.drawer{width:100vw}}
-  @media print{.top,.filters,.overlay,.drawer{display:none!important}.panel,.kpi{box-shadow:none;break-inside:avoid}.table-wrap{max-height:none;overflow:visible}}
+  .drawer{position:fixed;top:0;right:0;width:min(720px,96vw);height:100vh;overflow:auto;background:var(--paper2);border-left:1px solid var(--line2);box-shadow:-24px 0 60px rgba(34,28,24,.18);z-index:31;padding:22px 24px 44px}
+  .drawer[hidden]{display:none}
+  .drawer-head{display:flex;gap:12px;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:15px}
+  .drawer-head h3{font-family:var(--serif);font-size:22px;line-height:1.2;margin:0 0 3px}
+  .drawer-head .sub{font-family:var(--mono);font-size:9px;color:var(--muted)}
+  .drawer-head .x{margin-left:auto;border:0;background:#eee7db;color:var(--ink);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:17px;line-height:1}
+  .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:8px 0 16px}
+  .metric{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:rgba(255,253,248,.7)}
+  .metric .k{font-family:var(--mono);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .metric .v{font-size:12px;margin-top:2px}
+  .drawer h4{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--gold);text-transform:uppercase;margin:19px 0 8px}
+  .chain{display:grid;gap:8px}
+  .stage{border:1px solid var(--line);border-left:3px solid var(--line2);border-radius:9px;padding:11px 12px;background:rgba(255,253,248,.7)}
+  .stage.used{border-left-color:var(--green)}
+  .stage.not_invoked,.stage.derived{border-left-color:var(--gold)}
+  .stage .h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:600;font-size:12px}
+  .stage .h .prov{font-family:var(--mono);font-size:8px;font-weight:400;color:var(--muted);margin-left:auto}
+  .stage .d{font-size:11px;color:var(--ink);margin-top:5px}
+  .stage .m{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:5px;word-break:break-word}
+  .hyp{border:1px solid var(--line);border-radius:9px;padding:11px 12px;background:#fbf6ed}
+  .hyp .q{font-size:12px}
+  .check{display:grid;grid-template-columns:78px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:10.5px}
+  .check:last-child{border-bottom:none}
+  .check .actual{color:var(--muted)}
+  .coverage{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .coverage .box{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:10.5px}
+  .coverage .box .k{font-family:var(--mono);font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
+  @media(max-width:1100px){.funnel{grid-template-columns:repeat(3,1fr)}.funnel-card:nth-child(3):after{display:none}.metric-grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:680px){.wrap{padding:14px}.funnel{grid-template-columns:1fr 1fr}.funnel-card:after{display:none}.meta{margin-left:0}.coverage{grid-template-columns:1fr}.drawer{padding:16px}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="brand">Factor Lab <span>控制台</span></div>
-    <div class="top-meta">
-      <span>更新 <b>__GENERATED_AT__</b></span>
+    <div class="brand">Factor Lab <span>Research Log</span></div>
+    <div class="meta">
+      <span>更新 <b id="m-updated">—</b></span>
       <span>策略 <b id="m-policy">—</b></span>
       <span>账本 <b id="m-ledger">—</b></span>
-      <span>心跳 <b id="m-heartbeat">—</b></span>
-      <span>周期 <b id="m-cycle">—</b></span>
       <span>提交 <b id="m-commit">—</b></span>
     </div>
   </header>
 
-  <section class="hero">
-    <div class="hero-card">
-      <div class="eyebrow">实验室状态</div>
-      <div class="status-line"><span id="status-dot" class="status-dot"></span><h1 id="status-label">—</h1></div>
-      <p class="status-reason" id="status-reason"></p>
-    </div>
-    <div class="hero-side" id="hero-side"></div>
-  </section>
+  <div class="health" id="health"><span class="dot" id="health-dot"></span><span id="health-text">—</span></div>
 
-  <section class="kpis" id="kpis"></section>
-
-  <section class="grid3">
-    <div class="panel">
-      <div class="panel-head"><h2>PathFinder 记录</h2><span class="sub" id="gov-pf-count">—</span></div>
-      <div class="stack" id="pathfinder"></div>
-    </div>
-    <div class="panel">
-      <div class="panel-head"><h2>Supervisor 记录</h2><span class="sub" id="gov-sv-count">—</span></div>
-      <div class="stack" id="supervisor"></div>
-    </div>
-    <div class="panel">
-      <div class="panel-head"><h2>FactorBuilder 状态</h2><span class="sub" id="gov-fb-count">—</span></div>
-      <div class="stack" id="builder"></div>
-    </div>
-  </section>
-
-  <section class="grid">
-    <div class="panel">
-      <div class="panel-head">
-        <h2>实验记录</h2>
-        <span class="sub" id="table-count">—</span>
-      </div>
-      <div class="filters">
-        <input id="q" type="search" placeholder="搜索因子 / 编号 / 押注" />
-        <select id="f-status"><option value="">全部审计状态</option><option value="pass">通过</option><option value="warn">警告</option><option value="fail">失败</option><option value="pending">待定</option></select>
-        <select id="f-g3"><option value="">全部 G3</option><option value="pass">通过</option><option value="warn">边界</option><option value="fail">失败</option><option value="pending">待定</option></select>
-        <select id="f-bet"><option value="">全部押注</option></select>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>实验</th><th>因子</th><th>押注</th><th>门禁</th><th>IC</th><th>净价差/5日</th><th>换手</th><th>ρ</th><th>N/q</th><th>审计</th><th>决策</th><th>时间</th>
-          </tr></thead>
-          <tbody id="tbody"></tbody>
-        </table>
-      </div>
-      <div class="pager" id="table-pager"></div>
-    </div>
-    <aside class="panel">
-      <div class="panel-head"><h2>待处理</h2><span class="sub">人工队列</span></div>
-      <div class="stack" id="attention"></div>
-      <div class="pager" id="attention-pager"></div>
-    </aside>
-  </section>
-
-  <section class="grid3">
-    <div class="panel">
-      <div class="panel-head"><h2>门禁漏斗</h2><span class="sub">门禁计数</span></div>
-      <div id="funnel"></div>
-    </div>
-    <div class="panel">
-      <div class="panel-head"><h2>试验累计</h2><span class="sub">账本</span></div>
-      <svg class="chart" id="trial-chart" viewBox="0 0 600 170" role="img" aria-label="试验累计"></svg>
-    </div>
-    <div class="panel">
-      <div class="panel-head"><h2>研究押注</h2><span class="sub">组合</span></div>
-      <div class="bets" id="bets"></div>
-      <div class="pager" id="bets-pager"></div>
-    </div>
-  </section>
-
-  <section class="grid2">
-    <div class="panel">
-      <div class="panel-head"><h2>审计发现</h2><span class="sub" id="finding-count">—</span></div>
-      <div id="findings"></div>
-      <div class="pager" id="findings-pager"></div>
-    </div>
-    <div class="panel">
-      <div class="panel-head"><h2>数据覆盖</h2><span class="sub">手工表</span></div>
-      <div id="coverage"></div>
-    </div>
-  </section>
+  <div class="section-title">
+    <h1>研究漏斗</h1>
+    <span class="sub">假设 → 因子 → 实验 → 评估 → 决策</span>
+  </div>
+  <section class="funnel" id="funnel"></section>
 
   <section class="panel">
-    <div class="panel-head"><h2>存储与清理</h2><span class="sub" id="storage-total">—</span></div>
-    <div id="storage"></div>
+    <div class="head">
+      <h2>实验记录</h2>
+      <span class="sub" id="table-count">—</span>
+    </div>
+    <div class="filters">
+      <input id="q" type="search" placeholder="搜索实验 / 因子 / 假设" />
+      <select id="f-grade">
+        <option value="">全部评级</option>
+        <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+      </select>
+      <select id="f-decision">
+        <option value="">全部决策</option>
+        <option value="park">park</option><option value="iterate">iterate</option><option value="promote">promote</option>
+      </select>
+      <select id="f-audit">
+        <option value="">全部审计</option>
+        <option value="pass">通过</option><option value="warn">警告</option><option value="fail">失败</option>
+      </select>
+      <button id="reset" style="border:1px solid var(--line);background:var(--paper2);border-radius:7px;padding:7px 10px;font-size:11px;cursor:pointer;color:var(--muted)">重置</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>实验</th><th>因子</th><th>评级</th><th>IC</th><th>净价差/期</th><th>换手</th><th>审计</th><th>决策</th><th>日期</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="pager" id="pager"></div>
   </section>
 
   <div class="foot">
-    <span>Factor Lab v0.1 · 只读控制台</span>
+    <span>Factor Lab · 研究记录</span>
     <span>实验 <b id="m-exp">—</b></span>
-    <span>试验 <b id="m-trials">—</b></span>
-    <span>控制 <b id="m-control">—</b></span>
+    <span>账本记录 <b id="m-records">—</b></span>
+    <span>只读</span>
   </div>
 </div>
 
 <div class="overlay" id="overlay" hidden></div>
 <aside class="drawer" id="drawer" hidden>
-  <div class="drawer-head">
-    <div><div class="eyebrow" id="d-eyebrow">实验</div><h3 id="d-title">—</h3></div>
-    <button class="x" id="d-close" aria-label="close">×</button>
-  </div>
-  <div id="d-body"></div>
+  <button class="x" id="drawer-close" aria-label="关闭" style="border:0;background:#eee7db;width:30px;height:30px;border-radius:50%;float:right;cursor:pointer;font-size:17px">×</button>
+  <div id="drawer-body"></div>
 </aside>
 
 <script type="application/json" id="lab-data">__LAB_DATA__</script>
@@ -259,260 +175,168 @@
   const DATA = JSON.parse(document.getElementById('lab-data').textContent);
   const $ = (id) => document.getElementById(id);
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const LABEL = {
-    pass:'通过', warn:'警告', fail:'失败', pending:'待定', green:'绿灯', yellow:'黄灯', red:'红灯',
-    running:'运行中', success:'成功', failed:'失败', not_configured:'未配置',
-    park:'归档', iterate:'迭代', repair:'修复', promote:'晋升', 'promote to G4':'晋升 G4',
-    explore:'探索', exploit:'推进', confirmed:'已确认',
-    'G3 pass':'G3 通过', 'G3 boundary':'G3 边界', 'G3 fail':'G3 失败', 'G2 fail':'G2 失败'
-  };
-  const CHECK = {
-    artifacts:'产物齐全', run_id:'run_id 一致', params:'参数与窗口', sample:'样本覆盖',
-    ic_recompute:'IC 重算', spread_recompute:'毛价差重算', cost_identity:'成本恒等式',
-    monotonicity:'单调性', policy:'策略哈希', ledger_chain:'账本链', orphan_run:'孤儿 run',
-    outcome_pre_registered:'预注册口径', g3_tradeability:'G3 交易性', report_diagnostics:'报告诊断',
-    rating:'评级字段', turnover:'换手上限', capacity:'容量倍数', cost_sensitivity:'2× 成本', orthogonality:'G0.5 相关性'
-  };
-  const t = (v) => LABEL[String(v)] || String(v ?? '');
-  const checkTitle = (c) => CHECK[c.check_id] || c.title || c.check_id;
-  const fmt = (v) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(3);
-  const pct = (v) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : (Number(v) * 100).toFixed(2) + '%';
-  const dlabel = (v) => String(v || '').slice(0, 10);
-  const zhText = (s) => String(s ?? '')
-    .replace(/no fail \(warn only\)/gi, '无失败（仅警告）')
-    .replace(/\bfail\b/gi, '失败')
-    .replace(/\bwarn\b/gi, '警告')
-    .replace(/\bpass\b/gi, '通过')
-    .replace(/\bmissing\b/gi, '缺失')
-    .replace(/\bexpected\b/gi, '期望')
-    .replace(/\bchecks\b/gi, '项检查')
-    .replace(/cost net/gi, '成本后净价差')
-    .replace(/2x net/gi, '2× 净价差')
-    .replace(/2x/gi, '2×')
-    .replace(/\b(\d+)x\b/gi, '$1×')
-    .replace(/\bn\/a\b/gi, '—');
-  const bytes = (n) => { if (!n) return '0 B'; const u=['B','KB','MB','GB','TB']; let i=0; let x=Number(n); while(x>=1024&&i<u.length-1){x/=1024;i++;} return x.toFixed(1)+' '+u[i]; };
-  const badge = (v, cls) => `<span class="badge ${esc(cls || v || 'muted')}">${esc(t(v) || '—')}</span>`;
-  const PAGE_SIZE = { table: 10, attention: 5, bets: 4, findings: 8 };
-  const PAGE = { table: 1, attention: 1, bets: 1, findings: 1 };
-  function pageSlice(items, key) {
-    const size = PAGE_SIZE[key];
-    const pages = Math.max(1, Math.ceil(items.length / size));
-    PAGE[key] = Math.min(Math.max(1, PAGE[key]), pages);
-    const start = (PAGE[key] - 1) * size;
-    return items.slice(start, start + size);
-  }
-  function renderPager(id, key, total) {
-    const el = $(id);
-    if (!el) return;
-    if (!total) { el.innerHTML = ''; return; }
-    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE[key]));
-    const page = PAGE[key];
-    el.innerHTML = `<span class="page-info">第 ${page} / ${pages} 页 · ${total} 条</span>
-      <button data-page-key="${key}" data-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>上一页</button>
-      <button data-page-key="${key}" data-page="${page + 1}" ${page >= pages ? 'disabled' : ''}>下一页</button>`;
-  }
+  const fmt = (v, d=3) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(d);
+  const pct = (v, d=2) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : (Number(v) * 100).toFixed(d) + '%';
+  const badge = (v, cls) => `<span class="badge ${esc(cls || v || 'muted')}">${esc(v || '—')}</span>`;
+  const ratingBadge = (exp) => exp.grade ? `<span class="rating ${esc(exp.grade)}">${esc(exp.grade)} <small>${fmt(exp.score,1)}</small></span>` : '<span class="rating na">—</span>';
+  const PAGE_SIZE = 10;
+  const state = { page: 1, q: '', grade: '', decision: '', audit: '' };
 
-  function statusClass(level){ return level === 'green' ? 'green' : level === 'red' ? 'red' : 'yellow'; }
-  function renderHeader(){
-    const level = DATA.health?.level || 'yellow';
-    $('status-dot').className = 'status-dot ' + statusClass(level);
-    $('status-label').textContent = level === 'green' ? '绿灯 · 运行正常' : level === 'red' ? '红灯 · 停止检查' : '黄灯 · 受限运行';
-    $('status-reason').textContent = (DATA.health?.reasons || []).join(' · ');
+  function renderMeta(){
+    $('m-updated').textContent = DATA.meta?.generated_at || '—';
     $('m-policy').textContent = DATA.meta?.policy_version || '—';
-    $('m-ledger').textContent = (DATA.meta?.ledger_head || '—').slice(0, 18);
-    $('m-heartbeat').textContent = DATA.heartbeat?.host_alive_at ? String(DATA.heartbeat.host_alive_at).slice(11, 19) : '—';
-    $('m-cycle').textContent = DATA.cycle?.cycle_id ? `${DATA.cycle.cycle_id} · ${t(DATA.cycle.status || '')}` : '—';
+    $('m-ledger').textContent = DATA.meta?.ledger_head ? String(DATA.meta.ledger_head).slice(0, 10) : '—';
     $('m-commit').textContent = DATA.meta?.git_commit || '—';
-    $('m-exp').textContent = DATA.meta?.experiment_count ?? 0;
-    $('m-trials').textContent = DATA.ledger?.distinct_trials ?? 0;
-    $('m-control').textContent = t(DATA.control?.state || '未配置');
-    $('hero-side').innerHTML = [
-      ['去重 trial', DATA.ledger?.distinct_trials ?? 0, '账本'],
-      ['G3 候选', (DATA.experiments || []).filter(e => e.verdict !== 'fail' && e.g3 !== 'fail').length, '研究'],
-      ['待处理', (DATA.attention || []).length, '人工'],
-      ['策略版本', DATA.meta?.policy_version || '—', '门禁'],
-    ].map(([k,v,s]) => `<div class="mini-stat"><b>${esc(v)}</b><span>${esc(k)} · ${esc(s)}</span></div>`).join('');
-  }
-
-  function renderKpis(){
-    $('kpis').innerHTML = (DATA.kpis || []).map(k => `<div class="kpi"><div class="k">${esc(k.label)}</div><div class="v ${esc(k.tone || '')}">${esc(k.value)}</div><div class="s">${esc(k.sub)}</div></div>`).join('');
-  }
-
-  function renderGovernance(){
-    const governance = DATA.governance || {};
-    const records = governance.records || [];
-    const gate = (r) => r.actor === 'Supervisor' ? (r.verdict === 'blocked' ? 'fail' : r.verdict === 'watch' ? 'warn' : 'pass') : (r.status === 'not_invoked' ? 'muted' : 'gold');
-    const card = (r) => {
-      const meta = [r.mode, r.status, r.verdict, r.next].filter(Boolean).map(esc).join(' · ');
-      const detail = r.thought || r.reason || '';
-      const evidence = (r.evidence || []).slice(0, 3).map(esc).join(' · ');
-      const details = (r.details || []).slice(0, 5).map(item => `<div class="d">• ${esc(item)}</div>`).join('');
-      return `<div class="att ${r.actor === 'Supervisor' && r.verdict === 'watch' ? 'yellow' : ''}">
-        <div class="h"><span class="badge ${gate(r)}">${esc(r.actor || 'Agent')}</span><b>${esc(r.id || '')}</b><span class="muted mono" style="margin-left:auto">${esc(r.round || '')}</span></div>
-        <div class="d">${esc(detail)}</div>
-        ${details}
-        ${meta ? `<div class="d mono">${meta}</div>` : ''}
-        ${evidence ? `<div class="d mono">evidence: ${evidence}</div>` : ''}
-      </div>`;
-    };
-    const render = (id, countId, predicate) => {
-      const rows = records.filter(predicate);
-      const el = $(id);
-      if (el) el.innerHTML = rows.length ? rows.map(card).join('') : `<div class="empty">暂无记录</div>`;
-      const count = $(countId);
-      if (count) count.textContent = `${rows.length} 条`;
-    };
-    render('pathfinder', 'gov-pf-count', r => r.actor === 'PathFinder');
-    render('supervisor', 'gov-sv-count', r => r.actor === 'Supervisor');
-    render('builder', 'gov-fb-count', r => r.actor === 'FactorBuilder');
-  }
-
-  function renderTable(){
-    const q = ($('q').value || '').toLowerCase();
-    const status = $('f-status').value;
-    const g3 = $('f-g3').value;
-    const bet = $('f-bet').value;
-    const rows = (DATA.experiments || []).filter(e => {
-      const hay = [e.id, e.factor, e.bet, e.hypothesis_id].join(' ').toLowerCase();
-      return (!q || hay.includes(q)) && (!status || e.verdict === status) && (!g3 || e.g3 === g3) && (!bet || e.bet === bet);
-    });
-    $('table-count').textContent = `${rows.length} / ${(DATA.experiments || []).length}`;
-    if (!rows.length) {
-      $('tbody').innerHTML = `<tr><td colspan="12"><div class="empty">没有匹配当前筛选的实验</div></td></tr>`;
-      renderPager('table-pager', 'table', 0);
-      return;
-    }
-    const pageRows = pageSlice(rows, 'table');
-    $('tbody').innerHTML = pageRows.map(e => `
-      <tr data-id="${esc(e.id)}">
-        <td class="mono">${esc(e.id)}</td>
-        <td>${esc(e.factor)}<div class="muted mono">${esc(e.horizon)} 天 · ${esc(e.universe)}</div></td>
-        <td>${esc(e.bet)}</td>
-        <td>${badge(e.gate || e.g3, e.g3 === 'fail' ? 'fail' : e.g3 === 'warn' ? 'warn' : 'pass')}</td>
-        <td class="mono">${fmt(e.ic)}<div class="muted mono">t ${fmt(e.ic_t)}</div></td>
-        <td class="mono">${pct(e.net)}</td>
-        <td class="mono">${e.turnover == null ? '—' : (e.turnover * 100).toFixed(0) + '%'}</td>
-        <td class="mono">${e.max_rho == null ? '待算' : Number(e.max_rho).toFixed(2)}</td>
-        <td class="mono">${e.n_trials ?? '—'} / ${e.q_value == null ? 'q 待算' : Number(e.q_value).toFixed(2)}</td>
-        <td>${badge(e.verdict, e.verdict === 'fail' ? 'fail' : e.verdict === 'warn' ? 'warn' : 'pass')}</td>
-        <td>${badge(e.recommend || e.decision || 'pending', e.decision === 'promote' ? 'pass' : e.recommend === 'iterate' ? 'warn' : e.recommend === 'repair' ? 'fail' : 'muted')}</td>
-        <td class="mono">${e.age_days == null ? '—' : e.age_days.toFixed(1) + ' 天'}</td>
-      </tr>`).join('');
-    renderPager('table-pager', 'table', rows.length);
-    document.querySelectorAll('#tbody tr[data-id]').forEach(tr => tr.addEventListener('click', () => openDetail(tr.dataset.id)));
-  }
-
-  function renderAttention(){
-    const items = DATA.attention || [];
-    const pageItems = pageSlice(items, 'attention');
-    $('attention').innerHTML = pageItems.length ? pageItems.map(a => `<div class="att ${a.level}" ${a.exp_id ? `data-id="${esc(a.exp_id)}"` : ''}><div class="h">${badge(a.level, a.level)} ${esc(a.title)}</div><div class="d">${esc(a.detail)}</div></div>`).join('') : `<div class="empty">当前没有待处理项</div>`;
-    renderPager('attention-pager', 'attention', items.length);
-    document.querySelectorAll('.att[data-id]').forEach(el => el.addEventListener('click', () => openDetail(el.dataset.id)));
+    const h = DATA.health || {};
+    $('health-dot').className = 'dot ' + (h.level === 'green' ? 'green' : h.level === 'red' ? 'red' : '');
+    $('health-text').textContent = (h.reasons || []).join(' · ') || '运行正常';
+    $('m-exp').textContent = DATA.meta?.experiment_count ?? (DATA.experiments || []).length;
+    $('m-records').textContent = DATA.ledger?.records ?? '—';
   }
 
   function renderFunnel(){
-    const rows = DATA.funnel || [];
-    const max = Math.max(1, ...rows.map(r => Number(r.count || 0)));
-    $('funnel').innerHTML = rows.map(r => `<div class="bar-row"><span class="mono">${esc(r.gate)}</span><div class="bar"><i style="width:${(Number(r.count||0)/max*100).toFixed(1)}%"></i></div><span class="n">${r.count}</span></div><div class="muted" style="font-size:9px;margin:-3px 0 7px 50px">${esc(r.note||'')}</div>`).join('');
+    $('funnel').innerHTML = (DATA.research_funnel || []).map((s, i) => `
+      <div class="funnel-card">
+        <div class="k">0${i+1} · ${esc(s.stage)}</div>
+        <div class="v">${esc(s.count)}</div>
+        <div class="n">${esc(s.note)}</div>
+      </div>`).join('') || '<div class="empty">还没有研究记录</div>';
   }
 
-  function renderTrials(){
-    const pts = DATA.ledger_points || [];
-    const svg = $('trial-chart');
-    if (!pts.length) { svg.innerHTML = `<text x="20" y="85">暂无账本数据</text>`; return; }
-    const w=600, h=170, padL=36, padR=12, padT=16, padB=26;
-    const nMax = Math.max(1, ...pts.map(p => Number(p.n||0)));
-    const xs = pts.map((p,i) => padL + (w-padL-padR) * (pts.length === 1 ? 0.5 : i/(pts.length-1)));
-    const ys = pts.map(p => h-padB - (h-padT-padB) * Number(p.n||0)/nMax);
-    const path = xs.map((x,i)=>`${i?'L':'M'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
-    const dots = xs.map((x,i)=>`<circle cx="${x.toFixed(1)}" cy="${ys[i].toFixed(1)}" r="2.5" fill="#7b1e2b"/>`).join('');
-    svg.innerHTML = `<line x1="${padL}" y1="${h-padB}" x2="${w-padR}" y2="${h-padB}" stroke="#d9cfc0"/><line x1="${padL}" y1="${padT}" x2="${padL}" y2="${h-padB}" stroke="#d9cfc0"/><path d="${path}" fill="none" stroke="#7b1e2b" stroke-width="2"/>${dots}<text x="${padL}" y="${h-8}">${esc(dlabel(pts[0]?.ts))}</text><text x="${w-padR}" y="${h-8}" text-anchor="end">${esc(dlabel(pts[pts.length-1]?.ts))}</text><text x="6" y="${padT+8}">${nMax}</text>`;
+  function filtered(){
+    const q = state.q.trim().toLowerCase();
+    return (DATA.experiments || []).filter(e => {
+      const hay = [e.id,e.factor,e.hypothesis_id,e.bet].join(' ').toLowerCase();
+      if (q && !hay.includes(q)) return false;
+      if (state.grade && String(e.grade || '').toUpperCase() !== state.grade) return false;
+      if (state.decision && String(e.decision || '') !== state.decision) return false;
+      if (state.audit && String(e.verdict || '') !== state.audit) return false;
+      return true;
+    });
   }
 
-  function renderBets(){
-    const bets = DATA.bets || [];
-    const pageBets = pageSlice(bets, 'bets');
-    $('bets').innerHTML = pageBets.length ? pageBets.map(b => `<div class="bet"><div class="t"><b>${esc(b.bet)}</b><span>${badge(b.status, b.status === 'confirmed' ? 'pass' : 'gold')}</span></div><div class="m"><div>实验<b>${b.experiments}</b></div><div>试验<b>${b.trials}</b></div><div>G3<b>${b.g3}</b></div></div></div>`).join('') : `<div class="empty">还没有押注</div>`;
-    renderPager('bets-pager', 'bets', bets.length);
+  function renderTable(){
+    const rows = filtered();
+    const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    state.page = Math.min(Math.max(1, state.page), pages);
+    const start = (state.page - 1) * PAGE_SIZE;
+    const pageRows = rows.slice(start, start + PAGE_SIZE);
+    $('table-count').textContent = `共 ${rows.length} 条 / 全部 ${(DATA.experiments||[]).length} 条`;
+    $('tbody').innerHTML = pageRows.length ? pageRows.map(e => `
+      <tr data-id="${esc(e.id)}">
+        <td class="mono">${esc(e.id)}<div class="muted">${esc((e.started_at || '').slice(0,10))}</div></td>
+        <td><b>${esc(e.factor)}</b><div class="muted">h=${esc(e.horizon)} · ${esc(e.universe || '—')}</div></td>
+        <td>${ratingBadge(e)}</td>
+        <td class="mono">${fmt(e.ic,3)}</td>
+        <td class="mono">${pct(e.net)}</td>
+        <td class="mono">${pct(e.turnover)}</td>
+        <td>${badge(e.verdict, e.verdict === 'fail' ? 'fail' : e.verdict === 'pass' ? 'pass' : 'warn')}</td>
+        <td>${badge(e.decision || '—', e.decision === 'promote' ? 'pass' : e.decision === 'iterate' ? 'gold' : 'muted')}</td>
+        <td class="mono">${esc((e.started_at || '').slice(0,10))}</td>
+      </tr>`).join('') : '<tr><td colspan="9"><div class="empty">没有匹配当前筛选的实验</div></td></tr>';
+    renderPager(rows.length, pages);
+    document.querySelectorAll('#tbody tr[data-id]').forEach(tr => tr.addEventListener('click', () => openDrawer(tr.dataset.id)));
   }
 
-  function renderFindings(){
-    const items = DATA.audit_findings || [];
-    const pageItems = pageSlice(items, 'findings');
-    $('finding-count').textContent = `${items.length} findings`;
-    $('findings').innerHTML = pageItems.length ? pageItems.map(f => `<div class="finding"><span class="id">${esc(f.exp_id)}</span><span>${badge(f.status, f.status === 'fail' ? 'fail' : 'warn')}</span><span><b>${esc(checkTitle(f))}</b><div class="d">${esc(zhText(f.actual))} · 期望 ${esc(zhText(f.expected))}</div></span></div>`).join('') : `<div class="empty">没有审计警告</div>`;
-    renderPager('findings-pager', 'findings', items.length);
+  function renderPager(total, pages){
+    if (!total) { $('pager').innerHTML = ''; return; }
+    let buttons = '';
+    for (let p = 1; p <= pages; p++) {
+      buttons += `<button data-page="${p}" class="${p === state.page ? 'active' : ''}">${p}</button>`;
+    }
+    $('pager').innerHTML = `<span class="info">第 ${state.page} / ${pages} 页</span>
+      <button data-page="${state.page - 1}" ${state.page <= 1 ? 'disabled' : ''}>上一页</button>
+      ${buttons}
+      <button data-page="${state.page + 1}" ${state.page >= pages ? 'disabled' : ''}>下一页</button>`;
+    document.querySelectorAll('#pager button[data-page]').forEach(btn => btn.addEventListener('click', () => {
+      state.page = Number(btn.dataset.page);
+      renderTable();
+    }));
   }
 
-  function renderCoverage(){
-    const rows = DATA.coverage || [];
-    $('coverage').innerHTML = rows.length ? `<div class="table-wrap" style="max-height:230px"><table style="min-width:0;width:100%"><thead><tr><th>字段</th><th>起始</th><th>覆盖率</th><th>PIT</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="mono">${esc(r.table)}.${esc(r.field)}</td><td class="mono">${esc(r.start)}</td><td class="mono">${r.coverage == null ? '—' : pct(r.coverage)}</td><td>${badge(r.pit ? '有' : '无', r.pit ? 'pass' : 'warn')}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">未提供 data_coverage.json；使用手工表</div>`;
+  function stageHtml(st){
+    const status = String(st.status || '');
+    const cls = status === 'used' ? 'used' : (status === 'not_invoked' || status === 'derived') ? status : '';
+    return `<div class="stage ${cls}">
+      <div class="h"><span class="badge gold">${esc(st.role || 'Agent')}</span>${esc(status || '')}<span class="prov">${esc(st.provenance || '')}</span></div>
+      <div class="d">${esc(st.thought || '')}</div>
+      ${st.artifact ? `<div class="m">artifact: ${esc(st.artifact)}</div>` : ''}
+      ${st.tests ? `<div class="m">tests: ${esc(st.tests)}</div>` : ''}
+      ${st.data_path ? `<div class="m">data_path: ${esc(st.data_path)} · codes: ${esc(st.codes)} · rows: ${esc(st.rows)}</div>` : ''}
+      ${st.rating ? `<div class="m">rating: ${esc(st.rating)} · decision: ${esc(st.decision || '')}</div>` : ''}
+    </div>`;
   }
 
-  function renderStorage(){
-    const s = DATA.storage || {};
-    $('storage-total').textContent = `${bytes(s.output_bytes)} 输出 · ${bytes(s.panel_cache)} 面板缓存`;
-    const rows = s.top || [];
-    const max = Math.max(1, ...rows.map(r => Number(r.bytes||0)));
-    $('storage').innerHTML = rows.map(r => `<div class="storage-row"><span class="mono">${esc(r.name)}</span><div class="bar"><i style="width:${(Number(r.bytes||0)/max*100).toFixed(1)}%;background:#a67c3d"></i></div><span class="n">${bytes(r.bytes)}</span></div>`).join('') || `<div class="empty">暂无存储快照</div>`;
-  }
-
-  function metric(k,v){ return `<div class="metric"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`; }
-  function checkRow(c){
-    return `<div class="check"><span class="id">${esc(c.check_id)}</span><span>${badge(c.status, c.status === 'fail' ? 'fail' : c.status === 'warn' ? 'warn' : 'pass')} <b>${esc(checkTitle(c))}</b><div class="a">${esc(zhText(c.actual))} · 期望 ${esc(zhText(c.expected))}${c.note ? ' · ' + esc(zhText(c.note)) : ''}</div></span></div>`;
-  }
-
-  function openDetail(id){
+  function openDrawer(id){
     const e = (DATA.experiments || []).find(x => x.id === id);
     if (!e) return;
-    const d = e.detail || {};
-    $('d-eyebrow').textContent = `${e.id} · ${t(e.status)}`;
-    $('d-title').textContent = e.factor || e.id;
-    const metrics = [
-      ['IC', fmt(e.ic)], ['IC t', fmt(e.ic_t)], ['净价差/5日', pct(e.net)], ['换手', e.turnover == null ? '—' : (e.turnover*100).toFixed(0)+'%'],
-      ['评级', e.grade || '—'], ['分数', e.score == null ? '—' : Number(e.score).toFixed(1)], ['N 试验', e.n_trials ?? '—'], ['q', e.q_value == null ? '待算' : Number(e.q_value).toFixed(3)],
-    ];
-    const checks = (d.audit_checks || []).map(checkRow).join('');
-    const brief = d.brief || {};
-    const paths = d.paths || {};
-    $('d-body').innerHTML = `
-      <div class="stack" style="grid-template-columns:1fr 1fr;display:grid">${badge(e.verdict, e.verdict)} ${badge('G3 ' + (e.g3||'—'), e.g3)}</div>
-      <h4>关键指标</h4><div class="metric-grid">${metrics.map(([k,v])=>metric(k,v)).join('')}</div>
-      <h4>决策摘要</h4>
-      <div class="metric-grid">${metric('门禁', brief.gate || e.gate || '—')}${metric('建议', brief.recommend || '—')}${metric('押注', brief.bet || e.bet)}${metric('试验', (brief.trials && brief.trials.n != null) ? brief.trials.n : (e.n_trials ?? '—'))}</div>
-      <div style="margin-top:8px;font-size:12px"><b>风险：</b> ${esc((brief.risks || []).join('；') || '—')}</div>
-      <h4>审计检查</h4>${checks || '<div class="empty">还没有审计结果</div>'}
-      <h4>产物路径</h4><div class="paths">${Object.entries(paths).map(([k,v])=>`<div>${esc(k)}: ${esc(v)}</div>`).join('') || '<div class="muted">无</div>'}</div>
+    const trace = e.agent_trace || {};
+    const input = trace.input || {};
+    const checks = (e.detail?.audit_checks || []);
+    const dm = e.data_manifest || {};
+    const dim = dm.data_interface_manifest || {};
+    const dq = e.detail?.report?.data_quality || {};
+    $('drawer-body').innerHTML = `
+      <div class="drawer-head">
+        <div><h3>${esc(e.factor)}</h3><div class="sub">${esc(e.id)} · ${esc(e.hypothesis_id || '')} · ${esc(e.started_at || '')}</div></div>
+        <div style="margin-left:auto;text-align:right">${ratingBadge(e)}<div class="muted mono" style="font-size:9px;margin-top:4px">${esc(e.decision || '无决策')}</div></div>
+      </div>
+      <h4>输入 / 假设</h4>
+      <div class="hyp">
+        <div class="q">${esc(input.question || e.detail?.hypothesis?.mechanism || '未记录研究问题')}</div>
+        <div class="mono muted" style="font-size:9px;margin-top:5px">origin: ${esc(input.origin || '—')} · hypothesis: ${esc(input.hypothesis_id || e.hypothesis_id || '—')}</div>
+      </div>
+      <h4>Agent 链路</h4>
+      <div class="chain">${(trace.stages || []).map(stageHtml).join('') || '<div class="empty">该实验没有 agent_trace.json</div>'}</div>
+      <h4>指标与评估</h4>
+      <div class="metric-grid">
+        <div class="metric"><div class="k">评级</div><div class="v">${esc(e.grade || '—')} / ${fmt(e.score,1)}</div></div>
+        <div class="metric"><div class="k">IC</div><div class="v">${fmt(e.ic,3)}</div></div>
+        <div class="metric"><div class="k">净价差 / 期</div><div class="v">${pct(e.net)}</div></div>
+        <div class="metric"><div class="k">换手</div><div class="v">${pct(e.turnover)}</div></div>
+        <div class="metric"><div class="k">审计</div><div class="v">${esc(e.verdict || '—')} / G3 ${esc(e.g3 || '—')}</div></div>
+        <div class="metric"><div class="k">决策</div><div class="v">${esc(e.decision || '—')}</div></div>
+        <div class="metric"><div class="k">持有期</div><div class="v">${esc(e.horizon)} 日</div></div>
+        <div class="metric"><div class="k">股票池</div><div class="v">${esc(e.universe || '—')}</div></div>
+      </div>
+      <h4>审计检查</h4>
+      <div>${checks.length ? checks.map(c => `<div class="check"><span>${badge(c.status, c.status === 'fail' ? 'fail' : c.status === 'warn' ? 'warn' : 'pass')} ${esc(c.check_id)}</span><span class="actual">${esc(c.actual || '')}${c.expected ? ' · 期望 ' + esc(c.expected) : ''}</span></div>`).join('') : '<div class="empty">无审计检查</div>'}</div>
+      <h4>数据覆盖</h4>
+      <div class="coverage">
+        <div class="box"><div class="k">data_path</div>${esc(dm.data_path || '—')}</div>
+        <div class="box"><div class="k">codes</div>${esc((dim.codes || []).length)}</div>
+        <div class="box"><div class="k">rows</div>${esc(dim.rows || '—')}</div>
+        <div class="box"><div class="k">services</div>${esc((dim.services || []).join(', ') || dq.universe || '—')}</div>
+        <div class="box"><div class="k">开始</div>${esc((dm.start || e.detail?.hypothesis?.start || '—'))}</div>
+        <div class="box"><div class="k">结束</div>${esc((dm.end || e.detail?.hypothesis?.end || '—'))}</div>
+      </div>
+      <h4>结论</h4>
+      <div class="hyp"><div class="q">${esc(trace.verdict || e.recommend || '—')}</div><div class="muted mono" style="font-size:9px;margin-top:5px">gate: ${esc(e.gate || '—')} · audit: ${esc(e.verdict || '—')}</div></div>
     `;
-    $('drawer').hidden = false; $('overlay').hidden = false;
+    $('overlay').hidden = false;
+    $('drawer').hidden = false;
   }
-  function closeDetail(){ $('drawer').hidden = true; $('overlay').hidden = true; }
+  function closeDrawer(){ $('overlay').hidden = true; $('drawer').hidden = true; }
 
-  function initBets(){
-    const bets = [...new Set((DATA.experiments || []).map(e => e.bet))];
-    $('f-bet').innerHTML = '<option value="">全部押注</option>' + bets.map(b=>`<option>${esc(b)}</option>`).join('');
+  function bindFilters(){
+    $('q').addEventListener('input', e => { state.q = e.target.value; state.page = 1; renderTable(); });
+    ['f-grade','f-decision','f-audit'].forEach(id => {
+      $(id).addEventListener('change', e => {
+        state[id === 'f-grade' ? 'grade' : id === 'f-decision' ? 'decision' : 'audit'] = e.target.value;
+        state.page = 1; renderTable();
+      });
+    });
+    $('reset').addEventListener('click', () => {
+      state.q = ''; state.grade = ''; state.decision = ''; state.audit = ''; state.page = 1;
+      $('q').value = ''; $('f-grade').value = ''; $('f-decision').value = ''; $('f-audit').value = '';
+      renderTable();
+    });
+    $('drawer-close').addEventListener('click', closeDrawer);
+    $('overlay').addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
   }
 
-  $('d-close').addEventListener('click', closeDetail);
-  $('overlay').addEventListener('click', closeDetail);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
-  function resetTablePage(){ PAGE.table = 1; renderTable(); }
-  ['q','f-status','f-g3','f-bet'].forEach(id => $(id).addEventListener('input', resetTablePage));
-  ['f-status','f-g3','f-bet'].forEach(id => $(id).addEventListener('change', resetTablePage));
-  document.addEventListener('click', e => {
-    const btn = e.target.closest('button[data-page-key]');
-    if (!btn || btn.disabled) return;
-    const key = btn.dataset.pageKey;
-    if (!(key in PAGE)) return;
-    PAGE[key] = Number(btn.dataset.page) || 1;
-    if (key === 'table') renderTable();
-    else if (key === 'attention') renderAttention();
-    else if (key === 'bets') renderBets();
-    else if (key === 'findings') renderFindings();
-  });
-
-  renderHeader(); renderKpis(); renderGovernance(); initBets(); renderTable(); renderAttention(); renderFunnel(); renderTrials(); renderBets(); renderFindings(); renderCoverage(); renderStorage();
+  renderMeta(); renderFunnel(); bindFilters(); renderTable();
 })();
 </script>
 </body>
