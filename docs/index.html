@@ -289,6 +289,7 @@
 
   /* architecture svg */
   .abox{fill:url(#gBox);stroke:rgba(148,163,184,.22);stroke-width:1}
+  .abox-lab{fill:rgba(201,255,90,.045);stroke:rgba(201,255,90,.28)}
   .abox-soft{fill:rgba(13,22,37,.6);stroke:rgba(148,163,184,.14);stroke-width:1}
   .atitle{fill:#e9eef7;font-family:var(--sans);font-size:14px;font-weight:650;letter-spacing:.01em}
   .asub{fill:#7f91aa;font-family:var(--mono);font-size:10px}
@@ -2158,16 +2159,6 @@ h1 .hl{
       </div>
       <div class="section" style="padding-top:16px">
         <div class="arch-shell">
-          <div class="arch-runtime">
-            <div class="arch-runtime-head">
-              <div><div class="arch-runtime-kicker mono">FACTOR LAB / CROSS-LAYER RUNTIME</div><h3>Agent 研究运行时</h3></div>
-              <span class="arch-runtime-tag">DSH NATIVE</span>
-            </div>
-            <div class="arch-runtime-flow">
-              <span>DSH session</span><i>→</i><span>PathFinder</span><i>→</i><span>Runner</span><i>→</i><span class="flow-api">data_interface</span><i>→</i><span>research / backtest</span><i>→</i><span>Evaluator</span><i>→</i><span>Supervisor</span>
-            </div>
-            <div class="arch-runtime-note">PathFinder 发起多轮 campaign；Runner 只经 data_interface 取数；研究状态落在 output/factor_lab；promote 仍需 Human G4。</div>
-          </div>
           <svg viewBox="0 -16 1240 830" role="img" aria-label="FactorPickle 分层架构图">
             <defs>
               <linearGradient id="gBox" x1="0" y1="0" x2="0" y2="1">
@@ -2253,29 +2244,31 @@ h1 .hl{
 
             <!-- layer F -->
             <g>
-              <rect class="abox" x="65" y="630" width="255" height="74" rx="12"/>
+              <rect class="abox" x="65" y="630" width="210" height="74" rx="12"/>
               <text class="atitle" x="85" y="656">strategies · 策略基类</text>
               <text class="asub" x="85" y="674">rank / weights / target_weight</text>
-              <text class="abadge" x="307" y="656" text-anchor="end">仅依赖 factors</text>
-              <text class="abadge" x="85" y="692" style="fill:#5f7288">STRATEGY 模块变量</text>
+              <text class="abadge" x="85" y="692" style="fill:#5f7288">仅依赖 factors · STRATEGY</text>
 
-              <rect class="abox" x="350" y="630" width="255" height="74" rx="12"/>
-              <text class="atitle" x="370" y="656">backtest · 回测撮合</text>
-              <text class="asub" x="370" y="674">run / optimize / walkforward</text>
-              <text class="abadge" x="592" y="656" text-anchor="end">T+1 · 涨跌停</text>
-              <text class="abadge" x="370" y="692" style="fill:#5f7288">RQAlpha · 自建账本</text>
+              <rect class="abox" x="290" y="630" width="210" height="74" rx="12"/>
+              <text class="atitle" x="310" y="656">backtest · 回测撮合</text>
+              <text class="asub" x="310" y="674">run / optimize / walkforward</text>
+              <text class="abadge" x="310" y="692" style="fill:#5f7288">T+1 · RQAlpha · 自建账本</text>
 
-              <rect class="abox" x="635" y="630" width="255" height="74" rx="12"/>
-              <text class="atitle" x="655" y="656">screener · 选股</text>
-              <text class="asub" x="655" y="674">ScreenSpec · screen() · rebuild</text>
-              <text class="abadge" x="877" y="656" text-anchor="end">0 直连 DB</text>
-              <text class="abadge" x="655" y="692" style="fill:#5f7288">覆盖率 · 停牌过滤</text>
+              <rect class="abox" x="515" y="630" width="210" height="74" rx="12"/>
+              <text class="atitle" x="535" y="656">screener · 选股</text>
+              <text class="asub" x="535" y="674">ScreenSpec · screen() · rebuild</text>
+              <text class="abadge" x="535" y="692" style="fill:#5f7288">0 直连 DB · 覆盖/停牌</text>
 
-              <rect class="abox" x="920" y="630" width="255" height="74" rx="12"/>
-              <text class="atitle" x="940" y="656">research · 因子报告</text>
-              <text class="asub" x="940" y="674">profile · panel cache · render</text>
-              <text class="abadge" x="1162" y="656" text-anchor="end">章节 + 样本敏感性</text>
-              <text class="abadge" x="940" y="692" style="fill:#5f7288">全市场 · 只输出 HTML</text>
+              <rect class="abox" x="740" y="630" width="210" height="74" rx="12"/>
+              <text class="atitle" x="760" y="656">research · 因子报告</text>
+              <text class="asub" x="760" y="674">profile · panel cache · render</text>
+              <text class="abadge" x="760" y="692" style="fill:#5f7288">全市场 · 章节/敏感性 · HTML</text>
+
+              <rect class="abox abox-lab" x="965" y="630" width="210" height="74" rx="12"/>
+              <rect x="973" y="638" width="3.5" height="58" rx="1.7" fill="#c9ff5a"/>
+              <text class="atitle" x="985" y="656" style="fill:#e6ffd0">Factor Lab · 研究编排</text>
+              <text class="asub" x="985" y="674">PathFinder · Runner · Evaluator</text>
+              <text class="abadge" x="985" y="692" style="fill:#8fa36f">DSH · data_interface only</text>
             </g>
 
             <!-- MCP -->
@@ -2316,20 +2309,27 @@ h1 .hl{
               <text class="alabel" x="736" y="612">read_latest</text>
 
               <!-- strategies -> backtest -->
-              <path class="aarrow" marker-end="url(#arw)" d="M320 667 H350"/>
+              <path class="aarrow" marker-end="url(#arw)" d="M275 667 H290"/>
 
               <!-- apps -> MCP -->
-              <path class="aarrow" marker-end="url(#arw)" d="M192 704 V742"/>
-              <path class="aarrow" marker-end="url(#arw)" d="M477 704 V742"/>
-              <path class="aarrow" marker-end="url(#arw)" d="M762 704 V742"/>
-              <path class="aarrow" marker-end="url(#arw)" d="M1047 704 V742"/>
+              <path class="aarrow" marker-end="url(#arw)" d="M170 704 V742"/>
+              <path class="aarrow" marker-end="url(#arw)" d="M395 704 V742"/>
+              <path class="aarrow" marker-end="url(#arw)" d="M620 704 V742"/>
+              <path class="aarrow" marker-end="url(#arw)" d="M845 704 V742"/>
+              <path class="aarrow" marker-end="url(#arw)" d="M1070 704 V742"/>
               <text class="alabel" x="790" y="727">注册为 MCP 工具</text>
+
+              <!-- Factor Lab relations -->
+              <path class="aarrow-cyan" marker-end="url(#arwC)" stroke-dasharray="4 4" d="M1175 213 H1208 V667 H1175"/>
+              <text class="alabel" x="1202" y="430" transform="rotate(90 1202 430)" text-anchor="middle">经 data_interface</text>
+              <path class="aarrow" marker-end="url(#arw)" stroke-dasharray="3 3" d="M1070 630 V610 H845 V630"/>
+              <text class="alabel" x="950" y="604" text-anchor="middle">编排 research / backtest</text>
             </g>
           </svg>
           <div class="arch-foot">
             <span><i class="lg-line"></i>同步调用</span>
             <span><i class="lg-dash"></i>事件 / 派生 / 弱耦合读取</span>
-            <span>Factor Lab 研究编排横跨应用层，只经 <b class="mono" style="color:#9fb2ca">data_interface</b> 取数</span>
+            <span>Factor Lab 位于应用层，只经 <b class="mono" style="color:#9fb2ca">data_interface</b> 取数</span>
             <span>所有 DB 访问仅限 <b class="mono" style="color:#9fb2ca">data_interface</b> 与 <b class="mono" style="color:#9fb2ca">factor_engine</b></span>
             <span>持仓表非 WAL（支持原地 UPDATE）</span>
           </div>
