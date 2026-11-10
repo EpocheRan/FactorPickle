@@ -56,9 +56,10 @@ DataInterfaceGateway
         │
         ▼
 build_factor_panel
-  ├─ price: market + reference
-  ├─ sentiment: market + moneyflow + margin
-  └─ quality/value: market + valuation/reference
+  ├─ market: OHLCV (required)
+  ├─ flow/moneyflow, margin, valuation: optional date x symbol extras
+  ├─ industry, regime: reference matrices
+  └─ every extras column is exposed to generated factors
         │
         ▼
 Panel + data_manifest

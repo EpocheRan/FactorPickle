@@ -125,6 +125,13 @@ class Panel:
             "turnover": flat(self.turnover),
             "float_mv": flat(self.market_cap),
         }
+        # Any extra date x symbol matrix loaded by the panel builder is exposed
+        # as a factor column.  This is the generic data path: no category gate.
+        for name, extra in (self.extras or {}).items():
+            key = str(name).lower()
+            if key in data or not isinstance(extra, pd.DataFrame):
+                continue
+            data[key] = flat(extra)
         if self.benchmark is not None and not self.benchmark.empty:
             bench = self.benchmark.reindex(close.index).to_numpy(dtype="float64")
             data["benchmark_close"] = np.tile(bench, n_cols)

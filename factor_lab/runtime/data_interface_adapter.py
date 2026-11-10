@@ -431,10 +431,25 @@ class DataInterfaceGateway:
         )
 
     def valuation_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
+        # Load every canonical valuation field the table exposes.  The bundle
+        # is a date x code matrix; its columns are factor inputs, not a fixed
+        # market-cap-only contract.
+        try:
+            from data_interface.financial.fields import VALUATION_COLUMNS
+
+            mapping = {
+                name: name
+                for name in VALUATION_COLUMNS
+                if name not in {"ts", "code", "period_end", "publish_date"}
+            }
+        except Exception:
+            mapping = {"market_cap": "total_mv", "float_market_cap": "float_mv"}
+        mapping["market_cap"] = "total_mv"
+        mapping["float_market_cap"] = "float_mv"
         return self._extra_bundle(
             kind="valuation",
             table="fin_valuation_daily",
-            mapping={"market_cap": "total_mv", "float_market_cap": "float_mv"},
+            mapping=mapping,
             codes=codes,
             start=start,
             end=end,

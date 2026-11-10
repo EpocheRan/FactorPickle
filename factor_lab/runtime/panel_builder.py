@@ -3,11 +3,14 @@
 There is one Runner data path: DataInterfaceGateway -> DataBundle ->
 build_factor_panel -> Panel.  The legacy research loader is not imported here.
 
-Category rules:
+Data rules:
 
-- price: market bundle + reference data
-- sentiment: market + moneyflow/margin extras
-- quality/value: market + valuation/reference; factor values stay in Research Module
+- market bundle is required.
+- every optional date x symbol matrix the gateway exposes is loaded:
+  flow/moneyflow, margin, valuation, industry, regime.
+- category metadata is descriptive only; it never gates data availability.
+- all loaded extras are exposed as columns on ``Panel.frame()`` so generated
+  factors can consume arbitrary data fields, not just OHLCV.
 """
 
 from __future__ import annotations
@@ -144,22 +147,14 @@ def build_factor_panel(
     extras: dict[str, pd.DataFrame] = {}
     manifests = [market.manifest]
     reference = bool(contract.get("reference", True))
-    if category == "sentiment":
-        flow = _safe_bundle(gateway, "flow_bundle", codes, fetch_start, end)
-        if flow is not None:
-            extras.update(_pivot_extras(flow.frames))
-            manifests.append(flow.manifest)
-        margin = _safe_bundle(gateway, "margin_bundle", codes, fetch_start, end)
-        if margin is not None:
-            extras.update(_pivot_extras(margin.frames))
-            manifests.append(margin.manifest)
-        if not extras:
-            raise DataGap("sentiment factor requires moneyflow/margin extras; none available")
-    if category in ("quality", "value") or reference:
-        valuation = _safe_bundle(gateway, "valuation_bundle", codes, fetch_start, end)
-        if valuation is not None:
-            extras.update(_pivot_extras(valuation.frames))
-            manifests.append(valuation.manifest)
+    # Data availability is not a factor-category decision.  Fetch every
+    # optional matrix the gateway exposes; a missing service only removes its
+    # columns and is recorded in the manifest, never blocks an unrelated factor.
+    for method in ("flow_bundle", "margin_bundle", "valuation_bundle"):
+        bundle = _safe_bundle(gateway, method, codes, fetch_start, end)
+        if bundle is not None:
+            extras.update(_pivot_extras(bundle.frames))
+            manifests.append(bundle.manifest)
 
     benchmark = None
     returns = close.pct_change(fill_method=None).mean(axis=1)

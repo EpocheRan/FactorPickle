@@ -270,7 +270,7 @@ def test_workflows_do_not_forbid_inherited_tools():
         assert "Do not use tools" not in text, path.name
 
 
-def test_panel_builder_routes_factor_categories():
+def test_panel_builder_loads_all_available_data_axes():
     class FlowService:
         def get_by_code(self, code, start, end):
             dates = pd.bdate_range("2024-01-01", periods=3)
@@ -289,7 +289,8 @@ def test_panel_builder_routes_factor_categories():
         warmup_days=10,
     )
     assert price.category == "price"
-    assert price.panel.extras is None
+    assert "mf_net_amount" in (price.panel.extras or {})
+    assert "mf_net_amount" in price.panel.frame().columns
     sentiment = build_factor_panel(
         gateway,
         {"factor_id": "sentiment.test", "category": "sentiment"},
@@ -309,6 +310,8 @@ def test_panel_builder_routes_factor_categories():
         warmup_days=10,
     )
     assert quality.category == "quality"
+    assert "mf_net_amount" in (quality.panel.extras or {})
+    assert "mf_net_amount" in quality.panel.frame().columns
 
 
 def test_panel_builder_price_matches_raw_data_interface_frames():
