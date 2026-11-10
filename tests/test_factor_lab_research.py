@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from factor_lab import evaluation, research_context
-from factor_lab.contracts import validate
-from factor_lab.store import write_json_atomic
-from factor_lab.web_gateway import mode_requires_web, resolve_mode
+from factor_lab.evaluation import evaluation
+from factor_lab.research import research_context
+from factor_lab.core.contracts import validate
+from factor_lab.core.store import write_json_atomic
+from factor_lab.research.web_gateway import mode_requires_web, resolve_mode
 
 
 def test_role_contract_rejects_incomplete_payload() -> None:

@@ -6,12 +6,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from factor_lab import control, dashboard
-from factor_lab.ledger import Ledger
-from factor_lab.policy import default_policy, verify_policy
-from factor_lab.schemas import Hypothesis, OutcomeSpec, trial_id
-from factor_lab.stats import classify_rho, two_sided_p
-from factor_lab.store import jsonable, read_json, write_json_atomic
+from factor_lab.core import control
+from factor_lab.reporting import dashboard
+from factor_lab.core.ledger import Ledger
+from factor_lab.core.policy import default_policy, verify_policy
+from factor_lab.core.schemas import Hypothesis, OutcomeSpec, trial_id
+from factor_lab.evaluation.stats import classify_rho, two_sided_p
+from factor_lab.core.store import jsonable, read_json, write_json_atomic
 
 
 def _hypothesis() -> Hypothesis:

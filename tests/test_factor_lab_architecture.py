@@ -7,17 +7,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from factor_lab import agents, budget
-from factor_lab.campaign import CampaignPolicy, CampaignRunner, run_ml_plan_campaign
-from factor_lab.data_interface_adapter import DataGap, DataInterfaceGateway
-from factor_lab.factor_library import FactorLibrary, FactorLibraryError
-from factor_lab.factor_builder import build as build_factor
-from factor_lab.history import HistoryEntry, append as append_history, recent, search
-from factor_lab.ml_engine import MLExperimentSpec, run_experiment, signal_to_factor_decision
-from factor_lab.panel_builder import build_factor_panel
-from factor_lab.readiness import ReadinessBlocked, require_data
-from factor_lab.schemas import Hypothesis, OutcomeSpec
-from factor_lab.web_gateway import build_context, parse_gateway_output, seed_queries
+from factor_lab.core import agents, budget
+from factor_lab.research.campaign import CampaignPolicy, CampaignRunner, run_ml_plan_campaign
+from factor_lab.runtime.data_interface_adapter import DataGap, DataInterfaceGateway
+from factor_lab.runtime.factor_library import FactorLibrary, FactorLibraryError
+from factor_lab.runtime.factor_builder import build as build_factor
+from factor_lab.research.history import HistoryEntry, append as append_history, recent, search
+from factor_lab.research.ml_engine import MLExperimentSpec, run_experiment, signal_to_factor_decision
+from factor_lab.runtime.panel_builder import build_factor_panel
+from factor_lab.runtime.readiness import ReadinessBlocked, require_data
+from factor_lab.core.schemas import Hypothesis, OutcomeSpec
+from factor_lab.research.web_gateway import build_context, parse_gateway_output, seed_queries
 from research.report.panel import Panel
 
 
@@ -143,7 +143,7 @@ def _ml_dataset(periods: int = 90, assets: int = 18) -> pd.DataFrame:
 
 
 def test_ml_engine_loads_data_only_through_gateway():
-    from factor_lab.ml_engine import load_dataset
+    from factor_lab.research.ml_engine import load_dataset
 
     gateway = DataInterfaceGateway(market_loader_factory=FakeMarket)
     frame, manifest = load_dataset(gateway, ["600000", "000001"], "2024-01-02", "2024-01-05", fields=["close", "amount"])
@@ -174,8 +174,8 @@ def test_ml_engine_walk_forward_and_non_dl():
 
 
 def test_campaign_hard_stop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr("factor_lab.campaign.check_campaign", lambda *a, **k: {"ok": True, "reasons": []})
-    monkeypatch.setattr("factor_lab.campaign.record_usage", lambda **kwargs: {})
+    monkeypatch.setattr("factor_lab.research.campaign.check_campaign", lambda *a, **k: {"ok": True, "reasons": []})
+    monkeypatch.setattr("factor_lab.research.campaign.record_usage", lambda **kwargs: {})
     calls = {"n": 0}
 
     def planner(state):
@@ -215,7 +215,7 @@ def test_agent_reclaim_is_safety_gated(tmp_path: Path, monkeypatch: pytest.Monke
 
 
 def test_history_is_append_only_and_searchable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    import factor_lab.history as history_mod
+    import factor_lab.research.history as history_mod
 
     path = tmp_path / "history.jsonl"
     index = tmp_path / "index.json"
@@ -236,8 +236,8 @@ def test_history_is_append_only_and_searchable(tmp_path: Path, monkeypatch: pyte
 
 
 def test_ml_plan_campaign_runs_and_stops(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr("factor_lab.campaign.check_campaign", lambda *a, **k: {"ok": True, "reasons": []})
-    monkeypatch.setattr("factor_lab.campaign.record_usage", lambda **kwargs: {})
+    monkeypatch.setattr("factor_lab.research.campaign.check_campaign", lambda *a, **k: {"ok": True, "reasons": []})
+    monkeypatch.setattr("factor_lab.research.campaign.record_usage", lambda **kwargs: {})
     plans = [
         {
             "action": "ml",
@@ -348,8 +348,8 @@ def test_panel_builder_from_data_interface():
 
 
 def test_web_gateway_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    from factor_lab.discovery import DiscoveryBrief
-    import factor_lab.web_gateway as gateway
+    from factor_lab.research.discovery import DiscoveryBrief
+    import factor_lab.research.web_gateway as gateway
 
     brief = DiscoveryBrief(
         research_question="overnight gap reversal",
@@ -400,7 +400,7 @@ def test_factor_builder_writes_direct_code_into_lab_library(tmp_path: Path):
 
 
 def test_readiness_writes_blocker_when_data_interface_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    import factor_lab.readiness as readiness
+    import factor_lab.runtime.readiness as readiness
 
     monkeypatch.setattr(readiness, "BLOCKER_PATH", tmp_path / "blocker.json")
     with pytest.raises(ReadinessBlocked):
@@ -411,7 +411,7 @@ def test_readiness_writes_blocker_when_data_interface_missing(tmp_path: Path, mo
 
 
 def test_runner_default_data_bundle_uses_gateway(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    from factor_lab import runner as runner_mod
+    from factor_lab.runtime import runner as runner_mod
 
     class Gateway(FakeGateway):
         def status(self):
@@ -424,7 +424,7 @@ def test_runner_default_data_bundle_uses_gateway(tmp_path: Path, monkeypatch: py
         assert kwargs["panel"] is not None
         return {"exp_id": "E-2", "run_id": "R-2", "experiment_dir": str(experiment_dir)}
 
-    monkeypatch.setattr("factor_lab.run.run_experiment", fake_run_experiment)
+    monkeypatch.setattr("factor_lab.runtime.run.run_experiment", fake_run_experiment)
     hypothesis = Hypothesis(
         hypothesis_id="H-2",
         factor_id="momentum.ret_21d",
@@ -445,7 +445,7 @@ def test_runner_default_data_bundle_uses_gateway(tmp_path: Path, monkeypatch: py
 
 
 def test_runner_writes_data_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    from factor_lab import runner
+    from factor_lab.runtime import runner
 
     class Gateway:
         def status(self):
@@ -457,7 +457,7 @@ def test_runner_writes_data_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyP
     def fake_run_experiment(hypothesis, **kwargs):
         return {"exp_id": "E-1", "run_id": "R-1", "experiment_dir": str(experiment_dir)}
 
-    monkeypatch.setattr("factor_lab.run.run_experiment", fake_run_experiment)
+    monkeypatch.setattr("factor_lab.runtime.run.run_experiment", fake_run_experiment)
     hypothesis = Hypothesis(
         hypothesis_id="H-1",
         factor_id="test.factor",

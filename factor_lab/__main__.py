@@ -7,17 +7,17 @@ import json
 import sys
 from pathlib import Path
 
-from . import config
-from .audit import audit_experiment
-from .brief import build_brief, write_decision
-from .control import ensure_control, load_control, set_state
-from .dashboard import render_dashboard
-from .ledger import Ledger
-from .maintenance import clean, inventory
-from .policy import init_policy, load_policy
-from .run import run_experiment
-from .schemas import Hypothesis, experiment_dir
-from .store import read_json, write_json_atomic
+from factor_lab.core import config
+from factor_lab.evaluation.audit import audit_experiment
+from factor_lab.evaluation.brief import build_brief, write_decision
+from factor_lab.core.control import ensure_control, load_control, set_state
+from factor_lab.reporting.dashboard import render_dashboard
+from factor_lab.core.ledger import Ledger
+from factor_lab.research.maintenance import clean, inventory
+from factor_lab.core.policy import init_policy, load_policy
+from factor_lab.runtime.run import run_experiment
+from factor_lab.core.schemas import Hypothesis, experiment_dir
+from factor_lab.core.store import read_json, write_json_atomic
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -172,10 +172,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "init":
-        from .directive import ensure_directive
-        from .retention import ensure_policy
-        from .supervisor import write_heartbeat
-        from .budget import ensure_policy as ensure_budget
+        from factor_lab.core.directive import ensure_directive
+        from factor_lab.research.retention import ensure_policy
+        from factor_lab.evaluation.supervisor import write_heartbeat
+        from factor_lab.core.budget import ensure_policy as ensure_budget
 
         policy = init_policy()
         ensure_budget()
@@ -192,28 +192,28 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "bootstrap":
-        from .bootstrap import bootstrap
+        from factor_lab.runtime.bootstrap import bootstrap
 
         _print(bootstrap(research=args.research))
         return 0
 
     if args.command == "doctor":
-        from .bootstrap import doctor
+        from factor_lab.runtime.bootstrap import doctor
 
         _print(doctor(probe_data=args.probe_data))
         return 0
 
     if args.command == "budget":
-        from . import budget
+        from factor_lab.core import budget
 
         _print(budget.status())
         return 0
 
     if args.command == "agents":
-        from . import agents
+        from factor_lab.core import agents
 
         if args.action == "roles":
-            from .team import load_roles, validate_roles
+            from factor_lab.team import load_roles, validate_roles
 
             _print({"validation": validate_roles(), "roles": load_roles()})
         elif args.action == "register":
@@ -229,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "library":
-        from .factor_library import LIBRARY
+        from factor_lab.runtime.factor_library import LIBRARY
 
         if args.action == "verify":
             if not args.factor:
@@ -264,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "factor-build":
-        from .factor_builder import build_from_files
+        from factor_lab.runtime.factor_builder import build_from_files
 
         factor = build_from_files(
             family=args.family,
@@ -275,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
             version=args.version,
         )
         if args.run_tests:
-            from .factor_library import LIBRARY
+            from factor_lab.runtime.factor_library import LIBRARY
 
             test_result = LIBRARY.run_tests(args.family, args.factor_id, args.version)
         else:
@@ -293,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "ml":
-        from .ml_engine import MLExperimentSpec, load_dataset, run_experiment
+        from factor_lab.research.ml_engine import MLExperimentSpec, load_dataset, run_experiment
 
         import pandas as pd
 
@@ -301,7 +301,7 @@ def main(argv: list[str] | None = None) -> int:
             codes = [item.strip() for item in args.codes.split(",") if item.strip()]
             if not codes:
                 raise SystemExit("ml data requires --codes")
-            from .data_interface_adapter import DataInterfaceGateway
+            from factor_lab.runtime.data_interface_adapter import DataInterfaceGateway
 
             frame, manifest = load_dataset(DataInterfaceGateway(), codes, args.start, args.end)
             out_dir = Path(args.out)
@@ -337,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "campaign":
-        from .campaign import create_campaign, load_campaign, run_ml_plan_campaign
+        from factor_lab.research.campaign import create_campaign, load_campaign, run_ml_plan_campaign
 
         if args.action == "status":
             if not args.id:
@@ -362,7 +362,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         else:
-            from .bootstrap import doctor
+            from factor_lab.runtime.bootstrap import doctor
 
             preflight = doctor()
             if not preflight.get("ok"):
@@ -376,7 +376,7 @@ def main(argv: list[str] | None = None) -> int:
         raw = read_json(path)
         if not isinstance(raw, dict):
             raise SystemExit(f"hypothesis not found or invalid: {path}")
-        from .runner import FactorRunner
+        from factor_lab.runtime.runner import FactorRunner
 
         hypothesis = Hypothesis.from_dict(raw)
         runner = FactorRunner()
@@ -397,8 +397,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "discovery":
-        from .discovery import DiscoveryBrief
-        from .web_gateway import parse_gateway_output, read_brief, seed_queries
+        from factor_lab.research.discovery import DiscoveryBrief
+        from factor_lab.research.web_gateway import parse_gateway_output, read_brief, seed_queries
         if args.action == "queries":
             brief = DiscoveryBrief(
                 research_question=args.question,
@@ -416,7 +416,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "parity":
-        from .parity import compare_price_panel, write_parity
+        from factor_lab.research.parity import compare_price_panel, write_parity
 
         codes = [item.strip() for item in args.codes.split(",") if item.strip()]
         if not codes:
@@ -440,7 +440,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "cycle":
-        from .cycle import run_cycle
+        from factor_lab.research.cycle import run_cycle
 
         _print(
             run_cycle(
@@ -455,7 +455,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "directive":
-        from .directive import ensure_directive, write_directive, default_directive
+        from factor_lab.core.directive import ensure_directive, write_directive, default_directive
 
         if args.action == "init":
             _print(write_directive(default_directive()))
@@ -464,8 +464,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "supervisor":
-        from .supervisor import read_supervisor
-        from . import agents, budget
+        from factor_lab.evaluation.supervisor import read_supervisor
+        from factor_lab.core import agents
+        from factor_lab.core import budget
 
         if args.action == "reclaim":
             if not args.id:
@@ -516,13 +517,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "orthogonality":
-        from .orthogonality import compute_orthogonality
+        from factor_lab.evaluation.orthogonality import compute_orthogonality
 
         _print(compute_orthogonality(_root(args.experiment)))
         return 0
 
     if args.command == "research-context":
-        from .research_context import build_context
+        from factor_lab.research.research_context import build_context
 
         if args.action == "build":
             _print(build_context(args.campaign or None))
@@ -532,20 +533,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "evaluate":
-        from .evaluation import derive, finalize
+        from factor_lab.evaluation.evaluation import derive, finalize
 
         target = Path(args.experiment)
         _print(finalize(target) if args.finalize else derive(target))
         return 0
 
     if args.command == "web-mode":
-        from .web_gateway import resolve_mode
+        from factor_lab.research.web_gateway import resolve_mode
 
         _print(resolve_mode(args.mode))
         return 0
 
     if args.command == "dry-run":
-        from .dry_run import run_dry_run
+        from factor_lab.evaluation.dry_run import run_dry_run
 
         _print(run_dry_run())
         return 0
@@ -555,7 +556,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "eval-adapter":
-        from .research_adapter import RESEARCH
+        from factor_lab.runtime.research_adapter import RESEARCH
 
         _print(
             {

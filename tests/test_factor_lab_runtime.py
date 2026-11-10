@@ -3,11 +3,11 @@ from __future__ import annotations
 import concurrent.futures
 from pathlib import Path
 
-from factor_lab import schemas
-from factor_lab.clock import next_token, parse_hlc
-from factor_lab.ledger import Ledger
-from factor_lab.research_adapter import RESEARCH
-from factor_lab.schemas import Hypothesis, OutcomeSpec, reserve_experiment_id, trial_id
+from factor_lab.core import schemas
+from factor_lab.core.clock import next_token, parse_hlc
+from factor_lab.core.ledger import Ledger
+from factor_lab.runtime.research_adapter import RESEARCH
+from factor_lab.core.schemas import Hypothesis, OutcomeSpec, reserve_experiment_id, trial_id
 
 
 def _hypothesis(fid: str = "H-TEST-001", family: str = "F-test") -> Hypothesis:

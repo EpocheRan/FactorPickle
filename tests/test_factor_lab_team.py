@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from factor_lab.team import load_roles, validate_roles
-from factor_lab.web_gateway import seed_queries
-from factor_lab.discovery import DiscoveryBrief
-from factor_lab import config
+from factor_lab.research.web_gateway import seed_queries
+from factor_lab.research.discovery import DiscoveryBrief
+from factor_lab.core import config
 
 
 def test_team_roles_are_portable() -> None:

@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from factor_lab.audit import audit_experiment
-from factor_lab.ledger import Ledger
-from factor_lab.policy import default_policy
-from factor_lab.schemas import Hypothesis, OutcomeSpec, trial_id
-from factor_lab.store import write_json_atomic
+from factor_lab.evaluation.audit import audit_experiment
+from factor_lab.core.ledger import Ledger
+from factor_lab.core.policy import default_policy
+from factor_lab.core.schemas import Hypothesis, OutcomeSpec, trial_id
+from factor_lab.core.store import write_json_atomic
 
 
 def _fixture(root: Path, ledger: Ledger, *, run_id: str = "RUN-TEST", ledger_run_id: str | None = None, corrupt_ic: bool = True):

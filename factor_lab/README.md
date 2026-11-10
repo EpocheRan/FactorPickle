@@ -11,6 +11,23 @@
 - 因子晋升与策略变更需要人工 G4，运行时不能自动晋升。
 - 所有可变研究状态位于 `output/factor_lab/`。
 
+## 目录
+
+```text
+factor_lab/
+  __init__.py
+  __main__.py          CLI 入口
+  core/                配置、存储、schema、策略、时钟、ledger、control、budget、contracts、agents
+  runtime/             Runner、Panel、data_interface 适配、因子构建、因子库、bootstrap、readiness
+  evaluation/          audit、evaluation、brief、orthogonality、stats、dry-run、supervisor、trace
+  research/            campaign、cycle、discovery、web_gateway、research_context、ML、history、parity
+  reporting/           dashboard 与模板
+  sources/             精选 discovery 来源
+  team/                durable teammate 角色与 bootstrap
+  templates/           dashboard HTML
+  workflows/           多 agent workflow 定义
+```
+
 ## 角色
 
 > 本 README 只描述当前实现；不保留历史版本、迁移记录或旧方案。
