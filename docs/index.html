@@ -856,7 +856,7 @@
   .fp-bars{display:flex;flex-direction:column;gap:9px}
   .fp-bar-row{display:grid;grid-template-columns:110px 1fr 58px;gap:10px;align-items:center;font-family:var(--mono);font-size:9px;color:#8da0ad}
   .fp-bar-track{height:4px;background:rgba(148,163,184,.12);overflow:hidden}
-  .fp-bar-fill{height:100%;background:linear-gradient(90deg,#7d9a50,#c9ff5a)}
+  .fp-bar-fill{display:block;height:100%;background:linear-gradient(90deg,#7d9a50,#c9ff5a)}
   .fp-note{margin:14px 0 0;font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:#5c7065}
   .fp-table{width:100%;border-collapse:collapse;font-size:12px;color:#9aadb9}
   .fp-table th{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:#6e8276;text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
@@ -956,11 +956,22 @@
   .fp-run-tags b{color:#d6e6d3;font-weight:400}
   .fp-run-factors{margin-top:10px;font-family:var(--mono);font-size:7.5px;line-height:1.7;color:#596e61;word-break:break-word}
   .fp-report .fp-note{margin-top:10px}
+  .fp-tag.bad{color:#ff9a8d;border-color:rgba(255,138,120,.3);background:rgba(255,90,70,.055)}
+  .fp-factor-verdict{display:flex;gap:16px;padding:16px;border:1px solid rgba(255,138,120,.18);background:rgba(255,90,70,.04);border-radius:7px}
+  .fp-factor-grade{flex:none;width:56px;height:56px;display:grid;place-items:center;border:1px solid rgba(255,138,120,.3);font-family:var(--mono);font-size:32px;line-height:1;color:#ff9a8d}
+  .fp-factor-verdict h4{margin:0 0 6px;font-size:14px;font-weight:520;color:#ffd5ce}
+  .fp-factor-verdict p{margin:0;font-size:11px;line-height:1.75;color:#a9bbb0}
+  .fp-factor-verdict p b{color:#ffd5ce;font-weight:500}
+  .fp-veto-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+  .fp-veto-list span{font-family:var(--mono);font-size:7px;letter-spacing:.04em;color:#e7a49b;border:1px solid rgba(255,138,120,.18);padding:4px 6px;border-radius:2px}
+  .fp-report-kv b.neg{color:#ff9a8d}
   @media(max-width:900px){
     .fp-report{padding:17px}
     .fp-report-metrics{grid-template-columns:1fr 1fr}
     .fp-report-metric b{font-size:15px}
     .fp-curve{height:120px}
+    .fp-factor-verdict{gap:12px;padding:13px}
+    .fp-factor-grade{width:44px;height:44px;font-size:25px}
     .fp-report-more-grid{grid-template-columns:1fr}
     .fp-report-toggle-row{align-items:flex-start;flex-direction:column;gap:10px}
     .fp-report-kv{grid-template-columns:1fr 1fr}
@@ -1678,7 +1689,123 @@ h1 .hl{
         <div class="fp-card"><div class="idx mono">05</div><h3>样本敏感性</h3><p>ALL / EX_BSE / INVESTABLE / HIGH_LIQ 四组样本，结论随样本如何变化。</p></div>
         <div class="fp-card"><div class="idx mono">06</div><h3>结论与归因</h3><p>五维评分、failure mode、caveats 与 next action 一并归档。</p></div>
       </div></div>
-      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">02 / REPORT SAMPLE</div><h2>评估报告样例</h2></div><span class="fp-tag">ILLUSTRATIVE DATA</span></div><div class="fp-report"><div class="fp-report-head"><div><div class="k">FACTOR REPORT</div><h3>momentum_20d</h3><p>ALL · 2018-01-01 → 2026-11-06 · v1.3</p></div><span class="fp-tag">PASS / REVIEW</span></div><div class="fp-report-metrics"><div class="fp-report-metric"><span>RANK IC</span><b>0.041</b></div><div class="fp-report-metric"><span>ICIR</span><b>0.57</b></div><div class="fp-report-metric"><span>LONG-SHORT</span><b>+12.8%</b></div><div class="fp-report-metric"><span>COVERAGE</span><b>96.2%</b></div></div><div class="fp-bars"><div class="fp-bar-row"><span>流动性分层</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:78%"></i></span><span>0.031</span></div><div class="fp-bar-row"><span>市值分层</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:64%"></i></span><span>0.025</span></div><div class="fp-bar-row"><span>行业稳健性</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:83%"></i></span><span>0.036</span></div><div class="fp-bar-row"><span>分月胜率</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:61%"></i></span><span>58.0%</span></div></div><div class="fp-note">示例数值，仅用于展示版式；真实报告由 research.report 生成。</div></div></div>
+      <div class="fp-section">
+        <div class="fp-sec-head">
+          <div><div class="fp-label mono">02 / REPORT SAMPLE</div><h2>评估报告样例</h2></div>
+          <span class="fp-tag">REAL REPORT / SAMPLE</span>
+        </div>
+        <div class="fp-report" id="factorResearchReport">
+          <div class="fp-report-head">
+            <div><div class="k">FACTOR REPORT</div><h3>momentum.ret_21d</h3><p>all_a · 2017-02-02 → 2026-10-30 · h=5 · T+1</p></div>
+            <span class="fp-tag bad">D / 46</span>
+          </div>
+          <div class="fp-report-metrics">
+            <div class="fp-report-metric"><span>RANK IC (h=5)</span><b>-0.045</b></div>
+            <div class="fp-report-metric"><span>ICIR</span><b>-2.08</b></div>
+            <div class="fp-report-metric"><span>多空 SHARPE</span><b>-1.28</b></div>
+            <div class="fp-report-metric"><span>覆盖率</span><b>99.9%</b></div>
+          </div>
+          <div class="fp-bars">
+            <div class="fp-bar-row"><span>时间稳定性</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:84%"></i></span><span>84 / 100</span></div>
+            <div class="fp-bar-row"><span>空间区分度</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:18%"></i></span><span>18 / 100</span></div>
+            <div class="fp-bar-row"><span>有效覆盖率</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:99.9%"></i></span><span>99.9%</span></div>
+            <div class="fp-bar-row"><span>先验同号率</span><span class="fp-bar-track"><i class="fp-bar-fill" style="width:0%"></i></span><span>0%</span></div>
+          </div>
+          <div class="fp-report-strip">
+            <span>股票池 <b>5,475 只</b></span>
+            <span>交易日 <b>2,384 天</b></span>
+            <span>多空年化 <b>-21.1%</b></span>
+            <span>多空回撤 <b>-90.5%</b></span>
+          </div>
+          <div class="fp-report-toggle-row">
+            <span class="fp-check mono">DIRECTION REVIEW / MULTI-LEG NEGATIVE</span>
+            <button class="fp-report-toggle" type="button" aria-expanded="false" aria-controls="factorResearchMore">
+              <span class="label-collapsed">展开完整报告</span><span class="label-expanded">收起完整报告</span>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+            </button>
+          </div>
+          <div class="fp-report-more" id="factorResearchMore">
+            <div class="fp-factor-verdict">
+              <div class="fp-factor-grade">D</div>
+              <div>
+                <h4>方向与先验相反，多头端双负</h4>
+                <p>在 all_a 全样本中，21 日收益呈现反转而非动量。IC 为负、独立 t 显著，且全 A 等权与同风格基准的多头端均显著为负；报告按 registry 的 <b>+1</b> 先验判定，不自动翻转方向。</p>
+                <div class="fp-veto-list"><span>IC -0.045</span><span>独立 t -6.6</span><span>全 A 多头 t -6.99</span><span>同风格多头 t -7.50</span></div>
+              </div>
+            </div>
+            <div class="fp-report-more-grid">
+              <div class="fp-report-panel">
+                <h4>多空组合</h4>
+                <div class="fp-report-kv">
+                  <div><span>年化收益</span><b class="neg">-21.1%</b></div>
+                  <div><span>年化波动</span><b>17.2%</b></div>
+                  <div><span>Sharpe</span><b class="neg">-1.28</b></div>
+                  <div><span>最大回撤</span><b class="neg">-90.5%</b></div>
+                  <div><span>G5−G1 净价差</span><b class="neg">-0.46% / 期</b></div>
+                  <div><span>净价差 t</span><b class="neg">-4.0</b></div>
+                  <div><span>期胜率</span><b>40%</b></div>
+                  <div><span>年化换手</span><b>1803%</b></div>
+                </div>
+              </div>
+              <div class="fp-report-panel">
+                <h4>方向复核</h4>
+                <div class="fp-report-kv">
+                  <div><span>registry 先验</span><b>+1 / 正向</b></div>
+                  <div><span>样本内信号</span><b class="neg">负向</b></div>
+                  <div><span>独立 t</span><b class="neg">-6.6</b></div>
+                  <div><span>先验同号率</span><b>0%</b></div>
+                  <div><span>同风格多头 t</span><b class="neg">-7.50</b></div>
+                  <div><span>处理方式</span><b>记录方向错，不翻转</b></div>
+                </div>
+              </div>
+            </div>
+            <div class="fp-report-panel">
+              <h4>分市场状态 IC（h=5）</h4>
+              <table class="fp-report-table">
+                <thead><tr><th>市场状态</th><th>天数</th><th>IC</th><th>95% CI</th><th>NW t</th></tr></thead>
+                <tbody>
+                  <tr><td>牛市</td><td>1,044</td><td class="neg">-0.034</td><td>[-0.048, -0.019]</td><td class="neg">-4.6</td></tr>
+                  <tr><td>震荡</td><td>315</td><td class="neg">-0.066</td><td>[-0.093, -0.037]</td><td class="neg">-4.6</td></tr>
+                  <tr><td>熊市</td><td>819</td><td class="neg">-0.056</td><td>[-0.074, -0.037]</td><td class="neg">-5.7</td></tr>
+                </tbody>
+              </table>
+              <div class="fp-note">三类市场状态下 IC 全部为负；不存在只靠某一种市场状态撑住结论的情况。</div>
+            </div>
+            <div class="fp-report-panel">
+              <h4>分组净收益（%/期）</h4>
+              <table class="fp-report-table">
+                <thead><tr><th>分组</th><th>G1</th><th>G2</th><th>G3</th><th>G4</th><th>G5</th><th>G5−G1</th></tr></thead>
+                <tbody>
+                  <tr><td>净收益</td><td>+0.17%</td><td>+0.14%</td><td>+0.16%</td><td>+0.18%</td><td class="neg">-0.12%</td><td class="neg">-0.46%</td></tr>
+                  <tr><td>毛收益</td><td>+0.25%</td><td>+0.26%</td><td>+0.29%</td><td>+0.30%</td><td class="neg">-0.05%</td><td class="neg">-0.30%</td></tr>
+                </tbody>
+              </table>
+              <div class="fp-note">G5 最弱、G1 反而最强；分层单调性 ρ=0.00。</div>
+            </div>
+            <div class="fp-report-more-grid">
+              <div class="fp-report-panel">
+                <h4>数据质量与覆盖</h4>
+                <div class="fp-report-kv">
+                  <div><span>universe</span><b>all_a / 剔北证</b></div>
+                  <div><span>股票池</span><b>5,475 只</b></div>
+                  <div><span>有效观测覆盖</span><b>99.9%</b></div>
+                  <div><span>不可成交占比</span><b>0.16%</b></div>
+                  <div><span>数据截止</span><b>2026-10-30</b></div>
+                  <div><span>停牌 / 无成交</span><b>262 只</b></div>
+                </div>
+              </div>
+              <div class="fp-report-panel">
+                <h4>运行信息</h4>
+                <div class="fp-run-tags">
+                  <span>universe <b>all_a</b></span><span>horizon <b>5</b></span><span>groups <b>5</b></span><span>cost <b>10bp/side</b></span><span>fill <b>T+1 open</b></span><span>periods <b>2,384</b></span><span>run_id <b>20261110T1225_282e3baa</b></span>
+                </div>
+                <div class="fp-run-factors">数据源 ohlcv_1d · 后复权收盘价 · 方向来源 registry · 评分卡 v2.4.2-2026-11</div>
+              </div>
+            </div>
+            <div class="fp-note">数据来自 research 评估报告样例 · 报告由 research.report 生成。</div>
+          </div>
+        </div>
+      </div>
       <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">03 / CAPABILITY</div><h2>评估能力</h2></div></div><div class="fp-grid"><div class="fp-card"><div class="idx mono">REPRODUCIBLE</div><h3>报告可复核</h3><p>章节、指标与评分同源；同输入可重跑，HTML 可直接归档或分享。</p></div><div class="fp-card"><div class="idx mono">GATE</div><h3>硬门禁不被改写</h3><p>Evaluator 只解释 Gate，不把 fail 改成 pass，也不重算指标。</p></div><div class="fp-card"><div class="idx mono">CACHE</div><h3>Panel 复用</h3><p>行情与因子面板缓存复用，报告重跑不必重新拉取全量数据。</p></div></div></div>
     </div>
   </section>
