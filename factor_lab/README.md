@@ -177,9 +177,13 @@ Factor Lab 的研究角色由 DSH durable teammates 承担：
 | `pathfinder` | 选择研究方向和下一轮动作 |
 | `web-gateway` | 外部检索、保留 URL 引用、生成 discovery map |
 | `factor-builder` | 生成因子代码、spec、测试并写入 Lab 因子库 |
+| `runner` | 选择 codes 和数据窗口，通过 data_interface 执行一次实验 |
+| `evaluator` | 解释评级/审计，检查口径一致性，给出 caveats |
 | `ml-planner` | 设计非 Deep Learning 实验方案 |
+| `ml-monitor` | 检查 leakage、over-search、成本与可解释性 |
 | `supervisor` | 审计预算、provenance、gate 和 agent 行为 |
 
+Gate Service、DataInterfaceGateway、Research Module/Adapter 是确定性服务，不是 teammate。
 Lead 通过 `send_message` 派任务，teammate 完成后保持 inactive，可在下一轮唤醒。
 Teammate 共享工作区，但不得修改生产模块、直连数据库、promote 或绕过 Gate。
 
