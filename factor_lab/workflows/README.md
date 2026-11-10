@@ -1,34 +1,14 @@
-# DSH workflows: Factor Lab research roles
+# Factor Lab research roles
 
-DSH subagents are full local Agents. Their tools come from the selected Agent
-preset / parent composition; by default a child joins the parent composition
-and inherits its tools. `maxDepth` limits grandchildren, not tools. If a child
-appears to have no tools, check the preset's plugins / imported services /
-activation state before changing the prompt.
+Factor Lab 的研究角色由 DSH durable teammates 承担：
 
-Tool-capable contracts:
+- `pathfinder`：读 History / discovery map / campaigns，提出一轮动作。
+- `web-gateway`：执行外部检索并返回带 URL 的 digest。
+- `ml-planner`：输出非 Deep Learning 的实验 spec。
+- `factor-builder`：生成并写入 Lab 因子版本；Python `factor-build` 负责校验。
+- `supervisor`：审计预算、provenance、Gate 与 agent 行为。
 
-- `research_pathfinder.js`: may use `read` / `glob` / `grep` / `web_search` to
-  inspect History, discovery maps and campaigns; it only proposes one round.
-- `web_gateway.js`: may use `web_search` directly; returns a cited digest with
-  `discovery_map`/`web_digest` inputs.
-- `ml_planner.js`: may read data coverage / history / prior result; returns a
-  non-Deep-Learning spec; Python executes.
-- `factor_builder.js`: may read existing factors and write generated factor
-  versions into the Lab library; Python `factor-build` remains the validator.
+本目录的 JS 文件只定义角色输出契约，不承担执行调度。Lead 通过 `send_message`
+把任务派给 durable teammate；Python runtime 负责数据访问、执行、Gate、预算和 reclaim。
 
-The Python runtime owns data access, execution, Gate, budget, campaign rounds
-and reclamation. Do not let an LLM child promote a factor or bypass a Gate.
-
-Web discovery flow:
-
-```text
-python -m factor_lab discovery queries --question "..."
-DSH web_gateway.js (web_search + summarize) -> gateway_result.json
-python -m factor_lab discovery ingest --result gateway_result.json
-```
-
-Agent budget: keep a bounded number of children per cycle; no ping/probe
-agents in production. Use `factor_lab/agents.py` / `supervisor reclaim` for
-safety-gated registry-based reclamation; the PowerShell script remains a
-manual utility.
+不要 promote、不要绕过 Gate、不要新增直连 QuestDB/SQL 的路径。
