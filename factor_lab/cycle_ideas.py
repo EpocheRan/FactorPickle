@@ -1,4 +1,4 @@
-"""Phase 1 factor catalog for fresh, multi-cycle mining.
+"""Factor catalog for fresh, multi-cycle mining.
 
 Every factor is a simple, reproducible transform of the daily price/volume
 panel.  The catalog is deliberately larger than one cycle so the Scout can keep

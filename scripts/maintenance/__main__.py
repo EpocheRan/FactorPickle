@@ -12,7 +12,7 @@ COMMANDS = {
     "migrate-factors": "scripts.maintenance.migrate_factors",
     "repair-index": "scripts.maintenance.repair_index_data",
     "fix-index-series": "scripts.maintenance.fix_index_series",
-    "verify-backfill": "scripts.maintenance.verify_p0_p2",
+    "verify-backfill": "scripts.maintenance.verify_pipeline",
 }
 
 

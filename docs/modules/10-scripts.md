@@ -8,8 +8,8 @@
 
 - 因子评估只走 `python -m research.report`；
 - 回测只走 `python -m backtest`；
-- 历史回补只走 `python -m acquisition backfill --phase <name>`；
-- `scripts/` 不再承载一次性研究脚本。
+- 数据回补只走 `python -m acquisition backfill --phase <name>`；
+- `scripts/` 只承载运维、数据构建与辅助入口。
 
 ## 2. 当前脚本
 
@@ -17,7 +17,7 @@
 
 | 脚本 | 作用 | 典型用法 |
 |---|---|---|
-| `scripts/backfill_history.py` | 历史回补 shim，实际实现位于 `acquisition/backfill/` | `python -m acquisition backfill --phase daily` |
+| `scripts/backfill_history.py` | 回补入口，实际实现位于 `acquisition/backfill/` | `python -m acquisition backfill --phase daily` |
 | `scripts/export_index_minutes.py` | 按指数成分导出分钟线 CSV（断点续跑） | `--index 000300.SH --start ... --end ... --freq 5min` |
 | `scripts/import_minutes_csv.py` | 分钟线 CSV 落库 | `--csv output/xxx.csv --freq 5min` |
 | `scripts/fetch_minute_pilot.py` | 小样本分钟线冒烟 | `--source zzshare --freq 5min --codes ...` |
@@ -39,7 +39,7 @@
 | `scripts/maintenance/migrate_factors.py` | 因子注册表迁移 |
 | `scripts/maintenance/repair_index_data.py` | 修复指数日线 |
 | `scripts/maintenance/fix_index_series.py` | 修复指数序列 |
-| `scripts/maintenance/verify_p0_p2.py` | 分时/板块/披露链路验收 |
+| `scripts/maintenance/verify_pipeline.py` | 分时/板块/披露链路验收 |
 | `scripts/schemas/*.py` | 表结构定义与校验 |
 | `scripts/compact-docker-vhdx.ps1` | 重建 Docker 数据盘，回收 vhdx 空间 |
 
@@ -65,9 +65,9 @@ powershell -ExecutionPolicy Bypass -File "$PWD\scripts\compact-docker-vhdx.ps1"
 - 备份目录不会自动删除，确认服务正常后手动清理；
 - 脚本必须保存为 UTF-8 with BOM（PowerShell 5.1 兼容）。
 
-## 4. 历史回补
+## 4. 数据回补
 
-历史回补实现已迁移到 `acquisition`，`scripts/backfill_history.py` 只保留兼容入口。
+数据回补实现位于 `acquisition`，`scripts/backfill_history.py` 提供入口。
 
 ```bash
 python -m acquisition backfill --phase daily
@@ -88,10 +88,3 @@ python -m acquisition backfill --phase valuation
 | 幂等 | 回补按缺失判断，可中断后重跑 |
 | 退市股 | `volume` 可能为 NaN，写 LONG 列前要填充 |
 | 区间接口 | 单次上限约 6,000 行，解禁/回购/股东户数需按月分页 |
-
-## 5. 清理记录
-
-- **2026-11-10**：删除 `scripts/analysis/`（一次性专题与归档脚本）以及 maintenance 下的
-  临时 concept 回补脚本；清理 `__pycache__`。
-- 因子评分卡、方向校准、批量研究等旧脚本已移除；这些能力由 `research.report` 的报告与
-  方向复核逻辑承担。

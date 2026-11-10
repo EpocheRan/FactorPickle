@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""P0–P2 端到端验收：分时结构 / 板块归属与板块收益 / 披露日历与公告。
+"""端到端验收：分时结构 / 板块归属与板块收益 / 披露日历与公告。
 
 用法::
 
-    python scripts/verify_p0_p2.py
-    python scripts/verify_p0_p2.py --code 603699 --date 2026-10-28
+    python scripts/maintenance/verify_pipeline.py
+    python scripts/maintenance/verify_pipeline.py --code 603699 --date 2026-10-28
 
 验收标准（与手工核对过的真实值一致）：
 1. 分时：能把 2026-10-28 的「11:12 首次封板、2 次炸板、尾盘竞价 98,200 股」还原出来；

@@ -1,4 +1,4 @@
-"""One Phase-0 research cycle: 4 factors, 2 worker processes, then audit."""
+"""One research cycle: 4 factors, 2 worker processes, then audit."""
 
 from __future__ import annotations
 
@@ -166,7 +166,7 @@ def run_cycle(
         specs = [spec for spec in CYCLE_SPECS if spec.factor_id not in existing]
         specs = _select_specs(specs, max(1, int(limit)))
     directive = ensure_directive()
-    family_id = str(family_id or directive.get("family_id") or "F-phase0-cycle")
+    family_id = str(family_id or directive.get("family_id") or "F-cycle")
     hypotheses = [_hypothesis_for(spec, directive, family_id) for spec in specs]
     if not hypotheses:
         return {"status": "empty", "reason": "no fresh cycle factors"}

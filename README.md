@@ -52,7 +52,7 @@ MCPserver ── 统一工具出口（http / sse / stdio）
 | `backtest/` | 单股 / 横截面回测、执行规则、账本 | `python -m backtest` |
 | `strategies/` | 策略基类、universe、weighting、模型 | `python -m backtest list` |
 | `position/` | 组合、持仓、交易流水、ATR / GRID 模式 | MCP `pm_*` 工具 |
-| `scripts/` | 建表、迁移、因子审计、相关性分析 | 手工执行 |
+| `scripts/` | 建表、迁移、数据验收、运维辅助 | 手工执行 |
 | `MCPserver.py` | FastMCP 注册与启动 | `python MCPserver.py` |
 
 ## 快速开始
@@ -64,7 +64,7 @@ cp config.example.json config.json   # 填入 TUSHARE_TOKEN 等
 docker compose up -d
 ```
 
-启动顺序：`questdb` → `db-init`（一次性建表）→ `mcp-server`。运行期不再建表。
+启动顺序：`questdb` → `db-init`（一次性建表）→ `mcp-server`。运行期不建表。
 
 ```bash
 docker compose ps
@@ -105,16 +105,18 @@ python -m acquisition run --datasets ohlcv_1d,factors,screener
 - **市场与品种**：`market` 是交易所（`SSE` / `SZSE` / `BSE`），`type` 是品种（`stock` / `etf` / `lof` / `fund` / `idx`）。
 - **时点正确**：财务按 `publish_date` 过滤，板块成分按 `as_of` 取最近整组快照。
 - **写入边界**：raw 表只由 `data_interface` 写，因子表只由 `factor_engine` 写。
-- **报告单一入口**：因子报告只认 `research.report`；报告章节由 `eval_profile` 里的 profile 决定。取数入口在 `research.data`（`loader.py` / `db.py` / `spec.py`），不再有 eval CLI。
-- **因子报告唯一入口**：只用 `python -m research.report`。默认 `all_a` 全市场、`2017-01-01` 至 `2026-11-01`、`default` profile、5 日持有；股票池只用 `--universe`（`all_a` / `index:...` / `pool:date:size`），不再使用 `--pool/--pool-date`；只输出 HTML。禁止另写自定义报告脚本或临时 Panel。
-- **profile 即报告章节**：`default` 包含定义、时间、空间、评级、附录五章；`quick` 只含定义、时间、评级。`research.eval` 已移除，数据/面板参数在 `research.data`。
+- **报告单一入口**：因子报告只认 `research.report`；报告章节由 `eval_profile` 里的 profile 决定。取数入口在 `research.data`（`loader.py` / `db.py` / `spec.py`）。
+- **因子报告唯一入口**：只用 `python -m research.report`。默认 `all_a` 全市场、`2017-01-01` 至 `2026-11-01`、`default` profile、5 日持有；股票池只用 `--universe`（`all_a` / `index:...` / `pool:date:size`）；只输出 HTML。禁止另写自定义报告脚本或临时 Panel。
+- **profile 即报告章节**：`default` 包含定义、时间、空间、评级、附录五章；`quick` 只含定义、时间、评级。数据/面板参数在 `research.data`。
 - **Panel 缓存**：`output/cache/research_panel/`；数据截止日/universe/extras/schema 变化自动失效；`--no-cache` 强制重建；5 个报告优先一个进程 `--batch`。
-- **策略回测入口**：`python -m backtest`（已存在，不要改 `backtest/reporting`）。
+- **策略回测入口**：`python -m backtest`（不要改 `backtest/reporting`）。
 - **profile 唯一键**：profile 以 `name` 唯一，不设版本号；股票池、区间、horizon、cost 都是 run parameter，不写进 profile。
 
 完整字段、分区与迁移说明见 [docs/design/](docs/design/) 与 [docs/data/coverage.md](docs/data/coverage.md)。
 
 ## 文档
+
+> 约定：README 与文档只描述当前实现；不保留历史版本、迁移记录、旧方案或中间状态。变更由代码提交承载。
 
 | 入口 | 内容 |
 |---|---|

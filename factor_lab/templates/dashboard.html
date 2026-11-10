@@ -205,7 +205,7 @@
 
   <section class="grid3">
     <div class="panel">
-      <div class="panel-head"><h2>门禁漏斗</h2><span class="sub">P0 计数</span></div>
+      <div class="panel-head"><h2>门禁漏斗</h2><span class="sub">门禁计数</span></div>
       <div id="funnel"></div>
     </div>
     <div class="panel">
@@ -226,7 +226,7 @@
       <div class="pager" id="findings-pager"></div>
     </div>
     <div class="panel">
-      <div class="panel-head"><h2>数据覆盖</h2><span class="sub">P0 手工表</span></div>
+      <div class="panel-head"><h2>数据覆盖</h2><span class="sub">手工表</span></div>
       <div id="coverage"></div>
     </div>
   </section>
@@ -447,7 +447,7 @@
 
   function renderCoverage(){
     const rows = DATA.coverage || [];
-    $('coverage').innerHTML = rows.length ? `<div class="table-wrap" style="max-height:230px"><table style="min-width:0;width:100%"><thead><tr><th>字段</th><th>起始</th><th>覆盖率</th><th>PIT</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="mono">${esc(r.table)}.${esc(r.field)}</td><td class="mono">${esc(r.start)}</td><td class="mono">${r.coverage == null ? '—' : pct(r.coverage)}</td><td>${badge(r.pit ? '有' : '无', r.pit ? 'pass' : 'warn')}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">未提供 data_coverage.json；P0 先用手工表</div>`;
+    $('coverage').innerHTML = rows.length ? `<div class="table-wrap" style="max-height:230px"><table style="min-width:0;width:100%"><thead><tr><th>字段</th><th>起始</th><th>覆盖率</th><th>PIT</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="mono">${esc(r.table)}.${esc(r.field)}</td><td class="mono">${esc(r.start)}</td><td class="mono">${r.coverage == null ? '—' : pct(r.coverage)}</td><td>${badge(r.pit ? '有' : '无', r.pit ? 'pass' : 'warn')}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">未提供 data_coverage.json；使用手工表</div>`;
   }
 
   function renderStorage(){

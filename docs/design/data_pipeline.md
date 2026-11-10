@@ -12,7 +12,7 @@
 | 个股↔板块映射 + 板块收益自算 | ✅ 可用 | `map_stock_board` / `dim_board` / `concept_board_daily(source='computed.bk')` | `scripts/backfill_boards.py` |
 | 预约披露日历 + 公告列表 | ✅ 可用 | `fin_disclosure_calendar` / `announcement` | `scripts/backfill_disclosure.py` |
 
-验收：`python scripts/verify_p0_p2.py`（11 项检查，全绿）。
+验收：`python scripts/maintenance/verify_pipeline.py`（11 项检查，全绿）。
 
 ---
 
@@ -115,7 +115,7 @@ python scripts/backfill_boards.py --codes 603699 --peers --returns --start 2026-
 python scripts/backfill_disclosure.py --calendar --report-date 2026-09-30 --codes 603699
 
 # 验收
-python scripts/verify_p0_p2.py
+python scripts/maintenance/verify_pipeline.py
 ```
 
 ### 规模参考

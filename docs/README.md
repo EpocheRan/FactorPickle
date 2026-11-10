@@ -4,7 +4,7 @@
 > - `modules/` 只描述**当前实现**；
 > - `design/` 记录当前设计取舍；
 > - `guides/` 是可直接照做的用法与运维约定；
-> - 旧方案、迁移记录和历史版本不保留在文档树中，需要时查 git history。
+> - 文档只保留当前实现，变更通过代码提交承载。
 
 ## 一、目录结构
 
@@ -69,7 +69,7 @@ FactorPickle 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有�
 | 07 | `backtest` | 回测：RQAlpha 引擎 + A 股规则 + 横截面执行 | [07-backtest.md](modules/07-backtest.md) |
 | 08 | `strategies` | 策略基类：单标的/横截面、股票池、权重、上下文 | [08-strategies.md](modules/08-strategies.md) |
 | 09 | `position` | 持仓管理：组合/持仓/交易记录、成本与风控模式 | [09-position.md](modules/09-position.md) |
-| 10 | `scripts` | 运维脚本：回填、修复、报告、评分卡、方向校准 | [10-scripts.md](modules/10-scripts.md) |
+| 10 | `scripts` | 运维脚本：数据回补、建表/迁移、修复与验收 | [10-scripts.md](modules/10-scripts.md) |
 | 11 | `MCPserver` | MCP 工具服务器：注册各模块工具、传输与生命周期 | [11-mcp-server.md](modules/11-mcp-server.md) |
 | — | `factor_lab` | 自主因子研究运行时：PathFinder / FactorBuilder / Runner / ML / Supervisor | [factor_lab.md](design/factor_lab.md) |
 
@@ -89,7 +89,7 @@ FactorPickle 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有�
 - 时间维度含分月份 IC；
 - metrics 后端：`REPORT_METRICS_BACKEND=auto|pandas|polars`；Rank IC 固定 pandas，
   Quantile NAV 按截面规模路由，`FactorReport.metrics_engine` 记录实际后端；
-- `research.eval` 独立 CLI 已移除，数据层在 `research.data`。
+- 数据层在 `research.data`。
 
 ## 四、文档索引
 
@@ -179,5 +179,5 @@ MCPserver        -> 全部（注册工具）
 - **模块文档**：实现变更时同步更新对应 `modules/NN-*.md`，不保留过时签名；
 - **设计文档**：只描述当前设计，不保留版本号、阶段和已废弃方案；
 - **指南**：命令必须可在当前代码上直接执行；
-- **历史**：由 git history 保存，不在文档树中维护变更记录；
+- **变更**：通过代码提交承载，不在文档树中维护变更记录；
 - **图谱**：`index.html` 按当前模块与表结构维护，不包含本地数据行数；模块入口或表结构变化后同步更新。

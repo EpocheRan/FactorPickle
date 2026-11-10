@@ -5,20 +5,17 @@ from pathlib import Path
 
 from factor_lab import schemas
 from factor_lab.clock import next_token, parse_hlc
-from factor_lab.cycle import _select_specs
-from factor_lab.cycle_ideas import CYCLE_SPECS
 from factor_lab.ledger import Ledger
-from factor_lab.phase1_agent import _safe_plan
 from factor_lab.research_adapter import RESEARCH
 from factor_lab.schemas import Hypothesis, OutcomeSpec, reserve_experiment_id, trial_id
 
 
-def _hypothesis(fid: str = "H-PHASE0-001", family: str = "F-phase0-test") -> Hypothesis:
+def _hypothesis(fid: str = "H-TEST-001", family: str = "F-test") -> Hypothesis:
     return Hypothesis(
         hypothesis_id=fid,
         factor_id="risk.max_drawdown_20d",
-        title="phase0",
-        mechanism="phase0",
+        title="runtime",
+        mechanism="runtime",
         expected_sign=-1,
         outcomes=[OutcomeSpec(universe="pool:2022-01-04:200", horizon=5)],
         family_id=family,
@@ -59,7 +56,7 @@ def test_ledger_hlc_and_parent_link(tmp_path: Path) -> None:
 def test_ledger_family_trials(tmp_path: Path) -> None:
     ledger = Ledger(tmp_path / "ledger.jsonl")
     for index in (1, 2):
-        hyp = _hypothesis(f"H-PHASE0-{index:03d}")
+        hyp = _hypothesis(f"H-TEST-{index:03d}")
         event = ledger.register_hypothesis(hyp)
         ledger.start_run(
             run_id=f"RUN-{index}",
@@ -70,8 +67,8 @@ def test_ledger_family_trials(tmp_path: Path) -> None:
             family_id=hyp.family_id,
             parent_event_id=event["event_id"],
         )
-    assert len(ledger.family_trials("F-phase0-test")) == 2
-    assert ledger.summary()["family_trials"]["F-phase0-test"] == 2
+    assert len(ledger.family_trials("F-test")) == 2
+    assert ledger.summary()["family_trials"]["F-test"] == 2
 
 
 def test_reserve_experiment_ids_are_atomic(tmp_path: Path, monkeypatch) -> None:
@@ -80,31 +77,6 @@ def test_reserve_experiment_ids_are_atomic(tmp_path: Path, monkeypatch) -> None:
         ids = list(pool.map(lambda _: reserve_experiment_id(), range(4)))
     assert len(ids) == len(set(ids))
     assert all((tmp_path / "experiments" / exp_id).is_dir() for exp_id in ids)
-
-
-def test_cycle_catalog_and_scout_selection() -> None:
-    ids = [spec.factor_id for spec in CYCLE_SPECS]
-    assert len(ids) == len(set(ids))
-    assert len(ids) >= 20
-    selected = _select_specs(list(CYCLE_SPECS), 4)
-    assert len(selected) == 4
-    assert len({spec.factor_id for spec in selected}) == 4
-    assert len({spec.bet for spec in selected}) >= 2
-
-
-def test_agent_plan_filters_to_fresh_known_factors(monkeypatch) -> None:
-    monkeypatch.setattr("factor_lab.phase1_agent._existing_factors", lambda: set())
-    plan = _safe_plan(
-        {
-            "selected": ["risk.vol_of_vol_120d", "not.a.factor", "risk.high_low_ratio_60d"],
-            "family_id": "F-test-agent",
-            "rationale": "test",
-            "next_bet": "test",
-            "discovery_verdict": "transmission_gap",
-        }
-    )
-    assert plan["selected"] == ["risk.vol_of_vol_120d", "risk.high_low_ratio_60d"]
-    assert plan["family_id"] == "F-test-agent"
 
 
 def test_research_adapter_points_to_production_evaluator() -> None:

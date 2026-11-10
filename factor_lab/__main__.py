@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m factor_lab")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("init", help="create the P0 gate policy and control file")
+    sub.add_parser("init", help="create gate policy and control file")
 
     bootstrap_parser = sub.add_parser("bootstrap", help="portable workspace bootstrap")
     bootstrap_parser.add_argument("--research", action="store_true")
@@ -120,29 +120,15 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--robustness", action="store_true")
     run_parser.add_argument("--no-audit", action="store_true")
 
-    sub.add_parser("pilot", help="run the amount_bias P0 pilot and dashboard")
+    sub.add_parser("pilot", help="run the amount_bias pilot and dashboard")
 
-    cycle_parser = sub.add_parser("cycle", help="run one Phase-0 research cycle")
+    cycle_parser = sub.add_parser("cycle", help="run one research cycle")
     cycle_parser.add_argument("--limit", type=int, default=4)
     cycle_parser.add_argument("--profile", default="quick")
     cycle_parser.add_argument("--heartbeat-interval", type=int, default=2)
     cycle_parser.add_argument("--no-orthogonality", action="store_true")
     cycle_parser.add_argument("--family", default=None)
     cycle_parser.add_argument("--factors", default="", help="comma-separated explicit factor ids")
-
-    phase1_parser = sub.add_parser("phase1", help="run multiple Phase 1 cycles with Scout/Director records")
-    phase1_parser.add_argument("--cycles", type=int, default=4)
-    phase1_parser.add_argument("--limit", type=int, default=4)
-    phase1_parser.add_argument("--profile", default="quick")
-    phase1_parser.add_argument("--heartbeat-interval", type=int, default=2)
-
-    agent_parser = sub.add_parser("phase1-agent", help="run a Phase 1 cycle from a DSH Scout plan")
-    agent_parser.add_argument("--plan", default=str(config.PHASE1_DIR / "agent_plan.json"))
-    agent_parser.add_argument("--profile", default="quick")
-    agent_parser.add_argument("--heartbeat-interval", type=int, default=2)
-
-    director_parser = sub.add_parser("phase1-director", help="apply a DSH Director memo to the research queue")
-    director_parser.add_argument("--memo", default=str(config.PHASE1_DIR / "agent_memo.json"))
 
     directive_parser = sub.add_parser("directive", help="show or initialize research direction")
     directive_parser.add_argument("action", choices=["show", "init"], nargs="?", default="show")
@@ -152,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     supervisor_parser.add_argument("--id", default="")
     supervisor_parser.add_argument("--apply", action="store_true")
 
-    mine_parser = sub.add_parser("mine", help="run the P1 idea batch")
+    mine_parser = sub.add_parser("mine", help="run the idea batch")
     mine_parser.add_argument("--limit", type=int, default=23)
     mine_parser.add_argument("--profile", default="quick")
     mine_parser.add_argument("--no-orthogonality", action="store_true")
@@ -164,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     brief_parser = sub.add_parser("brief", help="build decision brief / decision for one experiment")
     brief_parser.add_argument("--experiment", required=True)
 
-    ortho_parser = sub.add_parser("orthogonality", help="compute P1 exposure correlation for one experiment")
+    ortho_parser = sub.add_parser("orthogonality", help="compute exposure correlation for one experiment")
     ortho_parser.add_argument("--experiment", required=True)
 
     sub.add_parser("dashboard", help="render the dashboard from artifacts")
@@ -469,37 +455,6 @@ def main(argv: list[str] | None = None) -> int:
                 factor_ids=factor_ids,
             )
         )
-        return 0
-
-    if args.command == "phase1":
-        from .phase1 import run_phase1
-
-        _print(
-            run_phase1(
-                cycles=args.cycles,
-                limit=args.limit,
-                profile=args.profile,
-                heartbeat_interval=args.heartbeat_interval,
-            )
-        )
-        return 0
-
-    if args.command == "phase1-agent":
-        from .phase1_agent import run_agent_plan
-
-        _print(
-            run_agent_plan(
-                Path(args.plan),
-                profile=args.profile,
-                heartbeat_interval=args.heartbeat_interval,
-            )
-        )
-        return 0
-
-    if args.command == "phase1-director":
-        from .phase1_agent import apply_director_memo
-
-        _print(apply_director_memo(Path(args.memo)))
         return 0
 
     if args.command == "directive":
