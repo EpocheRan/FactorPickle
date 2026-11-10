@@ -1966,7 +1966,7 @@ h1 .hl{
   <!-- ============ POSITION ============ -->
   <section class="view" id="view-position">
     <div class="wrap fp-page">
-      <div class="fp-hero"><div class="fp-kicker mono">POSITION / PORTFOLIO / RISK</div><h1>仓位管理</h1><p class="fp-lede">组合、持仓与交易流水是同一本账。仓位模块负责把成交写实、成本刷新、盈亏汇总与 ATR / GRID 风控串起来。</p><div class="fp-metrics"><div class="fp-metric"><b>3</b><span>CORE TABLES</span></div><div class="fp-metric"><b>ATR / GRID</b><span>MODES</span></div><div class="fp-metric"><b>逐笔</b><span>TRADE LEDGER</span></div><div class="fp-metric"><b>PM_*</b><span>MCP TOOLS</span></div></div></div>
+      <div class="fp-hero"><div class="fp-kicker mono">POSITION / PORTFOLIO / RISK</div><h1>仓位管理</h1><p class="fp-lede">组合、持仓与交易流水是同一本账。仓位模块负责把成交写实、成本刷新、盈亏汇总与 ATR / GRID 风控串起来。</p><div class="fp-metrics"><div class="fp-metric"><b>3</b><span>CORE TABLES</span></div><div class="fp-metric"><b>ATR / GRID / &hellip;</b><span>MODES</span></div><div class="fp-metric"><b>逐笔</b><span>TRADE LEDGER</span></div><div class="fp-metric"><b>PM_*</b><span>MCP TOOLS</span></div></div></div>
       <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">01 / MODEL</div><h2>一本可追溯的账</h2></div></div><div class="fp-grid">
         <div class="fp-card"><div class="idx mono">PORTFOLIO</div><h3>组合</h3><p>现金、总资产、市值与策略归属；组合是持仓的聚合根。</p></div>
         <div class="fp-card"><div class="idx mono">POSITION</div><h3>持仓</h3><p>标的、数量、成本、可用数量与止损位；模式决定加减仓规则。</p></div>
@@ -1976,7 +1976,7 @@ h1 .hl{
 <span class="p">›</span> pm_execute_trade
 <span class="p">›</span> pm_refresh_positions
 <span class="p">›</span> pm_portfolio_summary</code></pre></div></div>
-      <div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">03 / MODES</div><h2>两种执行模式</h2></div></div><div class="fp-boxrow"><div class="fp-box"><b>ATR 模式</b><span>按波动率调整风险预算与止损距离，适合趋势 / 波段持仓。</span></div><div class="fp-box"><b>GRID 模式</b><span>按价格网格分批成交，记录每一格的数量与成本。</span></div><div class="fp-box"><b>人工确认</b><span>组合创建与执行可由 Human 审批；Agent 只准备交易意图。</span></div></div></div>
+<div class="fp-section"><div class="fp-sec-head"><div><div class="fp-label mono">03 / MODES</div><h2>执行模式，可扩展</h2><p>ATR / GRID 只是内置实现。仓位管理与风控是开放接口，用户可以继续接入自己的模式。</p></div></div><div class="fp-boxrow"><div class="fp-box"><b>ATR 模式</b><span>按波动率调整风险预算与止损距离，适合趋势 / 波段持仓。</span></div><div class="fp-box"><b>GRID 模式</b><span>按价格网格分批成交，记录每一格的数量与成本。</span></div><div class="fp-box"><b>人工确认</b><span>组合创建与执行可由 Human 审批；Agent 只准备交易意图。</span></div></div><div class="fp-note">模式可插拔：新增仓位管理方式只需实现同一套接口，组合、持仓与交易台账无需改动。</div></div>
     </div>
   </section>
 
