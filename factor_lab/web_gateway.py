@@ -19,7 +19,7 @@ from .discovery import DiscoveryBrief, DiscoveryLead, write_map
 from .store import read_json, write_json_atomic
 
 DIGEST_PATH = config.LAB_ROOT / "discovery" / "web_digest.json"
-SOURCE_CATALOG_PATH = config.LAB_ROOT / "discovery" / "source_catalog.json"
+SOURCE_CATALOG_PATH = Path(__file__).with_name("sources") / "catalog.json"
 DISCOVERY_MODES = ("exploit", "explore", "deep")
 
 

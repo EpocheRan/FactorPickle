@@ -79,7 +79,7 @@ def _coverage() -> dict[str, Any]:
 def _discovery() -> dict[str, Any]:
     raw = read_json(config.LAB_ROOT / "discovery" / "discovery_map.json")
     result = raw if isinstance(raw, dict) else {"leads": [], "sources": []}
-    catalog = read_json(config.LAB_ROOT / "discovery" / "source_catalog.json")
+    catalog = read_json(config.PROJECT_ROOT / "factor_lab" / "sources" / "catalog.json")
     if isinstance(catalog, dict):
         result["source_catalog"] = catalog
     return result
