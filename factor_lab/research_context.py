@@ -78,7 +78,11 @@ def _coverage() -> dict[str, Any]:
 
 def _discovery() -> dict[str, Any]:
     raw = read_json(config.LAB_ROOT / "discovery" / "discovery_map.json")
-    return raw if isinstance(raw, dict) else {"leads": [], "sources": []}
+    result = raw if isinstance(raw, dict) else {"leads": [], "sources": []}
+    catalog = read_json(config.LAB_ROOT / "discovery" / "source_catalog.json")
+    if isinstance(catalog, dict):
+        result["source_catalog"] = catalog
+    return result
 
 
 def _ml_results() -> list[dict[str, Any]]:
