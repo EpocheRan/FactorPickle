@@ -61,7 +61,8 @@ class FactorRunner:
         # sources.  Use 3x the factor window plus a small buffer, capped.
         spec = dict(getattr(artifact, "spec", {}) or {}) if not isinstance(artifact, dict) else dict(artifact.get("spec") or {})
         window = int(spec.get("window", 20) or 20)
-        warmup_days = max(60, min(800, window + 20))
+        # Calendar-day warmup must exceed the factor's trading-day window.
+        warmup_days = max(90, min(800, window * 2 + 30))
         return build_factor_panel(
             self.gateway, artifact, codes, start, end, warmup_days=warmup_days
         )
