@@ -146,6 +146,14 @@ python -m factor_lab agents roles
 python -m factor_lab doctor
 ```
 
+创建团队前先读 `factor_lab/team/BOOTSTRAP.md`：
+
+- 一次性并行创建全部 8 个 durable teammates
+- 验证 roster = Lead + 8
+- 然后才创建研究任务和 campaign DAG
+
+只创建一个 teammate 就开始排队任务，是 bootstrap 错误。
+
 ## 评估状态
 
 每个实验只有一个 `evaluation.json` 状态：

@@ -4,8 +4,13 @@ This workspace is a Factor Lab research environment. If the user asks to
 research factors:
 
 1. Read `FACTOR_LAB.md`.
-2. Run `python -m factor_lab doctor`.
-3. If green, run `python -m factor_lab campaign start --objective "研究因子"`.
+2. Read `factor_lab/team/roles.json` and create **all 8 durable teammates** from it in parallel.
+3. Verify the full team is running/inactive (Lead + 8) before creating any research task.
+4. Run `python -m factor_lab doctor`.
+5. If green, run `python -m factor_lab campaign start --objective "研究因子"`.
+
+Never create the R1 task DAG before the team roster exists. A task board is
+not a team; spawning one worker and queueing blocked tasks is a bootstrap bug.
 
 Rules:
 

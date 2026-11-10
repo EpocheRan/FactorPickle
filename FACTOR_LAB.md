@@ -11,6 +11,13 @@ python -m factor_lab doctor
 python -m factor_lab campaign start --objective "研究因子"
 ```
 
+Before starting a research campaign, create the full durable team from
+`factor_lab/team/roles.json`: `pathfinder`, `web-gateway`, `factor-builder`,
+`runner`, `evaluator`, `ml-planner`, `ml-monitor`, `supervisor`.
+
+Create all roles first, verify the roster, then create/assign research tasks.
+Do not create a blocked task DAG with only one teammate online.
+
 ## Architecture
 
 ```text
