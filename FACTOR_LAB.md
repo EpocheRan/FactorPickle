@@ -74,6 +74,11 @@ python -m factor_lab discovery ingest --result gateway_result.json
 - LLM pricing: input ¥0.04 / 1M tokens, output ¥8.00 / 1M tokens.
 - Lab quota 150GB: 100 output + 20 cache + 30 archive; 50GB free floor.
 - Do not promote factors or change policy without human G4.
+- Generated factor code/spec/tests/manifests are runtime research data under
+  `output/factor_lab/factors/generated/`. Do not copy, mirror, or move them into
+  the repository; they are not portable design assets.
+- Portable design is limited to code, contracts, `factor_lab/team/roles.json`,
+  and `factor_lab/sources/catalog.json`. Never duplicate runtime state into Git.
 
 ## State
 
@@ -84,10 +89,13 @@ control/       directive, budget, heartbeat, cycle, agents
 ledger/        trial ledger
 experiments/   immutable experiment artifacts
 campaigns/     campaign traces
-factors/       generated Lab factors (versioned)
+factors/       generated Lab factors (versioned runtime data)
 dashboard/     read-only dashboard
 ml/            ML datasets and outputs
 ```
+
+`factor_lab/team/` and `factor_lab/sources/` are tracked design/config inputs,
+not runtime state.
 
 If data credentials/configuration are absent, `doctor` must fail with an
 actionable blocker. Do not bypass `data_interface`.

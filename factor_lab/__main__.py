@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     agents_parser.add_argument("--apply", action="store_true")
 
     library_parser = sub.add_parser("library", help="versioned Lab factor library")
-    library_parser.add_argument("action", choices=["list", "verify", "install-artifacts"], nargs="?", default="list")
+    library_parser.add_argument("action", choices=["list", "verify"], nargs="?", default="list")
     library_parser.add_argument("--factor", default="")
 
     build_parser = sub.add_parser("factor-build", help="write a generated factor into the Lab library")
@@ -230,12 +230,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "library":
         from .factor_library import LIBRARY
-
-        if args.action == "install-artifacts":
-            from .artifacts import install
-
-            _print(install())
-            return 0
 
         if args.action == "verify":
             if not args.factor:

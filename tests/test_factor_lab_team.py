@@ -33,12 +33,3 @@ def test_seed_queries_prioritize_catalog_domains() -> None:
     queries = seed_queries(DiscoveryBrief(research_question="52 week high factor", max_queries=8))
     assert any(query.startswith("site:") for query in queries)
     assert queries[0].startswith("site:")
-
-
-def test_portable_factor_artifacts_install(tmp_path) -> None:
-    from factor_lab.artifacts import install
-
-    result = install(target=tmp_path)
-    assert result["ok"]
-    assert result["installed"]
-    assert (tmp_path / "f-near-52w-high-20261110" / "momentum.near_52w_high_252d" / "v1" / "factor.py").exists()

@@ -13,6 +13,11 @@ Rules:
 - Runner data access must go through `data_interface`; never add direct QuestDB/SQL access to Factor Lab.
 - Do not promote factors or change policy; those require human G4.
 - Write all research state under `output/factor_lab`.
+- Generated factor code/spec/tests/manifests are runtime research data under
+  `output/factor_lab/factors/generated/`. Do not copy, mirror, or move them into
+  the repository; they are not portable design assets.
+- Portable design is limited to code, contracts, `factor_lab/team/roles.json`,
+  and `factor_lab/sources/catalog.json`. Never duplicate runtime state into Git.
 - If the environment or data is not ready, report `blocker_feedback` and wait; do not fabricate results.
 - Web discovery: DSH subagents inherit tools by default. The `web_gateway.js` child may call `web_search` directly, or the main session may search and pass results in; then run
   `python -m factor_lab discovery ingest --result <gateway-result.json>`. The Gateway LLM must keep URLs and citations.
