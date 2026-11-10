@@ -108,12 +108,29 @@ python -m factor_lab discovery queries --question "研究问题"
 python -m factor_lab discovery ingest --result gateway_result.json
 
 python -m factor_lab dashboard
+python -m factor_lab research-context
+python -m factor_lab evaluate --experiment E-... --finalize
+python -m factor_lab web-mode --mode exploit
+python -m factor_lab dry-run
 python -m factor_lab control pause --reason "review"
 python -m factor_lab control resume
 python -m factor_lab maintenance inventory
 python -m factor_lab maintenance clean
 python -m factor_lab maintenance clean --apply
 ```
+
+## 评估状态
+
+每个实验只有一个 `evaluation.json` 状态：
+
+`draft / running / needs_fix / blocked / parked / candidate / promoted / failed`
+
+`audit`、`g3`、`rating` 是评估子字段；只有 Supervisor 能写最终状态。
+
+## 研究上下文
+
+`research_context.json` 汇总历史实验、失败构造、数据覆盖、来源引用、ML 结果和 agent trace；
+PathFinder 必须基于它提案，并声明 `informed_by` 与 `differentiation`。
 
 ## Campaign 规则
 

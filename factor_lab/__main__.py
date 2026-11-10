@@ -144,6 +144,17 @@ def main(argv: list[str] | None = None) -> int:
 
     ortho_parser = sub.add_parser("orthogonality", help="compute exposure correlation for one experiment")
     ortho_parser.add_argument("--experiment", required=True)
+    context_parser = sub.add_parser("research-context", help="build/show the structured research context")
+    context_parser.add_argument("action", choices=["build", "show"], nargs="?", default="build")
+
+    evaluate_parser = sub.add_parser("evaluate", help="derive or finalize one experiment evaluation")
+    evaluate_parser.add_argument("--experiment", required=True)
+    evaluate_parser.add_argument("--finalize", action="store_true")
+
+    web_mode_parser = sub.add_parser("web-mode", help="show discovery mode and cache state")
+    web_mode_parser.add_argument("--mode", choices=["exploit", "explore", "deep"], default="exploit")
+
+    sub.add_parser("dry-run", help="check the end-to-end research scaffold without a new trial")
 
     sub.add_parser("dashboard", help="render the dashboard from artifacts")
 
@@ -503,6 +514,36 @@ def main(argv: list[str] | None = None) -> int:
         from .orthogonality import compute_orthogonality
 
         _print(compute_orthogonality(_root(args.experiment)))
+        return 0
+
+    if args.command == "research-context":
+        from .research_context import build_context
+        from .store import read_json
+
+        if args.action == "build":
+            _print(build_context())
+        else:
+            _print(read_json(config.LAB_ROOT / "research_context.json") or {"error": "not built"})
+        return 0
+
+    if args.command == "evaluate":
+        from pathlib import Path
+        from .evaluation import derive, finalize
+
+        target = Path(args.experiment)
+        _print(finalize(target) if args.finalize else derive(target))
+        return 0
+
+    if args.command == "web-mode":
+        from .web_gateway import resolve_mode
+
+        _print(resolve_mode(args.mode))
+        return 0
+
+    if args.command == "dry-run":
+        from .dry_run import run_dry_run
+
+        _print(run_dry_run())
         return 0
 
     if args.command == "dashboard":

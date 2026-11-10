@@ -152,7 +152,7 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>实验</th><th>因子</th><th>评级</th><th>IC</th><th>净价差/期</th><th>换手</th><th>审计</th><th>决策</th><th>日期</th></tr></thead>
+        <thead><tr><th>实验</th><th>因子</th><th>评级</th><th>IC</th><th>净价差/期</th><th>换手</th><th>审计</th><th>状态</th><th>日期</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
@@ -235,7 +235,7 @@
         <td class="mono">${pct(e.net)}</td>
         <td class="mono">${pct(e.turnover)}</td>
         <td>${badge(e.verdict, e.verdict === 'fail' ? 'fail' : e.verdict === 'pass' ? 'pass' : 'warn')}</td>
-        <td>${badge(e.decision || '—', e.decision === 'promote' ? 'pass' : e.decision === 'iterate' ? 'gold' : 'muted')}</td>
+        <td>${badge(e.evaluation_status || 'draft', e.evaluation_status === 'candidate' || e.evaluation_status === 'promoted' ? 'pass' : e.evaluation_status === 'parked' || e.evaluation_status === 'failed' ? 'fail' : 'gold')}</td>
         <td class="mono">${esc((e.started_at || '').slice(0,10))}</td>
       </tr>`).join('') : '<tr><td colspan="9"><div class="empty">没有匹配当前筛选的实验</div></td></tr>';
     renderPager(rows.length, pages);
@@ -299,7 +299,7 @@
         <div class="metric"><div class="k">净价差 / 期</div><div class="v">${pct(e.net)}</div></div>
         <div class="metric"><div class="k">换手</div><div class="v">${pct(e.turnover)}</div></div>
         <div class="metric"><div class="k">审计</div><div class="v">${esc(e.verdict || '—')} / G3 ${esc(e.g3 || '—')}</div></div>
-        <div class="metric"><div class="k">决策</div><div class="v">${esc(e.decision || '—')}</div></div>
+        <div class="metric"><div class="k">状态</div><div class="v">${esc(e.evaluation_status || 'draft')}</div></div>
         <div class="metric"><div class="k">持有期</div><div class="v">${esc(e.horizon)} 日</div></div>
         <div class="metric"><div class="k">股票池</div><div class="v">${esc(e.universe || '—')}</div></div>
       </div>

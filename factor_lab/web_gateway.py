@@ -10,6 +10,7 @@ PathFinder.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,59 @@ from .discovery import DiscoveryBrief, DiscoveryLead, write_map
 from .store import read_json, write_json_atomic
 
 DIGEST_PATH = config.LAB_ROOT / "discovery" / "web_digest.json"
+DISCOVERY_MODES = ("exploit", "explore", "deep")
+
+
+def mode_requires_web(mode: str) -> bool:
+    """Exploit may reuse a warm cache; explore/deep require a fresh search."""
+    return str(mode) in {"explore", "deep"}
+
+
+def read_cached_digest(max_age_days: int = 30) -> dict[str, Any] | None:
+    raw = read_json(DIGEST_PATH)
+    if not isinstance(raw, dict):
+        return None
+    created = str(raw.get("created_at") or "")
+    try:
+        from datetime import datetime, timezone
+
+        stamp = datetime.fromisoformat(created.replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - stamp).days
+    except Exception:
+        age = max_age_days + 1
+    return raw if age <= int(max_age_days) else None
+
+
+def resolve_mode(requested: str = "exploit") -> dict[str, Any]:
+    mode = requested if requested in DISCOVERY_MODES else "exploit"
+    cached = read_cached_digest()
+    return {
+        "mode": mode,
+        "requires_web": mode_requires_web(mode),
+        "cache_hit": bool(cached),
+        "cache_age_days": (
+            None
+            if not cached
+            else _cache_age_days(cached)
+        ),
+    }
+
+
+def _cache_age_days(digest: dict[str, Any]) -> int | None:
+    try:
+        stamp = datetime.fromisoformat(str(digest.get("created_at")).replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return max(0, (datetime.now(timezone.utc) - stamp).days)
+    except Exception:
+        return None
+
+
+def write_digest_cache(digest: dict[str, Any]) -> Path:
+    write_json_atomic(DIGEST_PATH, digest)
+    return DIGEST_PATH
 
 
 @dataclass

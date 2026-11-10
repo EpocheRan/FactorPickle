@@ -145,6 +145,7 @@ def _load_experiments() -> list[dict[str, Any]]:
         audit = _read(root / "audit.json")
         brief = _read(root / "decision_brief.json")
         decision = _read(root / "decision.json")
+        evaluation = _read(root / "evaluation.json")
         hypothesis = _read(root / "hypothesis.json")
         outcome = manifest.get("outcome") or {}
         horizon = int(outcome.get("horizon") or 5)
@@ -184,6 +185,8 @@ def _load_experiments() -> list[dict[str, Any]]:
             "g3": g3,
             "recommend": brief.get("recommend"),
             "decision": decision.get("decision"),
+            "evaluation_status": evaluation.get("status") or decision.get("decision") or "draft",
+            "evaluation_reason": evaluation.get("reason") or "",
             "gate": brief.get("gate"),
             "agent_trace": _read(root / "agent_trace.json"),
             "data_manifest": _read(root / "data_manifest.json"),
