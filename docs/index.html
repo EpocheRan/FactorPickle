@@ -1313,7 +1313,7 @@ h1 .hl{
 
 <header class="topbar">
   <div class="topbar-in">
-    <a class="brand" href="#overview" aria-label="FactorPickle 总览">
+    <a class="brand" id="brandHome" href="#overview" aria-label="FactorPickle 总览">
       <span class="logo" aria-hidden="true">
         <img src="assets/logo-factorpickle.svg" alt="">
       </span>
@@ -3790,6 +3790,21 @@ const closeAllNavDrops = (except = null) => {
     drop.querySelector('.nav-trigger')?.setAttribute('aria-expanded', 'false');
   });
 };
+
+const brandHome = $('#brandHome');
+if (brandHome) {
+  brandHome.addEventListener('click', e => {
+    e.preventDefault();
+    closeAllNavDrops();
+    switchView('overview');
+    history.replaceState(null, '', '#overview');
+    const root = document.documentElement;
+    const previousScrollBehavior = root.style.scrollBehavior;
+    root.style.scrollBehavior = 'auto';
+    window.scrollTo({top: 0, behavior: 'auto'});
+    root.style.scrollBehavior = previousScrollBehavior;
+  });
+}
 
 const navStart = $('#navStart');
 if (navStart) {
