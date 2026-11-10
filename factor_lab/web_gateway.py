@@ -19,6 +19,7 @@ from .discovery import DiscoveryBrief, DiscoveryLead, write_map
 from .store import read_json, write_json_atomic
 
 DIGEST_PATH = config.LAB_ROOT / "discovery" / "web_digest.json"
+SOURCE_CATALOG_PATH = config.LAB_ROOT / "discovery" / "source_catalog.json"
 DISCOVERY_MODES = ("exploit", "explore", "deep")
 
 
@@ -83,13 +84,25 @@ class GatewayLead:
     tags: list[str] | None = None
 
 
+def _catalog_domains(limit: int = 4) -> list[str]:
+    raw = read_json(SOURCE_CATALOG_PATH)
+    if not isinstance(raw, dict):
+        return []
+    domains: list[str] = []
+    for category in raw.get("categories") or []:
+        if category.get("category") not in {"papers", "aggregators", "newsletters"}:
+            continue
+        for source in category.get("sources") or []:
+            url = str(source.get("url") or "")
+            if "://" in url:
+                domain = url.split("://", 1)[1].split("/", 1)[0]
+                if domain and domain not in domains:
+                    domains.append(domain)
+    return domains[:limit]
+
+
 def seed_queries(brief: DiscoveryBrief) -> list[str]:
-    """Deterministic seed queries for the DSH search tool.
-
-    This is not the discovery loop itself; it gives the DSH Gateway a starting
-    set.  The Gateway may expand/cite/dedupe from there.
-    """
-
+    """Deterministic seed queries, prioritizing the curated source catalog."""
     question = brief.research_question.strip()
     queries = [
         f"{question} A-share factor anomaly",
@@ -97,9 +110,17 @@ def seed_queries(brief: DiscoveryBrief) -> list[str]:
         f"{question} China equity factor paper",
         f"{question} investable signal transaction cost",
     ]
+    for domain in _catalog_domains(limit=3):
+        queries.insert(0, f"site:{domain} {question}")
     for dead in brief.known_dead_ends[:2]:
         queries.append(f"{question} alternative to {dead}")
-    return queries[: max(1, int(brief.max_queries))]
+    seen = set()
+    unique = []
+    for query in queries:
+        if query not in seen:
+            seen.add(query)
+            unique.append(query)
+    return unique[: max(1, int(brief.max_queries))]
 
 
 def build_context(brief: DiscoveryBrief, search_results: list[dict[str, Any]]) -> str:
