@@ -52,14 +52,14 @@ def main(argv: list[str] | None = None) -> int:
     budget_parser.add_argument("action", choices=["status"], nargs="?", default="status")
 
     agents_parser = sub.add_parser("agents", help="agent registry / safe reclaim")
-    agents_parser.add_argument("action", choices=["status", "register", "reclaim"], nargs="?", default="status")
+    agents_parser.add_argument("action", choices=["status", "register", "reclaim", "roles"], nargs="?", default="status")
     agents_parser.add_argument("--id", default="")
     agents_parser.add_argument("--role", default="")
     agents_parser.add_argument("--session-dir", default="")
     agents_parser.add_argument("--apply", action="store_true")
 
     library_parser = sub.add_parser("library", help="versioned Lab factor library")
-    library_parser.add_argument("action", choices=["list", "verify"], nargs="?", default="list")
+    library_parser.add_argument("action", choices=["list", "verify", "install-artifacts"], nargs="?", default="list")
     library_parser.add_argument("--factor", default="")
 
     build_parser = sub.add_parser("factor-build", help="write a generated factor into the Lab library")
@@ -212,7 +212,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "agents":
         from . import agents
 
-        if args.action == "register":
+        if args.action == "roles":
+            from .team import load_roles, validate_roles
+
+            _print({"validation": validate_roles(), "roles": load_roles()})
+        elif args.action == "register":
             if not args.id:
                 raise SystemExit("agents register requires --id")
             _print(agents.register(args.id, args.role or "worker", session_dir=args.session_dir or None).to_dict())
@@ -226,6 +230,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "library":
         from .factor_library import LIBRARY
+
+        if args.action == "install-artifacts":
+            from .artifacts import install
+
+            _print(install())
+            return 0
 
         if args.action == "verify":
             if not args.factor:

@@ -1,0 +1,18 @@
+{
+  "category": "momentum",
+  "window": 20,
+  "unit": "ratio",
+  "direction": 1,
+  "data_contract": {
+    "dataset": "ohlcv_1d",
+    "fields": [
+      "open",
+      "close"
+    ],
+    "frequency": "1d",
+    "lookback": 25
+  },
+  "factor_id": "momentum.intraday_overnight_flow_20d",
+  "family": "lab.intraday-flow",
+  "version": "v4"
+}

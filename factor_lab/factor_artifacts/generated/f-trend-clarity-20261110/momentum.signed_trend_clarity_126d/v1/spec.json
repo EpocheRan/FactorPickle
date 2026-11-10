@@ -1,0 +1,25 @@
+{
+  "category": "momentum",
+  "window": 126,
+  "unit": "ratio",
+  "direction": 1,
+  "name": "signed_trend_clarity_126d",
+  "description": "OLS R-squared of ln(close) on time over the last 126 trading days, signed by the slope: a clean uptrend tends to +1, a clean downtrend to -1, no or noisy trend to ~0. Direction +1 for forward returns.",
+  "mechanism": "Trend clarity (linearity of log price vs time) gated by slope direction; clean persistent trends are assumed to carry over the forward 20d horizon.",
+  "formula": "y_i = ln(close_{t-125+i}), x_i = i, i=0..125; b = OLS slope; R2 = 1 - SSres/SStot; F = sign(b) * R2 in [-1, 1]; NaN unless all 126 closes valid and > 0 and SStot > 0",
+  "min_periods": 126,
+  "data_contract": {
+    "dataset": "ohlcv_1d",
+    "fields": [
+      "close"
+    ],
+    "frequency": "1d",
+    "window": 126,
+    "min_periods": 126,
+    "warmup": 150,
+    "lookback": 150
+  },
+  "factor_id": "momentum.signed_trend_clarity_126d",
+  "family": "f-trend-clarity-20261110",
+  "version": "v1"
+}

@@ -119,6 +119,28 @@ python -m factor_lab maintenance clean
 python -m factor_lab maintenance clean --apply
 ```
 
+## 可移植设计
+
+以下内容进入 Git，换环境可直接复现：
+
+- `factor_lab/team/roles.json`：8 个 durable teammate 的名称、context、prompt
+- `factor_lab/sources/catalog.json`：精选 discovery 来源
+- `factor_lab/factor_artifacts/generated/`：Agent/FactorBuilder 生成的因子代码、spec、测试、manifest
+- `factor_lab/` 下的运行时、评测、dashboard、research context 代码
+
+以下内容不进入 Git，属于本机运行状态：
+
+- `output/factor_lab/`：experiments、campaigns、ledger、dashboard 数据、discovery 结果、runtime factor library
+
+换环境后：
+
+```powershell
+python -m factor_lab bootstrap
+python -m factor_lab agents roles
+python -m factor_lab library install-artifacts
+python -m factor_lab doctor
+```
+
 ## 评估状态
 
 每个实验只有一个 `evaluation.json` 状态：
