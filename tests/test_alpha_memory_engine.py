@@ -201,6 +201,14 @@ def test_discovery_requires_sources(tmp_path) -> None:
     result = ingest_discovery(payload, memory=memory)
     assert result["discovery"]["schema"] == "factor_lab.alpha.discovery_map.v1"
     assert result["discovery"]["sources"][0]["url"].startswith("https://")
+    gateway_map = {
+        "schema_version": "factor_lab.discovery_map.v1",
+        "research_question": "gateway question",
+        "leads": [{"title": "lead", "mechanism": "accrual"}],
+        "sources": ["https://example.com/gateway"],
+    }
+    result2 = ingest_discovery(gateway_map, memory=memory)
+    assert result2["discovery"]["sources"][0]["url"].endswith("gateway")
 
 
 def test_role_contracts_are_five_llm_roles() -> None:

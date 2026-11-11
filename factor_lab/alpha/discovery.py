@@ -29,6 +29,8 @@ def ingest_discovery(
         raise ValueError("discovery map requires at least one cited source")
     normalized_sources = []
     for source in sources:
+        if isinstance(source, str):
+            source = {"url": source}
         if not isinstance(source, dict):
             continue
         url = str(source.get("url") or "").strip()
@@ -43,10 +45,14 @@ def ingest_discovery(
                 "trust": source.get("trust"),
             }
         )
+    if not normalized_sources:
+        raise ValueError("discovery map has no usable sources")
     discovery = {
         "schema": DISCOVERY_SCHEMA,
         "discovery_id": f"DISC-{uuid.uuid4().hex[:12]}",
-        "brief": payload.get("brief") or {},
+        "brief": payload.get("brief") or {
+            "research_question": payload.get("research_question"),
+        },
         "clusters": payload.get("clusters") or [],
         "leads": payload.get("leads") or [],
         "gaps": payload.get("gaps") or [],

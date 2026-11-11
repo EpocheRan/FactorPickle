@@ -655,11 +655,13 @@ def main(argv: list[str] | None = None) -> int:
             })
             return 0
         if args.action == "discovery":
-            if not args.discovery_file:
-                raise SystemExit("alpha discovery requires --discovery-file")
-            payload = read_json(Path(args.discovery_file))
+            if args.discovery_file:
+                payload = read_json(Path(args.discovery_file))
+            else:
+                from factor_lab.research.discovery import read_map
+                payload = read_map()
             if not isinstance(payload, dict):
-                raise SystemExit("discovery file must contain a JSON object")
+                raise SystemExit("no discovery map; pass --discovery-file or create output/factor_lab/discovery/discovery_map.json")
             _print(ingest_discovery(payload))
             return 0
         if args.action == "campaign":
