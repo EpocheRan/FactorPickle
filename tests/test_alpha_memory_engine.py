@@ -7,9 +7,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from factor_lab.alpha.allocator import CapitalAllocator, RiskController
 from factor_lab.alpha.campaign import CampaignController, CampaignError
 from factor_lab.alpha.compiler import AlphaContext
 from factor_lab.alpha.data import AlphaDataset
+from factor_lab.alpha.deployability import evaluate_long_only_expression
 from factor_lab.alpha.discovery import ingest_discovery
 from factor_lab.alpha.factor_library import (
     list_factors,
@@ -17,6 +19,8 @@ from factor_lab.alpha.factor_library import (
     write_factor_artifact,
 )
 from factor_lab.alpha.memory import AlphaMemory, make_edge_card
+from factor_lab.alpha.pipeline import run_research_cycle
+from factor_lab.alpha.supervisor import Supervisor
 from factor_lab.alpha.ml_branch import make_ml_plan, run_ml_experiment
 from factor_lab.alpha.research_runtime import explain_result, run_research
 from factor_lab.alpha.roles import active_roles, role_contracts
@@ -210,3 +214,66 @@ def test_role_contracts_are_five_llm_roles() -> None:
         "Reader",
     }
     assert active_roles("L0")["llm_roles"] == ["PathFinder", "FactorBuilder"]
+
+
+def test_long_only_deployability_lens() -> None:
+    context = _context()
+    result = evaluate_long_only_expression("rank(close)", context, horizon=5, cost_bps=20.0)
+    assert result["schema"] == "factor_lab.alpha.deployability.v1"
+    assert result["entry_rule"] == "next_open"
+    assert result["n_dates"] > 0
+    assert "long_only_net_excess_annualized" in result
+    assert "turnover" in result
+
+
+def test_capital_allocator_defaults_to_baseline(tmp_path) -> None:
+    memory = AlphaMemory(tmp_path / "memory")
+    allocator = CapitalAllocator(memory)
+    empty = allocator.allocate()
+    assert empty["baseline_weight"] == 1.0
+    assert empty["active_weight"] == 0.0
+    card = make_edge_card(
+        "rank(close)",
+        {"ic_mean": 0.02, "gross_spread": 0.01, "gross_t": 2.5, "net_spread": 0.006, "net_t": 2.0},
+        status="validated",
+        horizon=5,
+        source="test",
+    )
+    memory.record_edge_card(card)
+    allocated = allocator.allocate()
+    assert allocated["active_weight"] > 0
+    assert allocated["baseline_weight"] + allocated["active_weight"] == pytest.approx(1.0)
+    assert allocated["positions"][0]["kind"] == "baseline"
+
+
+def test_risk_controller_exposure_and_drawdown() -> None:
+    controller = RiskController(target_vol=0.125)
+    assert controller.exposure(0.25) == pytest.approx(0.5)
+    assert controller.exposure(0.10) == 0.95
+    assert controller.drawdown_target(0.16) == 0.08
+    assert controller.drawdown_target(0.20) == 0.0
+
+
+def test_end_to_end_research_cycle(tmp_path) -> None:
+    context = _context()
+    dataset = _dataset(context)
+    artifact = write_factor_artifact(
+        factor_id="close_rank_cycle",
+        family="price",
+        expression="rank(close)",
+        spec={"data_contract": {"fields": ["close"]}},
+        library_root=tmp_path / "factors",
+    )
+    controller = CampaignController(tmp_path / "campaigns")
+    campaign = controller.create("e2e", max_rounds=2)
+    payload = run_research_cycle(
+        campaign["campaign_id"],
+        artifact,
+        dataset,
+        supervisor=Supervisor(controller),
+        memory=AlphaMemory(tmp_path / "memory"),
+    )
+    assert payload["schema"] == "factor_lab.alpha.research_cycle.v1"
+    assert payload["round"]["round_number"] == 1
+    assert payload["edge_card"]["factor_ref"]["factor_id"] == "close_rank_cycle"
+    assert controller.load(campaign["campaign_id"])["n_rounds"] == 1

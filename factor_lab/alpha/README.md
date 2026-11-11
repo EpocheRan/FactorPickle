@@ -26,6 +26,9 @@ factor_lab/alpha/
   supervisor.py       CampaignController 的硬限制封装
   ml_branch.py        非 DL ML：plan / purged walk-forward / ridge / model card
   discovery.py        Web Gateway discovery_map 校验与 Memory 写入
+  deployability.py    long-only 可部署性（next-open / 成本 / 换手）
+  allocator.py        单账户 baseline + validated active 权重 / risk controller
+  pipeline.py         Runner → Runtime → Evaluator → Memory → Campaign 闭环
   roles.py            5 个 LLM 角色 + 确定性角色契约
 ```
 
@@ -73,6 +76,13 @@ python -m factor_lab alpha ml --codes output/factor_lab/hypotheses/pool200.txt `
 
 # Web Gateway discovery 接入
 python -m factor_lab alpha discovery --discovery-file discovery.json
+
+# long-only 部署口径
+python -m factor_lab alpha deploy --codes output/factor_lab/hypotheses/pool200.txt `
+  --start 2022-10-01 --end 2025-10-31 --expression "rank(close)"
+
+# 单账户分配（无 validated edge 时 100% baseline）
+python -m factor_lab alpha allocate
 
 # 角色契约
 python -m factor_lab alpha roles
@@ -178,7 +188,9 @@ financial statements（按 publish_date PIT，fin_*）
 - 每个进入评估的表达式都写入 trial + memory。
 - Red Team 不通过不能进入 candidate。
 - 研究证据使用 long-short；部署仍只做 long-only；8 只持仓/20% DD 不参与研究统计。
+- `deployability.py` 输出 long-only 税后超额、TE、换手、t 值，用于部署判断。
 - 未 validated 的 Edge Card 不进账户；默认持有宽基指数。
+- `allocator.py` 只消费 validated/active Edge Cards；没有 edge 时 100% baseline。
 
 ## 输出
 

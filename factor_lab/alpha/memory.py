@@ -71,6 +71,7 @@ def make_edge_card(
     kill_criteria: Iterable[str] | None = None,
     factor_ref: dict[str, Any] | None = None,
     research_mode: str = "research",
+    deployability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if status not in VALID_CARD_STATUSES:
         raise ValueError(f"invalid edge-card status: {status}")
@@ -100,13 +101,16 @@ def make_edge_card(
         "search_id": search_id,
         "horizon_days": int(horizon),
         "signal_evidence": signal,
-        "deployability": {
-            "status": "not_measured",
-            "long_only_excess_after_tax": None,
-            "long_only_te": None,
-            "alpha_per_turn": None,
-            "cost_bps": float(cost_bps),
-        },
+        "deployability": dict(
+            deployability
+            or {
+                "status": "not_measured",
+                "long_only_excess_after_tax": None,
+                "long_only_te": None,
+                "alpha_per_turn": None,
+                "cost_bps": float(cost_bps),
+            }
+        ),
         "validation": validation or {},
         "red_team": red_team or {},
         "status": status,

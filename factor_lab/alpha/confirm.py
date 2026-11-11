@@ -9,6 +9,7 @@ from typing import Any
 
 from factor_lab.alpha.compiler import compile_expression
 from factor_lab.alpha.data import AlphaDataset, HoldoutWindow
+from factor_lab.alpha.deployability import evaluate_long_only_expression
 from factor_lab.alpha.evaluation import evaluate_expression
 from factor_lab.alpha.memory import AlphaMemory, make_edge_card
 from factor_lab.alpha.red_team import red_team_review
@@ -68,12 +69,21 @@ def confirm_search(
         cost_bps=cost_bps,
         permutations=40,
     )
+    long_only = evaluate_long_only_expression(
+        expression,
+        dataset.context,
+        horizon=horizon,
+        cost_bps=cost_bps,
+        start=dataset.start,
+        end=dataset.end,
+    )
     result = {
         "schema": "factor_lab.alpha.confirmation.v1",
         "search_path": str(search_path),
         "selection": "best_red_team_passed" if confirmed else "top_score",
         "expression": expression,
         "metrics": metrics,
+        "long_only": long_only,
         "red_team": review,
         "passed": bool(review.get("passed")) and float(metrics.get("net_spread", -1.0)) > 0.0,
         "dataset": dataset.data_manifest,
@@ -97,6 +107,14 @@ def confirm_search(
         evidence=[str(out), f"holdout:{holdout.holdout_start}..{holdout.holdout_end}"],
         kill_criteria=["holdout failed", "long_short_t < 2", "capacity < 2"],
         research_mode="validate",
+        deployability={
+            "status": "measured",
+            "long_only_excess_after_tax": long_only["long_only_net_excess_annualized"],
+            "long_only_te": long_only["long_only_te_annualized"],
+            "alpha_per_turn": None,
+            "turnover": long_only["turnover"],
+            "cost_bps": long_only["cost_bps"],
+        },
     )
     memory.record_edge_card(card)
     result["memory"] = memory.finalize()

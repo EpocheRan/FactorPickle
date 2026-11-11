@@ -153,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     evaluate_parser.add_argument("--finalize", action="store_true")
 
     alpha_parser = sub.add_parser("alpha", help="Alpha DSL / benchmark / search / red team")
-    alpha_parser.add_argument("action", choices=["validate", "eval", "benchmark", "search", "confirm", "holdout", "trials", "memory", "library", "campaign", "ml", "discovery", "roles"], nargs="?", default="holdout")
+    alpha_parser.add_argument("action", choices=["validate", "eval", "benchmark", "search", "confirm", "holdout", "trials", "memory", "library", "campaign", "ml", "discovery", "roles", "deploy", "allocate", "cycle"], nargs="?", default="holdout")
     alpha_parser.add_argument("--expression", default="")
     alpha_parser.add_argument("--codes", default=str(config.HYPOTHESES_DIR / "pool200.txt"))
     alpha_parser.add_argument("--start", default="2022-10-01")
@@ -181,6 +181,7 @@ def main(argv: list[str] | None = None) -> int:
     alpha_parser.add_argument("--ml-out", default="")
     alpha_parser.add_argument("--discovery-file", default="")
     alpha_parser.add_argument("--round-file", default="")
+    alpha_parser.add_argument("--factor-artifact", default="")
 
     web_mode_parser = sub.add_parser("web-mode", help="show discovery mode and cache state")
     web_mode_parser.add_argument("--mode", choices=["exploit", "explore", "deep"], default="exploit")
@@ -575,11 +576,15 @@ def main(argv: list[str] | None = None) -> int:
         from factor_lab.alpha.confirm import confirm_search
         from factor_lab.alpha.data import HoldoutWindow, default_holdout, load_alpha_dataset, load_holdout, save_holdout
         from factor_lab.alpha.discovery import ingest_discovery
+        from factor_lab.alpha.allocator import CapitalAllocator
+        from factor_lab.alpha.deployability import evaluate_long_only_expression
         from factor_lab.alpha.evaluation import evaluate_expression
         from factor_lab.alpha.campaign import CampaignController
         from factor_lab.alpha.factor_library import library_summary
         from factor_lab.alpha.memory import AlphaMemory
         from factor_lab.alpha.ml_branch import make_ml_plan, run_ml_experiment
+        from factor_lab.alpha.pipeline import run_research_cycle
+        from factor_lab.alpha.supervisor import Supervisor
         from factor_lab.alpha.roles import role_contracts
         from factor_lab.alpha.search import run_search
         from factor_lab.alpha.trials import summarize_trials
@@ -619,6 +624,35 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.action == "roles":
             _print(role_contracts())
+            return 0
+        if args.action == "allocate":
+            _print(CapitalAllocator(AlphaMemory()).allocate())
+            return 0
+        if args.action == "cycle":
+            if not args.factor_artifact or not args.campaign_id:
+                raise SystemExit("alpha cycle requires --factor-artifact and --campaign-id")
+            from factor_lab.alpha.runner import load_artifact
+            cycle_codes = _codes(args.codes)
+            if not cycle_codes:
+                raise SystemExit("no codes supplied")
+            dataset = load_alpha_dataset(cycle_codes, args.start, args.end, warmup_days=args.warmup)
+            payload = run_research_cycle(
+                args.campaign_id,
+                load_artifact(args.factor_artifact),
+                dataset,
+                horizon=args.horizon,
+                cost_bps=args.cost_bps,
+                supervisor=Supervisor(),
+                memory=AlphaMemory(),
+            )
+            _print({
+                "schema": payload["schema"],
+                "campaign_id": payload["campaign_id"],
+                "factor_ref": payload["factor_ref"],
+                "round": payload["round"],
+                "evaluation": payload["evaluation"],
+                "edge_card": payload["edge_card"]["edge_id"],
+            })
             return 0
         if args.action == "discovery":
             if not args.discovery_file:
@@ -663,6 +697,12 @@ def main(argv: list[str] | None = None) -> int:
                 raise SystemExit("alpha eval requires --expression")
             dataset = load_alpha_dataset(codes, args.start, args.end, warmup_days=args.warmup)
             _print(evaluate_expression(args.expression, dataset.context, horizon=args.horizon, cost_bps=args.cost_bps, start=args.start, end=args.end))
+            return 0
+        if args.action == "deploy":
+            if not args.expression:
+                raise SystemExit("alpha deploy requires --expression")
+            dataset = load_alpha_dataset(codes, args.start, args.end, warmup_days=args.warmup)
+            _print(evaluate_long_only_expression(args.expression, dataset.context, horizon=args.horizon, cost_bps=args.cost_bps, start=args.start, end=args.end))
             return 0
         if args.action == "ml":
             dataset = load_alpha_dataset(codes, args.start, args.end, warmup_days=args.warmup)
