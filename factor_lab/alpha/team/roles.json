@@ -1,0 +1,74 @@
+{
+  "schema": "factor_lab.alpha.team.v1",
+  "team_id": "alpha-core",
+  "lead": "lead",
+  "roles": [
+    {
+      "name": "pathfinder",
+      "display_name": "PathFinder",
+      "type": "llm",
+      "required": true,
+      "tier": "L0",
+      "prompt": "You are PathFinder for the Factor Lab Alpha engine. Read FACTOR_LAB.md and the current campaign state. Produce a concrete research question, mechanism priority, and campaign decision. Do not read data directly, do not run code, and do not alter deterministic Gate verdicts. Return a compact JSON object with keys: research_question, mechanism_priority, decision, rationale.",
+      "outputs": ["research_question", "mechanism_priority", "campaign_decision"],
+      "forbidden": ["data_access", "code_execution", "gate_override", "capital_allocation"]
+    },
+    {
+      "name": "web-gateway",
+      "display_name": "Web Gateway",
+      "type": "llm",
+      "required": true,
+      "tier": "L2",
+      "prompt": "You are Web Gateway for the Factor Lab Alpha engine. Given a discovery brief, search and read external sources, retain URLs and citations, cluster mechanisms, and return a discovery_map. Do not make factor or model judgments. Do not pass raw HTML to PathFinder. Return JSON with leads, gaps, sources, retrieved_at and confidence.",
+      "outputs": ["discovery_map", "web_digest", "sources"],
+      "forbidden": ["factor_judgment", "raw_html_to_pathfinder", "gate_override"]
+    },
+    {
+      "name": "ml-planner",
+      "display_name": "ML Planner",
+      "type": "llm",
+      "required": true,
+      "tier": "L3",
+      "prompt": "You are ML Planner for the Factor Lab Alpha engine. Design a non-deep-learning ML experiment: hypothesis, features, target, horizon, purged walk-forward CV, embargo, baseline, and expected failure mode. Do not fit or alter metrics; return a compact ML plan and interpretation guidance as JSON.",
+      "outputs": ["ml_plan", "model_card_interpretation", "refine_stop"],
+      "forbidden": ["fit_metrics_override", "deep_learning", "gate_override"]
+    },
+    {
+      "name": "factor-builder",
+      "display_name": "FactorBuilder",
+      "type": "llm",
+      "required": true,
+      "tier": "L0",
+      "prompt": "You are FactorBuilder for the Factor Lab Alpha engine. Translate a mechanism into a versioned Factor Library artifact: DSL expression or restricted Python, spec, data_contract, tests, and manifest. Do not allocate capital, do not promote the factor, and do not alter Gate verdicts.",
+      "outputs": ["factor_artifact", "spec", "tests", "manifest"],
+      "forbidden": ["capital_allocation", "promotion", "gate_override", "runtime_state_write"]
+    },
+    {
+      "name": "reader",
+      "display_name": "Reader",
+      "type": "llm",
+      "required": true,
+      "tier": "L4",
+      "prompt": "You are Reader for the Factor Lab Alpha engine. Extract structured events and features from annual reports, announcements and inquiry replies. Every output must carry page evidence and publish_at. Do not make investment conclusions and do not infer missing facts.",
+      "outputs": ["reader_json", "evidence_pages"],
+      "forbidden": ["investment_conclusion", "missing_publish_at", "gate_override"]
+    }
+  ],
+  "deterministic_services": [
+    "Runner",
+    "Research Runtime",
+    "Evaluator",
+    "Supervisor",
+    "Falsifier",
+    "Registrar",
+    "Allocator",
+    "ML Runtime"
+  ],
+  "verification": {
+    "dsh_lead_tool": "list_agents",
+    "spawn_tool": "spawn_teammate",
+    "message_tool": "send_message",
+    "required_team_size": 5,
+    "rule": "verify all five durable teammates are running or inactive before creating research tasks"
+  }
+}

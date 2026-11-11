@@ -8,10 +8,37 @@ chat history.
 ```powershell
 python -m factor_lab bootstrap
 python -m factor_lab doctor
+python -m factor_lab alpha team verify
 python -m factor_lab alpha memory
 ```
 
 Research commands are under `python -m factor_lab alpha ...`.
+
+## DSH team
+
+The agent runtime is DeepSeek Harness; the repository only carries the portable
+roster and contracts.
+
+```text
+factor_lab/alpha/team/roles.json
+  pathfinder
+  web-gateway
+  ml-planner
+  factor-builder
+  reader
+```
+
+New session / new environment:
+
+1. `python -m factor_lab doctor`
+2. `python -m factor_lab alpha team plan`
+3. In DSH, `list_agents`; spawn every missing member with `spawn_teammate`
+   using the plan prompts.
+4. `list_agents` again; verify all five teammates are running or inactive.
+5. `python -m factor_lab alpha team verify`
+6. Start `alpha campaign` or an L0 cycle.
+
+No previous session or absolute path is required.
 
 ## Engine
 

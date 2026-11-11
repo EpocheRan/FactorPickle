@@ -22,7 +22,12 @@ factors or run an Alpha campaign:
 The five model-facing roles are `PathFinder`, `Web Gateway`, `ML Planner`,
 `FactorBuilder`, and `Reader`. Runner, Research Runtime, Evaluator,
 Supervisor, Falsifier, Registrar and Allocator are deterministic services.
-There is no legacy 8-role team bootstrap.
+
+The agent runtime is DeepSeek Harness. Do not build a separate agent runtime.
+For a new session/environment, load the portable roster from
+`factor_lab/alpha/team/roles.json`, use `python -m factor_lab alpha team plan`
+and create the five durable DSH teammates with `spawn_teammate`. Verify with
+`list_agents` and `python -m factor_lab alpha team verify` before research.
 
 ## Rules
 

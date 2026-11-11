@@ -21,6 +21,7 @@ from factor_lab.alpha.factor_library import (
 from factor_lab.alpha.memory import AlphaMemory, make_edge_card
 from factor_lab.alpha.pipeline import run_research_cycle
 from factor_lab.alpha.supervisor import Supervisor
+from factor_lab.alpha.team import bootstrap_plan, session_brief, validate_roster
 from factor_lab.alpha.ml_branch import make_ml_plan, run_ml_experiment
 from factor_lab.alpha.research_runtime import explain_result, run_research
 from factor_lab.alpha.roles import active_roles, role_contracts
@@ -285,3 +286,23 @@ def test_end_to_end_research_cycle(tmp_path) -> None:
     assert payload["round"]["round_number"] == 1
     assert payload["edge_card"]["factor_ref"]["factor_id"] == "close_rank_cycle"
     assert controller.load(campaign["campaign_id"])["n_rounds"] == 1
+
+
+def test_portable_team_roster_and_bootstrap_plan() -> None:
+    check = validate_roster()
+    assert check["ok"] is True
+    assert check["n_roles"] == 5
+    plan = bootstrap_plan()
+    assert plan["schema"] == "factor_lab.alpha.team_plan.v1"
+    assert plan["lead"] == "lead"
+    assert {member["target"] for member in plan["members"]} == {
+        "pathfinder",
+        "web-gateway",
+        "ml-planner",
+        "factor-builder",
+        "reader",
+    }
+    brief = session_brief()
+    assert brief["schema"] == "factor_lab.alpha.session_brief.v1"
+    assert brief["team"]["n_roles"] == 5
+    assert "commands" in brief

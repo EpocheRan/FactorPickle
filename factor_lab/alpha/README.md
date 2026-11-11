@@ -30,6 +30,7 @@ factor_lab/alpha/
   allocator.py        单账户 baseline + validated active 权重 / risk controller
   pipeline.py         Runner → Runtime → Evaluator → Memory → Campaign 闭环
   roles.py            5 个 LLM 角色 + 确定性角色契约
+  team/               DSH 可移植团队 roster / bootstrap / session brief
 ```
 
 ## CLI
@@ -86,6 +87,11 @@ python -m factor_lab alpha allocate
 
 # 角色契约
 python -m factor_lab alpha roles
+
+# 可移植 DSH 团队
+python -m factor_lab alpha team plan
+python -m factor_lab alpha team verify
+python -m factor_lab alpha team brief
 ```
 
 ## LLM 角色

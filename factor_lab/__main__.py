@@ -46,10 +46,12 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
             "deploy",
             "allocate",
             "cycle",
+            "team",
         ],
         nargs="?",
         default="holdout",
     )
+    parser.add_argument("team_command", nargs="?", default="")
     parser.add_argument("--expression", default="")
     parser.add_argument("--codes", default=str(config.LAB_ROOT / "hypotheses" / "pool200.txt"))
     parser.add_argument("--start", default="2022-10-01")
@@ -78,6 +80,7 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
     parser.add_argument("--discovery-file", default="")
     parser.add_argument("--round-file", default="")
     parser.add_argument("--factor-artifact", default="")
+    parser.add_argument("--team-action", choices=["plan", "verify", "brief"], default="plan")
 
 
 def _run_alpha(args: argparse.Namespace) -> int:
@@ -126,6 +129,17 @@ def _run_alpha(args: argparse.Namespace) -> int:
         return 0
     if args.action == "roles":
         _print(role_contracts())
+        return 0
+    if args.action == "team":
+        from factor_lab.alpha.team import bootstrap_plan, session_brief, validate_roster
+
+        team_command = args.team_command or args.team_action
+        if team_command == "verify":
+            _print(validate_roster())
+        elif team_command == "brief":
+            _print(session_brief())
+        else:
+            _print(bootstrap_plan())
         return 0
     if args.action == "allocate":
         _print(CapitalAllocator(AlphaMemory()).allocate())
