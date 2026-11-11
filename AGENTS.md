@@ -28,7 +28,8 @@ The agent runtime is DeepSeek Harness. Do not build a separate agent runtime.
 For a new session/environment, load the portable roster from
 `factor_lab/alpha/team/roles.json`, use `python -m factor_lab alpha team plan`
 and create the five durable DSH teammates with `spawn_teammate`. Verify with
-`list_agents` and `python -m factor_lab alpha team verify` before research.
+`list_agents`, `python -m factor_lab alpha team verify`, and
+`python -m factor_lab alpha behavior --behavior-action verify` before research.
 
 ## Rules
 

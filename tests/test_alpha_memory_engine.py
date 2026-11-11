@@ -23,6 +23,7 @@ from factor_lab.alpha.memory import AlphaMemory, make_edge_card
 from factor_lab.alpha.pipeline import run_research_cycle
 from factor_lab.alpha.supervisor import Supervisor
 from factor_lab.alpha.team import bootstrap_plan, session_brief, validate_roster
+from factor_lab.alpha.team.behavior import list_behaviors, load_behavior, verify_behaviors
 from factor_lab.core import config
 from factor_lab.alpha.ml_branch import make_ml_plan, run_ml_experiment
 from factor_lab.alpha.research_runtime import explain_result, run_research
@@ -218,13 +219,13 @@ def test_role_contracts_are_five_llm_roles() -> None:
     contracts = role_contracts()
     assert contracts["n_llm_roles"] == 5
     assert set(contracts["llm_roles"]) == {
-        "PathFinder",
-        "Web Gateway",
-        "ML Planner",
-        "FactorBuilder",
-        "Reader",
+        "pathfinder",
+        "web-gateway",
+        "ml-planner",
+        "factor-builder",
+        "reader",
     }
-    assert active_roles("L0")["llm_roles"] == ["PathFinder", "FactorBuilder"]
+    assert active_roles("L0")["llm_roles"] == ["pathfinder", "factor-builder"]
 
 
 def test_long_only_deployability_lens() -> None:
@@ -308,6 +309,14 @@ def test_portable_team_roster_and_bootstrap_plan() -> None:
     assert brief["schema"] == "factor_lab.alpha.session_brief.v1"
     assert brief["team"]["n_roles"] == 5
     assert "commands" in brief
+    behaviors = list_behaviors()
+    assert len(behaviors) == 5
+    assert verify_behaviors([member["target"] for member in plan["members"]])["ok"] is True
+    reader = load_behavior("reader")
+    assert reader["behavior_hash"]
+    assert reader["contract"]["agent"] == "reader"
+    assert reader["n_evals"] >= 1
+    assert all(member["behavior_hash"] for member in plan["members"])
 
 
 def test_source_of_truth_is_not_in_output() -> None:

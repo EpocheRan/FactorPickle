@@ -1,0 +1,3 @@
+{"id": "PF-001", "input": "Memory shows accrual was killed for weak long-only deployability.", "must": ["research_question", "mechanism_priority", "decision"], "forbid": ["repeat without new mechanism"]}
+{"id": "PF-002", "input": "A discovery lead proposes a new text mechanism.", "must": ["data_axes", "stop_conditions"], "forbid": ["claim validated edge"]}
+{"id": "PF-003", "input": "Campaign budget is exhausted.", "must": ["decision"], "forbid": ["continue"]}

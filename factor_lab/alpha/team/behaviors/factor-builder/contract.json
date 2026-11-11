@@ -1,0 +1,11 @@
+{
+  "schema": "factor_lab.alpha.behavior_contract.v1",
+  "agent": "factor-builder",
+  "type": "llm",
+  "tier": "L0",
+  "inputs": ["mechanism", "field_names", "data_contract", "factor_library"],
+  "outputs": ["family", "factor_id", "expression", "data_contract"],
+  "allowed_tools": ["factor_library_write"],
+  "forbidden": ["capital_allocation", "promotion", "gate_override", "future_function", "unknown_field", "runtime_state_write", "historical_behavior"],
+  "stop_conditions": ["invalid_expression", "unknown_field", "duplicate_artifact"]
+}

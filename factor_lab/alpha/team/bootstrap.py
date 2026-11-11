@@ -14,6 +14,7 @@ from typing import Any
 
 from factor_lab.alpha.factor_library import library_summary
 from factor_lab.alpha.memory import AlphaMemory
+from factor_lab.alpha.team.behavior import load_behavior, verify_behaviors
 from factor_lab.core import config
 from factor_lab.core.store import read_json
 
@@ -55,17 +56,23 @@ def validate_roster(path: str | Path | None = None) -> dict[str, Any]:
         names.append(name)
         if role.get("type") != "llm":
             issues.append(f"{name}: only llm roles belong in the team roster")
-        if not role.get("prompt"):
-            issues.append(f"{name}: missing prompt")
-        if not role.get("outputs"):
-            issues.append(f"{name}: missing outputs")
-        if not role.get("forbidden"):
-            issues.append(f"{name}: missing forbidden actions")
+        if not role.get("behavior"):
+            issues.append(f"{name}: missing behavior path")
+            continue
+        try:
+            behavior = load_behavior(name)
+        except (OSError, ValueError) as exc:
+            issues.append(f"{name}: behavior invalid: {exc}")
+            continue
+        if not behavior["contract"].get("forbidden"):
+            issues.append(f"{name}: behavior has no forbidden actions")
     if roster.get("lead") != "lead":
         issues.append("lead must be 'lead'")
     expected = int((roster.get("verification") or {}).get("required_team_size") or 0)
     if expected != len(roles):
         issues.append(f"required_team_size {expected} != roster size {len(roles)}")
+    behavior_check = verify_behaviors(sorted(names))
+    issues.extend(behavior_check["issues"])
     return {
         "ok": not issues,
         "issues": issues,
@@ -73,6 +80,7 @@ def validate_roster(path: str | Path | None = None) -> dict[str, Any]:
         "lead": roster.get("lead"),
         "roles": [role.get("name") for role in roles if isinstance(role, dict)],
         "n_roles": len(names),
+        "behaviors": behavior_check["behaviors"],
         "deterministic_services": roster.get("deterministic_services") or [],
     }
 
@@ -82,17 +90,21 @@ def bootstrap_plan(path: str | Path | None = None) -> dict[str, Any]:
     check = validate_roster(path)
     if not check["ok"]:
         raise ValueError("; ".join(check["issues"]))
-    members = [
-        {
-            "target": role["name"],
-            "display_name": role.get("display_name"),
-            "tier": role.get("tier"),
-            "prompt": role["prompt"],
-            "outputs": role.get("outputs") or [],
-            "forbidden": role.get("forbidden") or [],
-        }
-        for role in roster["roles"]
-    ]
+    members = []
+    for role in roster["roles"]:
+        behavior = load_behavior(role["name"])
+        members.append(
+            {
+                "target": role["name"],
+                "display_name": role.get("display_name"),
+                "tier": role.get("tier"),
+                "behavior_hash": behavior["behavior_hash"],
+                "prompt": behavior["system_prompt"],
+                "outputs": behavior["contract"].get("outputs") or [],
+                "forbidden": behavior["contract"].get("forbidden") or [],
+                "n_evals": behavior["n_evals"],
+            }
+        )
     return {
         "schema": "factor_lab.alpha.team_plan.v1",
         "team_id": roster["team_id"],
@@ -133,6 +145,7 @@ def session_brief() -> dict[str, Any]:
         "schema": "factor_lab.alpha.session_brief.v1",
         "lab_root": str(config.LAB_ROOT),
         "team": validate_roster(),
+        "behaviors": verify_behaviors(),
         "memory": memory.summary(),
         "factor_library": library_summary(),
         "campaigns": campaigns[-10:],

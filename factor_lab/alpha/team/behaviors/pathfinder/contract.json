@@ -1,0 +1,11 @@
+{
+  "schema": "factor_lab.alpha.behavior_contract.v1",
+  "agent": "pathfinder",
+  "type": "llm",
+  "tier": "L0",
+  "inputs": ["campaign", "memory_summary", "factor_library", "discovery_map"],
+  "outputs": ["research_question", "mechanism_priority", "data_axes", "decision", "rationale", "stop_conditions"],
+  "allowed_tools": [],
+  "forbidden": ["data_access", "code_execution", "gate_override", "capital_allocation", "historical_behavior"],
+  "stop_conditions": ["duplicate_question", "no_data_axis", "budget_exhausted"]
+}

@@ -1,38 +1,16 @@
-"""Role contracts for the Alpha research engine.
+"""Role contracts for the Alpha engine.
 
-Only the five LLM roles in this module are model-facing.  Runner, Research
-Runtime, Evaluator, Supervisor, Falsifier, Registrar and Allocator are
-deterministic services; they are not prompts and must not be allowed to
-rewrite evidence or gate verdicts.
+The behavior files under ``team/behaviors/<agent>/`` are the source of truth.
+This module exposes the current contracts to the CLI; it does not keep a second
+copy of prompts or forbidden action lists.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from factor_lab.alpha.team.behavior import list_behaviors
 
-LLM_ROLES: dict[str, dict[str, Any]] = {
-    "PathFinder": {
-        "outputs": ["research_question", "mechanism_priority", "campaign_decision"],
-        "boundary": "no data access, no code execution, no gate verdict",
-    },
-    "Web Gateway": {
-        "outputs": ["discovery_brief", "discovery_map", "web_digest", "sources"],
-        "boundary": "no factor/model judgment; no raw HTML into PathFinder",
-    },
-    "ML Planner": {
-        "outputs": ["ml_plan", "model_card_interpretation", "refine_stop"],
-        "boundary": "runtime fits/evaluates; planner cannot alter metrics",
-    },
-    "FactorBuilder": {
-        "outputs": ["factor_artifact", "spec", "tests", "manifest"],
-        "boundary": "writes versioned Factor Library only; cannot allocate capital",
-    },
-    "Reader": {
-        "outputs": ["reader_json", "evidence_pages"],
-        "boundary": "extraction only; no investment conclusion",
-    },
-}
 
 DETERMINISTIC_ROLES: dict[str, str] = {
     "Runner": "factor artifact + data_interface -> data_bundle/manifest",
@@ -41,27 +19,37 @@ DETERMINISTIC_ROLES: dict[str, str] = {
     "Supervisor": "rounds/budget/stop/reclaim hard limits",
     "Falsifier": "PIT/cost/DSR/gate checks",
     "Registrar": "trial ledger, edge cards, memory",
-    "Data Steward": "PIT/coverage/dual-source validation",
     "Allocator": "index baseline and validated active weights",
     "ML Runtime": "fit/predict/purged CV/diagnostics",
 }
 
 TIERS: list[dict[str, Any]] = [
-    {"tier": "L0", "llm_roles": ["PathFinder", "FactorBuilder"], "reason": "first Edge Card"},
-    {"tier": "L1", "llm_roles": ["PathFinder", "FactorBuilder"], "services": ["Runner", "Research Runtime", "Evaluator", "Supervisor"]},
-    {"tier": "L2", "llm_roles": ["PathFinder", "FactorBuilder", "Web Gateway"], "services": ["Memory"]},
-    {"tier": "L3", "llm_roles": ["PathFinder", "FactorBuilder", "ML Planner"], "services": ["ML Runtime"]},
-    {"tier": "L4", "llm_roles": ["PathFinder", "FactorBuilder", "Reader"], "services": ["Reader pilot"]},
-    {"tier": "L5", "llm_roles": ["PathFinder", "FactorBuilder"], "services": ["Allocator"]},
+    {"tier": "L0", "llm_roles": ["pathfinder", "factor-builder"], "reason": "first Edge Card"},
+    {"tier": "L1", "llm_roles": ["pathfinder", "factor-builder"], "services": ["Runner", "Research Runtime", "Evaluator", "Supervisor"]},
+    {"tier": "L2", "llm_roles": ["pathfinder", "factor-builder", "web-gateway"], "services": ["Memory"]},
+    {"tier": "L3", "llm_roles": ["pathfinder", "factor-builder", "ml-planner"], "services": ["ML Runtime"]},
+    {"tier": "L4", "llm_roles": ["pathfinder", "factor-builder", "reader"], "services": ["Reader pilot"]},
+    {"tier": "L5", "llm_roles": ["pathfinder", "factor-builder"], "services": ["Allocator"]},
 ]
 
 
 def role_contracts() -> dict[str, Any]:
+    behaviors = list_behaviors()
+    llm_roles = {
+        row["agent"]: {
+            "behavior_hash": row["behavior_hash"],
+            "outputs": row["contract"].get("outputs") or [],
+            "forbidden": row["contract"].get("forbidden") or [],
+            "tier": row["contract"].get("tier"),
+            "n_evals": row["n_evals"],
+        }
+        for row in behaviors
+    }
     return {
         "schema": "factor_lab.alpha.roles.v1",
-        "llm_roles": LLM_ROLES,
+        "llm_roles": llm_roles,
         "deterministic_roles": DETERMINISTIC_ROLES,
-        "n_llm_roles": len(LLM_ROLES),
+        "n_llm_roles": len(llm_roles),
         "tiers": TIERS,
     }
 

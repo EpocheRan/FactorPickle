@@ -1,0 +1,11 @@
+{
+  "schema": "factor_lab.alpha.behavior_contract.v1",
+  "agent": "reader",
+  "type": "llm",
+  "tier": "L4",
+  "inputs": ["document_text", "page_metadata", "publish_at", "schema"],
+  "outputs": ["doc_id", "publish_at", "doc_type", "events", "evidence", "confidence"],
+  "allowed_tools": [],
+  "forbidden": ["investment_conclusion", "missing_publish_at", "unsupported_event", "infer_missing_fact", "gate_override", "historical_behavior"],
+  "stop_conditions": ["no_text", "no_publish_at", "schema_invalid"]
+}

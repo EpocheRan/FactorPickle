@@ -47,6 +47,7 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
             "allocate",
             "cycle",
             "team",
+            "behavior",
         ],
         nargs="?",
         default="holdout",
@@ -81,6 +82,8 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
     parser.add_argument("--round-file", default="")
     parser.add_argument("--factor-artifact", default="")
     parser.add_argument("--team-action", choices=["plan", "verify", "brief"], default="plan")
+    parser.add_argument("--behavior-action", choices=["list", "show", "verify"], default="show")
+    parser.add_argument("--agent", default="")
 
 
 def _run_alpha(args: argparse.Namespace) -> int:
@@ -140,6 +143,25 @@ def _run_alpha(args: argparse.Namespace) -> int:
             _print(session_brief())
         else:
             _print(bootstrap_plan())
+        return 0
+    if args.action == "behavior":
+        from factor_lab.alpha.team.behavior import list_behaviors, load_behavior, verify_behaviors
+        from factor_lab.alpha.team.bootstrap import load_roster
+
+        behavior_command = args.behavior_action
+        if behavior_command == "list":
+            _print([
+                {"agent": row["agent"], "behavior_hash": row["behavior_hash"], "n_evals": row["n_evals"]}
+                for row in list_behaviors()
+            ])
+            return 0
+        if behavior_command == "verify":
+            roster = load_roster()
+            _print(verify_behaviors([role["name"] for role in roster["roles"]]))
+            return 0
+        if not args.agent:
+            raise SystemExit("alpha behavior show requires --agent or use --behavior-action list|verify")
+        _print(load_behavior(args.agent))
         return 0
     if args.action == "allocate":
         _print(CapitalAllocator(AlphaMemory()).allocate())

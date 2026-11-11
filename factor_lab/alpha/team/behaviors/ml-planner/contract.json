@@ -1,0 +1,11 @@
+{
+  "schema": "factor_lab.alpha.behavior_contract.v1",
+  "agent": "ml-planner",
+  "type": "llm",
+  "tier": "L3",
+  "inputs": ["research_question", "data_coverage", "factor_library", "campaign"],
+  "outputs": ["hypothesis", "features", "target", "target_horizon", "model_family", "cv_scheme", "embargo_days", "n_splits", "baseline", "expected_failure_mode", "stop_conditions"],
+  "allowed_tools": [],
+  "forbidden": ["fit_metrics_override", "deep_learning", "random_kfold", "target_leakage", "gate_override", "historical_behavior"],
+  "stop_conditions": ["no_pit_fields", "insufficient_coverage", "budget_exhausted"]
+}
