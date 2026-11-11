@@ -30,12 +30,13 @@ PathFinder
 
 - PathFinder chooses research direction from history, data coverage and discovery.
 - Web Gateway generates search questions and retains cited results.
-- FactorBuilder writes versioned factors under `factor_lab/factors/generated/`.
-- Runner is an LLM execution role; it selects codes, builds a Panel through
+- FactorBuilder writes versioned factors under `output/factor_lab/factors/generated/`.
+- Runner is a deterministic execution layer; it selects codes, builds a Panel through
   `DataInterfaceGateway`, and submits one pre-registered experiment.
-- Research Module computes factor values and `FactorReport`.
-- ML Engine is non-Deep-Learning only.
-- Supervisor owns campaign rounds, budgets, readiness blockers and safe reclamation.
+- Research Runtime computes factor values and evidence; Evaluator emits deterministic caveats.
+- ML Engine is non-Deep-Learning only; ML Planner is the only LLM role in that branch.
+- Supervisor is deterministic: campaign rounds, budgets, readiness blockers and safe reclamation.
+- Alpha engine has 5 LLM roles: PathFinder, Web Gateway, ML Planner, FactorBuilder, Reader.
 
 ## Data and evaluation boundary
 
@@ -80,6 +81,11 @@ python -m factor_lab alpha benchmark --codes output/factor_lab/hypotheses/pool20
 python -m factor_lab alpha search --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --budget 80
 python -m factor_lab alpha confirm --codes output/factor_lab/hypotheses/pool200.txt --search output/factor_lab/alpha/search/ALPHA-....json
 python -m factor_lab alpha trials
+python -m factor_lab alpha memory
+python -m factor_lab alpha library
+python -m factor_lab alpha deploy --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --expression "rank(close)"
+python -m factor_lab alpha allocate
+python -m factor_lab alpha roles
 ```
 
 Search runs only on the development window. The default holdout is the last
@@ -91,7 +97,8 @@ Search runs only on the development window. The default holdout is the last
 - N is family-scoped; confirmation runs do not enter development N.
 - Quarantine and ledger-repair gaps still count in N.
 - `control` is human-owned; stop drains work, it does not kill running workers.
-- Max 5 campaign rounds, 12 ML experiments, ¥60/campaign.
+- Default max 5 campaign rounds; controller enforces 1–20, budget and duplicate stops.
+- Max 12 ML experiments per campaign; ML artifacts and model_card are required when ML applies.
 - LLM pricing: input ¥0.04 / 1M tokens, output ¥8.00 / 1M tokens.
 - Lab quota 150GB: 100 output + 20 cache + 30 archive; 50GB free floor.
 - Do not promote factors or change policy without human G4.
