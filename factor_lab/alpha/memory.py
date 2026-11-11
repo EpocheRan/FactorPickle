@@ -176,6 +176,7 @@ class AlphaMemory:
         attempts = self.read_attempts()
         failures = self.read_failures()
         cards = self.latest_edge_cards()
+        discoveries = read_jsonl(self.root / "discoveries.jsonl")
         by_status: dict[str, int] = {}
         for card in cards:
             status = str(card.get("status") or "unknown")
@@ -186,9 +187,11 @@ class AlphaMemory:
             "n_attempts": len(attempts),
             "n_failures": len(failures),
             "n_edge_cards": len(cards),
+            "n_discoveries": len(discoveries),
             "edge_cards_by_status": by_status,
             "latest_attempt": attempts[-1] if attempts else None,
             "latest_failure": failures[-1] if failures else None,
+            "latest_discovery": discoveries[-1] if discoveries else None,
             "latest_edge_cards": cards[-5:],
         }
 

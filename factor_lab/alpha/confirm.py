@@ -69,14 +69,25 @@ def confirm_search(
         cost_bps=cost_bps,
         permutations=40,
     )
-    long_only = evaluate_long_only_expression(
-        expression,
-        dataset.context,
-        horizon=horizon,
-        cost_bps=cost_bps,
-        start=dataset.start,
-        end=dataset.end,
-    )
+    try:
+        long_only = evaluate_long_only_expression(
+            expression,
+            dataset.context,
+            horizon=horizon,
+            cost_bps=cost_bps,
+            start=dataset.start,
+            end=dataset.end,
+        )
+    except ValueError as exc:
+        long_only = {
+            "schema": "factor_lab.alpha.deployability.v1",
+            "status": "unavailable",
+            "error": str(exc),
+            "long_only_net_excess_annualized": None,
+            "long_only_te_annualized": None,
+            "turnover": None,
+            "cost_bps": float(cost_bps),
+        }
     result = {
         "schema": "factor_lab.alpha.confirmation.v1",
         "search_path": str(search_path),
@@ -108,12 +119,13 @@ def confirm_search(
         kill_criteria=["holdout failed", "long_short_t < 2", "capacity < 2"],
         research_mode="validate",
         deployability={
-            "status": "measured",
-            "long_only_excess_after_tax": long_only["long_only_net_excess_annualized"],
-            "long_only_te": long_only["long_only_te_annualized"],
+            "status": long_only.get("status", "measured"),
+            "long_only_excess_after_tax": long_only.get("long_only_net_excess_annualized"),
+            "long_only_te": long_only.get("long_only_te_annualized"),
             "alpha_per_turn": None,
-            "turnover": long_only["turnover"],
-            "cost_bps": long_only["cost_bps"],
+            "turnover": long_only.get("turnover"),
+            "cost_bps": long_only.get("cost_bps", float(cost_bps)),
+            "error": long_only.get("error"),
         },
     )
     memory.record_edge_card(card)
