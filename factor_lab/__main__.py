@@ -201,10 +201,14 @@ def _run_alpha(args: argparse.Namespace) -> int:
     codes = _codes(args.codes)
     if not codes:
         raise SystemExit("no codes supplied")
-    try:
-        window = default_holdout(args.end)
-    except ValueError:
-        window = HoldoutWindow(args.start, args.end, args.end, args.end, locked=False)
+    locked = load_holdout()
+    if locked is not None and not any([args.dev_end, args.holdout_start, args.holdout_end]):
+        window = locked
+    else:
+        try:
+            window = default_holdout(args.end)
+        except ValueError:
+            window = HoldoutWindow(args.start, args.end, args.end, args.end, locked=False)
     if args.start:
         window.dev_start = args.start
     if args.dev_end:
@@ -273,7 +277,6 @@ def _run_alpha(args: argparse.Namespace) -> int:
         _print({"expression": payload["expression"], "passed": payload["passed"], "metrics": {key: payload["metrics"].get(key) for key in ("ic_mean", "net_spread", "turnover", "capacity_multiple")}, "long_only": payload.get("long_only"), "red_team_passed": payload["red_team"].get("passed"), "path": payload["path"]})
         return 0
     if args.action == "search":
-        save_holdout(window)
         dataset = load_alpha_dataset(codes, window.dev_start, window.dev_end, warmup_days=args.warmup)
         seed_expressions = []
         if args.seed_file:

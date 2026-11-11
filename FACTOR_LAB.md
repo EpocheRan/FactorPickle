@@ -14,6 +14,8 @@ python -m factor_lab alpha memory
 
 Research commands are under `python -m factor_lab alpha ...`.
 
+The binding coding contract is `factor_lab/alpha/ENGINEERING_CONTRACT.md`.
+
 ## DSH team
 
 The agent runtime is DeepSeek Harness; the repository only carries the portable
@@ -27,6 +29,9 @@ factor_lab/alpha/team/roles.json
   factor-builder
   reader
 ```
+
+Each agent has one current behavior directory under
+`factor_lab/alpha/team/behaviors/<agent>/`; behavior history lives in Git only.
 
 New session / new environment:
 
@@ -123,8 +128,8 @@ Do not add direct QuestDB/SQL access to Alpha. Data without PIT is not admitted.
 
 ## Research rules
 
-- Search only on the development window; the default holdout is the last 12
-  months and is locked.
+- Search only on the development window; the holdout policy lives in
+  `factor_lab/alpha/policy/holdout.json`, not in `output/`, and is locked.
 - Research evidence uses long-short spreads; deployment is long-only.
 - Every label-touching candidate is trial-accounted.
 - Red Team failure cannot become a candidate.

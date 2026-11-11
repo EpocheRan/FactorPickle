@@ -1,0 +1,8 @@
+{
+  "schema": "factor_lab.alpha.holdout.v1",
+  "dev_start": "2022-10-01",
+  "dev_end": "2025-10-31",
+  "holdout_start": "2025-11-01",
+  "holdout_end": "2026-11-01",
+  "locked": true
+}

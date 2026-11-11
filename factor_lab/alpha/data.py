@@ -155,7 +155,7 @@ def default_holdout(end: str | None = None) -> HoldoutWindow:
 
 
 def holdout_path() -> Path:
-    return config.LAB_ROOT / "alpha" / "holdout.json"
+    return config.ALPHA_POLICY_DIR / "holdout.json"
 
 
 def save_holdout(window: HoldoutWindow) -> Path:

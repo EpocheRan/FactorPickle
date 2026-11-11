@@ -34,7 +34,19 @@ Then, in the DSH session:
 3. `list_agents` again; verify all five are running or inactive
 4. start research with `alpha campaign` or an L0 cycle
 
-No previous chat history or absolute path is required. The roster is read from
+No previous chat history or absolute path is required.
+
+Behavior files are current-only:
+
+```text
+behaviors/<agent>/
+  system.md
+  contract.json
+  evals.jsonl
+```
+
+There are no version directories or historical behavior files. Git carries
+behavior history. The roster is read from
 this directory, and all mutable state is under `output/factor_lab`.
 
 ## Boundaries

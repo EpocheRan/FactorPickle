@@ -190,6 +190,7 @@ financial statements（按 publish_date PIT，fin_*）
 ## 规则
 
 - 搜索只使用开发集；holdout 锁定 12 个月。
+- holdout 政策保存在仓库 `factor_lab/alpha/policy/holdout.json`，不在 output。
 - 表达式必须通过 validation；未知字段、负窗口、未来算子拒绝。
 - 每个进入评估的表达式都写入 trial + memory。
 - Red Team 不通过不能进入 candidate。

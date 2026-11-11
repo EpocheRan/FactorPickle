@@ -14,6 +14,7 @@ def _project_root() -> Path:
 PROJECT_ROOT = _project_root()
 LAB_ROOT = Path(os.environ.get("FACTOR_LAB_ROOT", PROJECT_ROOT / "output" / "factor_lab"))
 ALPHA_DIR = LAB_ROOT / "alpha"
+ALPHA_POLICY_DIR = Path(__file__).resolve().parents[1] / "alpha" / "policy"
 FACTOR_LIBRARY_DIR = LAB_ROOT / "factors" / "generated"
 DISCOVERY_DIR = LAB_ROOT / "discovery"
 HYPOTHESES_DIR = LAB_ROOT / "hypotheses"

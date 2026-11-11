@@ -11,6 +11,7 @@ from factor_lab.alpha.allocator import CapitalAllocator, RiskController
 from factor_lab.alpha.campaign import CampaignController, CampaignError
 from factor_lab.alpha.compiler import AlphaContext
 from factor_lab.alpha.data import AlphaDataset
+from factor_lab.alpha.data import holdout_path
 from factor_lab.alpha.deployability import evaluate_long_only_expression
 from factor_lab.alpha.discovery import ingest_discovery
 from factor_lab.alpha.factor_library import (
@@ -22,6 +23,7 @@ from factor_lab.alpha.memory import AlphaMemory, make_edge_card
 from factor_lab.alpha.pipeline import run_research_cycle
 from factor_lab.alpha.supervisor import Supervisor
 from factor_lab.alpha.team import bootstrap_plan, session_brief, validate_roster
+from factor_lab.core import config
 from factor_lab.alpha.ml_branch import make_ml_plan, run_ml_experiment
 from factor_lab.alpha.research_runtime import explain_result, run_research
 from factor_lab.alpha.roles import active_roles, role_contracts
@@ -306,3 +308,15 @@ def test_portable_team_roster_and_bootstrap_plan() -> None:
     assert brief["schema"] == "factor_lab.alpha.session_brief.v1"
     assert brief["team"]["n_roles"] == 5
     assert "commands" in brief
+
+
+def test_source_of_truth_is_not_in_output() -> None:
+    policy = holdout_path()
+    assert policy.exists()
+    assert not str(policy.resolve()).startswith(str(config.LAB_ROOT.resolve()))
+    contract = Path("factor_lab/alpha/ENGINEERING_CONTRACT.md")
+    assert contract.exists()
+    behaviors = Path("factor_lab/alpha/team/behaviors")
+    assert behaviors.exists()
+    version_dirs = [path for path in behaviors.rglob("*") if path.is_dir() and path.name.startswith("v") and path.name[1:].isdigit()]
+    assert version_dirs == []
