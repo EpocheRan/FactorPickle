@@ -313,13 +313,20 @@ class AlphaMemory:
             raise ValueError(f"invalid edge card status: {card.get('status')}")
         append_jsonl(self.edge_cards_path, card)
         if card.get("status") in {"killed", "parked", "not_deployable"}:
-            self.record_failure(
-                str(card["canonical_expression"]),
-                reason=f"edge card status: {card['status']}",
-                status=str(card["status"]),
-                source=str(card.get("source") or ""),
-                horizon=int(card.get("horizon_days") or 5),
+            canonical = str(card["canonical_expression"])
+            recent = self.read_failures()[-20:]
+            already = any(
+                row.get("canonical_expression") == canonical
+                for row in recent
             )
+            if not already:
+                self.record_failure(
+                    canonical,
+                    reason=f"edge card status: {card['status']}",
+                    status=str(card["status"]),
+                    source=str(card.get("source") or ""),
+                    horizon=int(card.get("horizon_days") or 5),
+                )
         return card
 
     def record_discovery(self, payload: dict[str, Any]) -> dict[str, Any]:

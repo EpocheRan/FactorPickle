@@ -85,6 +85,12 @@ def test_memory_write_read_dedupe_and_edge_card(tmp_path) -> None:
     assert summary["n_edge_cards"] == 1
     assert summary["edge_cards_by_status"]["signal_validated"] == 1
     assert memory.context_for_search()["n_known_expressions"] == 1
+    failed = AlphaMemory(tmp_path / "failed")
+    failed.record_attempt("rank(close)", status="failed", reason="test")
+    failed.record_edge_card(
+        make_edge_card("rank(close)", {"ic_mean": -0.1}, status="killed", horizon=5)
+    )
+    assert failed.summary()["n_failures"] == 1
 
 
 def test_search_reads_memory_and_skips_known_expressions(tmp_path) -> None:
@@ -288,6 +294,8 @@ def test_end_to_end_research_cycle(tmp_path) -> None:
     assert payload["schema"] == "factor_lab.alpha.research_cycle.v1"
     assert payload["round"]["round_number"] == 1
     assert payload["edge_card"]["factor_ref"]["factor_id"] == "close_rank_cycle"
+    assert payload["edge_card"]["status"] in {"research", "killed"}
+    assert payload["memory"]["n_attempts"] >= 1
     assert controller.load(campaign["campaign_id"])["n_rounds"] == 1
 
 

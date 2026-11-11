@@ -38,7 +38,19 @@ def run_research_cycle(
         cost_bps=cost_bps,
     )
     evaluation = explain_result(result)
-    card = edge_card_from_result(result, status="research", source="research_cycle")
+    card_status = "research" if evaluation.get("verdict") == "pass" else "killed"
+    memory.record_attempt(
+        request["expression"],
+        status="evaluated" if card_status == "research" else "failed",
+        reason=None if card_status == "research" else "; ".join(evaluation.get("reasons") or []),
+        metrics=result.get("metrics") or {},
+        source="research_cycle",
+        generation=0,
+        horizon=horizon,
+        cost_bps=cost_bps,
+        search_id=f"cycle:{campaign_id}",
+    )
+    card = edge_card_from_result(result, status=card_status, source="research_cycle")
     card["factor_ref"] = request["factor_ref"]
     card["data_manifest"] = request["data_bundle"].get("data_manifest")
     memory.record_edge_card(card)
