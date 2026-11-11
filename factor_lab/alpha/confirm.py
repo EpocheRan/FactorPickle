@@ -10,6 +10,7 @@ from typing import Any
 from factor_lab.alpha.compiler import compile_expression
 from factor_lab.alpha.data import AlphaDataset, HoldoutWindow
 from factor_lab.alpha.evaluation import evaluate_expression
+from factor_lab.alpha.memory import AlphaMemory, make_edge_card
 from factor_lab.alpha.red_team import red_team_review
 from factor_lab.core import config
 from factor_lab.core.store import read_json, write_json_atomic
@@ -22,6 +23,7 @@ def confirm_search(
     horizon: int = 5,
     cost_bps: float = 20.0,
     holdout: HoldoutWindow | None = None,
+    memory: AlphaMemory | None = None,
 ) -> dict[str, Any]:
     if holdout is None:
         raise ValueError("confirm requires the persisted locked holdout window")
@@ -79,4 +81,23 @@ def confirm_search(
     out = config.LAB_ROOT / "alpha" / "confirm" / f"{Path(search_path).stem}.json"
     write_json_atomic(out, result)
     result["path"] = str(out)
+
+    memory = memory or AlphaMemory()
+    card = make_edge_card(
+        expression,
+        metrics,
+        status="signal_validated" if result["passed"] else "killed",
+        mechanism="holdout_confirmation",
+        data_axes=dataset.data_manifest.get("fields", []),
+        horizon=horizon,
+        cost_bps=cost_bps,
+        source="holdout_confirm",
+        validation={},
+        red_team=review,
+        evidence=[str(out), f"holdout:{holdout.holdout_start}..{holdout.holdout_end}"],
+        kill_criteria=["holdout failed", "long_short_t < 2", "capacity < 2"],
+        research_mode="validate",
+    )
+    memory.record_edge_card(card)
+    result["memory"] = memory.finalize()
     return result

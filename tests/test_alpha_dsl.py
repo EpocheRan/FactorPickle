@@ -7,6 +7,7 @@ from factor_lab.alpha.compiler import AlphaContext, compile_expression
 from factor_lab.alpha.expression import parse_expression
 from factor_lab.alpha.evaluation import evaluate_factor, evaluate_expression
 from factor_lab.alpha.red_team import red_team_review
+from factor_lab.alpha.memory import AlphaMemory
 from factor_lab.alpha.search import run_search
 from factor_lab.alpha.validation import validate
 from factor_lab.alpha.data import AlphaDataset, default_holdout
@@ -97,7 +98,7 @@ def test_holdout_and_search(tmp_path, monkeypatch) -> None:
 
     monkeypatch.setattr(trials_mod, "alpha_dir", lambda: tmp_path)
     window = default_holdout("2026-11-01")
-    result = run_search(dataset, budget=6, horizon=5, holdout=None, seed=2, out_path=str(tmp_path / "search.json"))
+    result = run_search(dataset, budget=6, horizon=5, holdout=None, seed=2, out_path=str(tmp_path / "search.json"), memory=AlphaMemory(tmp_path / "memory"), factor_library_root=tmp_path / "factors")
     assert result["n_evaluated"] >= 1
     assert result["top"]
     assert result["fdr"]["n_trials"] == result["n_evaluated"]

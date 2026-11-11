@@ -153,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     evaluate_parser.add_argument("--finalize", action="store_true")
 
     alpha_parser = sub.add_parser("alpha", help="Alpha DSL / benchmark / search / red team")
-    alpha_parser.add_argument("action", choices=["validate", "eval", "benchmark", "search", "confirm", "holdout", "trials"], nargs="?", default="holdout")
+    alpha_parser.add_argument("action", choices=["validate", "eval", "benchmark", "search", "confirm", "holdout", "trials", "memory", "library", "campaign", "ml", "discovery", "roles"], nargs="?", default="holdout")
     alpha_parser.add_argument("--expression", default="")
     alpha_parser.add_argument("--codes", default=str(config.HYPOTHESES_DIR / "pool200.txt"))
     alpha_parser.add_argument("--start", default="2022-10-01")
@@ -171,6 +171,16 @@ def main(argv: list[str] | None = None) -> int:
     alpha_parser.add_argument("--search", default="")
     alpha_parser.add_argument("--seed-file", default="")
     alpha_parser.add_argument("--seed", type=int, default=11)
+    alpha_parser.add_argument("--objective", default="")
+    alpha_parser.add_argument("--campaign-id", default="")
+    alpha_parser.add_argument("--max-rounds", type=int, default=5)
+    alpha_parser.add_argument("--campaign-budget", type=float, default=0.0)
+    alpha_parser.add_argument("--features", default="close,volume,amount")
+    alpha_parser.add_argument("--ml-splits", type=int, default=4)
+    alpha_parser.add_argument("--ml-embargo", type=int, default=5)
+    alpha_parser.add_argument("--ml-out", default="")
+    alpha_parser.add_argument("--discovery-file", default="")
+    alpha_parser.add_argument("--round-file", default="")
 
     web_mode_parser = sub.add_parser("web-mode", help="show discovery mode and cache state")
     web_mode_parser.add_argument("--mode", choices=["exploit", "explore", "deep"], default="exploit")
@@ -564,7 +574,13 @@ def main(argv: list[str] | None = None) -> int:
         from factor_lab.alpha.benchmarks import run_benchmark
         from factor_lab.alpha.confirm import confirm_search
         from factor_lab.alpha.data import HoldoutWindow, default_holdout, load_alpha_dataset, load_holdout, save_holdout
+        from factor_lab.alpha.discovery import ingest_discovery
         from factor_lab.alpha.evaluation import evaluate_expression
+        from factor_lab.alpha.campaign import CampaignController
+        from factor_lab.alpha.factor_library import library_summary
+        from factor_lab.alpha.memory import AlphaMemory
+        from factor_lab.alpha.ml_branch import make_ml_plan, run_ml_experiment
+        from factor_lab.alpha.roles import role_contracts
         from factor_lab.alpha.search import run_search
         from factor_lab.alpha.trials import summarize_trials
         from factor_lab.alpha.validation import validate
@@ -595,6 +611,38 @@ def main(argv: list[str] | None = None) -> int:
         if args.action == "trials":
             _print(summarize_trials())
             return 0
+        if args.action == "memory":
+            _print(AlphaMemory().summary())
+            return 0
+        if args.action == "library":
+            _print(library_summary())
+            return 0
+        if args.action == "roles":
+            _print(role_contracts())
+            return 0
+        if args.action == "discovery":
+            if not args.discovery_file:
+                raise SystemExit("alpha discovery requires --discovery-file")
+            payload = read_json(Path(args.discovery_file))
+            if not isinstance(payload, dict):
+                raise SystemExit("discovery file must contain a JSON object")
+            _print(ingest_discovery(payload))
+            return 0
+        if args.action == "campaign":
+            controller = CampaignController()
+            if args.campaign_id and args.round_file:
+                payload = read_json(Path(args.round_file))
+                if not isinstance(payload, dict):
+                    raise SystemExit("round file must contain a JSON object")
+                _print(controller.record_round(args.campaign_id, payload))
+                return 0
+            if args.campaign_id:
+                _print(controller.summary(args.campaign_id))
+                return 0
+            if not args.objective:
+                raise SystemExit("alpha campaign requires --objective or --campaign-id")
+            _print(controller.create(args.objective, max_rounds=args.max_rounds, budget=args.campaign_budget or None))
+            return 0
         codes = _codes(args.codes)
         if not codes:
             raise SystemExit("no codes supplied")
@@ -615,6 +663,25 @@ def main(argv: list[str] | None = None) -> int:
                 raise SystemExit("alpha eval requires --expression")
             dataset = load_alpha_dataset(codes, args.start, args.end, warmup_days=args.warmup)
             _print(evaluate_expression(args.expression, dataset.context, horizon=args.horizon, cost_bps=args.cost_bps, start=args.start, end=args.end))
+            return 0
+        if args.action == "ml":
+            dataset = load_alpha_dataset(codes, args.start, args.end, warmup_days=args.warmup)
+            features = [item.strip() for item in args.features.split(",") if item.strip()]
+            plan = make_ml_plan(
+                "CLI ML experiment",
+                features,
+                target_horizon=args.horizon,
+                n_splits=args.ml_splits,
+                embargo_days=args.ml_embargo,
+            )
+            result = run_ml_experiment(dataset, plan, out_dir=args.ml_out or str(config.LAB_ROOT / "alpha" / "ml"))
+            _print({
+                "plan_id": plan.plan_id,
+                "features": plan.features,
+                "metrics": result["metrics"],
+                "cv": result["cv"],
+                "path": args.ml_out or str(config.LAB_ROOT / "alpha" / "ml"),
+            })
             return 0
         if args.action == "benchmark":
             locked = load_holdout()

@@ -16,6 +16,8 @@ from factor_lab.alpha.baselines import HUMAN_BASELINES
 from factor_lab.alpha.compiler import AlphaContext, compile_expression
 from factor_lab.alpha.data import AlphaDataset, HoldoutWindow
 from factor_lab.alpha.evaluation import evaluate_factor
+from factor_lab.alpha.factor_library import write_factor_artifact
+from factor_lab.alpha.memory import AlphaMemory, canonical_expression, make_edge_card
 from factor_lab.alpha.red_team import red_team_review
 from factor_lab.alpha.trials import append_trial, benjamini_hochberg, p_value_from_t
 from factor_lab.alpha.validation import validate
@@ -159,6 +161,8 @@ def run_search(
     seed: int = 11,
     seed_expressions: Iterable[str] | None = None,
     out_path: str | None = None,
+    memory: AlphaMemory | None = None,
+    factor_library_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Search only on the development segment; holdout is never touched."""
     if holdout is not None:
@@ -168,37 +172,82 @@ def run_search(
     fields = _fields(context)
     candidates: list[Candidate] = []
     attempted = 0
-    seen: set[str] = set()
+    memory = memory or AlphaMemory()
+    known = memory.known_expressions()
+    seen: set[str] = {canonical_expression(item) for item in known}
+    search_id = f"ALPHA-{uuid.uuid4().hex[:8]}"
+
+    def evaluate_candidate(expression: str, *, source: str, generation: int) -> Candidate | None:
+        nonlocal attempted
+        attempted += 1
+        candidate = _candidate(
+            context,
+            expression,
+            horizon=horizon,
+            cost_bps=cost_bps,
+            source=source,
+            generation=generation,
+            start=dataset.start,
+            end=dataset.end,
+        )
+        if candidate is None:
+            memory.record_attempt(
+                expression,
+                status="invalid",
+                reason="validation/evaluation failed or insufficient sample",
+                source=source,
+                generation=generation,
+                horizon=horizon,
+                cost_bps=cost_bps,
+                search_id=search_id,
+            )
+            return None
+        p_value = p_value_from_t(
+            float(candidate.metrics.get("ic_t", 0.0)),
+            int(candidate.metrics.get("n_dates", 0)),
+        )
+        memory.record_attempt(
+            expression,
+            status="evaluated",
+            metrics=candidate.metrics,
+            source=source,
+            generation=generation,
+            horizon=horizon,
+            cost_bps=cost_bps,
+            search_id=search_id,
+            p_value=p_value,
+        )
+        return candidate
 
     # Optional LLM/PathFinder seeds are evaluated under the same trial accounting.
     for expression in list(seed_expressions or []):
         text = str(expression).strip()
-        if not text or text in seen:
+        key = canonical_expression(text)
+        if not text or key in seen:
             continue
-        seen.add(text)
-        attempted += 1
-        candidate = _candidate(context, text, horizon=horizon, cost_bps=cost_bps, source="seed", generation=0, start=dataset.start, end=dataset.end)
+        seen.add(key)
+        candidate = evaluate_candidate(text, source="seed", generation=0)
         if candidate is not None:
             candidates.append(candidate)
 
     # Human baselines are seeds, not the search space.
     for baseline in HUMAN_BASELINES:
-        if baseline.expression in seen:
+        baseline_key = canonical_expression(baseline.expression)
+        if baseline_key in seen:
             continue
-        seen.add(baseline.expression)
-        attempted += 1
-        candidate = _candidate(context, baseline.expression, horizon=horizon, cost_bps=cost_bps, source=f"baseline:{baseline.name}", generation=0, start=dataset.start, end=dataset.end)
+        seen.add(baseline_key)
+        candidate = evaluate_candidate(baseline.expression, source=f"baseline:{baseline.name}", generation=0)
         if candidate is not None:
             candidates.append(candidate)
 
     # Random / grammar candidates.
     for index in range(max(0, int(budget))):
         expression = _random_atom(rng, fields, depth=rng.choice([1, 2, 2, 3]))
-        if expression in seen:
+        expression_key = canonical_expression(expression)
+        if expression_key in seen:
             continue
-        seen.add(expression)
-        attempted += 1
-        candidate = _candidate(context, expression, horizon=horizon, cost_bps=cost_bps, source="grammar", generation=1, start=dataset.start, end=dataset.end)
+        seen.add(expression_key)
+        candidate = evaluate_candidate(expression, source="grammar", generation=1)
         if candidate is not None:
             candidates.append(candidate)
 
@@ -207,11 +256,11 @@ def run_search(
         parents = _dedupe(candidates)[: max(8, budget // 8)]
         for parent in parents:
             expression = _mutate(rng, parent.expression, fields)
-            if expression in seen:
+            expression_key = canonical_expression(expression)
+            if expression_key in seen:
                 continue
-            seen.add(expression)
-            attempted += 1
-            candidate = _candidate(context, expression, horizon=horizon, cost_bps=cost_bps, source=f"mutation:{parent.expression[:40]}", generation=generation, start=dataset.start, end=dataset.end)
+            seen.add(expression_key)
+            candidate = evaluate_candidate(expression, source=f"mutation:{parent.expression[:40]}", generation=generation)
             if candidate is not None:
                 candidates.append(candidate)
 
@@ -257,10 +306,62 @@ def run_search(
     pvalues = [p_value_from_t(float(item.metrics.get("ic_t", 0.0)), int(item.metrics.get("n_dates", 0))) for item in ranked]
     bh = benjamini_hochberg(pvalues, q=0.1)
     passed_count = sum(1 for item in bh if item["passed"])
+
+    if confirmed or ranked:
+        best = dict(confirmed[0] if confirmed else ranked[0].to_dict())
+        best_metrics = dict(best.get("metrics") or {})
+        review = best.get("red_team") or {}
+        card_status = (
+            "signal_validated"
+            if review.get("passed") and float(best_metrics.get("net_spread", -1.0)) > 0.0
+            else "research"
+        )
+        factor_ref = {"factor_id": "", "version": "", "code_hash": ""}
+        try:
+            artifact = write_factor_artifact(
+                factor_id=f"search_{search_id.lower()}",
+                family="alpha_search",
+                expression=str(best.get("expression") or ""),
+                spec={
+                    "source": "alpha_search",
+                    "search_id": search_id,
+                    "data_contract": {"fields": (best.get("validation") or {}).get("fields") or []},
+                    "horizon": horizon,
+                    "cost_bps": cost_bps,
+                },
+                source="alpha_search",
+                library_root=factor_library_root,
+            )
+            factor_ref = {
+                "factor_id": artifact.factor_id,
+                "version": artifact.version,
+                "code_hash": artifact.code_hash,
+            }
+        except Exception:  # noqa: BLE001 - evidence card remains usable without artifact
+            pass
+        card = make_edge_card(
+            str(best.get("expression") or ""),
+            best_metrics,
+            status=card_status,
+            mechanism=str(best.get("source") or "unspecified"),
+            data_axes=(best.get("validation") or {}).get("fields") or [],
+            horizon=horizon,
+            cost_bps=cost_bps,
+            source=str(best.get("source") or ""),
+            search_id=search_id,
+            validation=best.get("validation") or {},
+            red_team=review,
+            evidence=[f"search:{search_id}"],
+            factor_ref=factor_ref,
+            research_mode="explore",
+        )
+        memory.record_edge_card(card)
+
+    memory.finalize()
     payload = {
         "schema": "factor_lab.alpha.search.v1",
         "created_at": config.now_iso(),
-        "search_id": f"ALPHA-{uuid.uuid4().hex[:8]}",
+        "search_id": search_id,
         "dataset": dataset.data_manifest,
         "holdout": holdout.to_dict() if holdout else None,
         "budget": budget,
@@ -274,6 +375,7 @@ def run_search(
         "confirmed": confirmed,
         "confirmed_passed": [item["expression"] for item in confirmed if item.get("red_team", {}).get("passed")],
         "trials_path": str(config.LAB_ROOT / "alpha" / "trials.jsonl"),
+        "memory": memory.summary(),
     }
     if out_path is None:
         out_path = str(config.LAB_ROOT / "alpha" / "search" / f"{payload['search_id']}.json")
