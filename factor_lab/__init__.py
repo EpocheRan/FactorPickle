@@ -1,8 +1,8 @@
-"""Factor Lab: reproducible experiment plumbing for FactorPickle.
+"""Factor Lab Alpha research engine.
 
-The package is intentionally additive.  It reads FactorPickle's existing research
-pipeline and writes lab artifacts under ``output/factor_lab``; it never edits
-production modules or the factor registry during P0.
+The package owns the Alpha DSL, evidence evaluation, memory, versioned Factor
+Library, campaign control, deterministic execution layers and non-deep-learning
+ML branch.  Runtime state lives under ``output/factor_lab``.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

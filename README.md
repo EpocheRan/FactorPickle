@@ -51,7 +51,7 @@ MCPserver ── 统一工具出口（http / sse / stdio）
 | `factors/` | 因子定义、时序与横截面算子 | `from factors import F` |
 | `factor_engine/` | 因子物化、宽表、审计与对账 | `python -m factor_engine` |
 | `research/` | 统一报告：profile 章节 + 单因子 HTML；默认全市场 | `python -m research.report` / `python -m scripts.cli profile` |
-| `factor_lab/` | 自主因子研究运行时：路径发现、因子构建、Runner、ML、Supervisor | `python -m factor_lab` |
+| `factor_lab/` | Alpha Research Engine：DSL、Edge Card、Memory、Factor Library、Campaign、ML Branch | `python -m factor_lab alpha` |
 | `screener/` | 因子筛股、基线、停牌与覆盖检查 | `python -m screener` |
 | `backtest/` | 单股 / 横截面回测、执行规则、账本 | `python -m backtest` |
 | `strategies/` | 策略基类、universe、weighting、模型 | `python -m backtest list` |

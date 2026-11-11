@@ -1,132 +1,123 @@
 # Factor Lab
 
-Portable research workspace. A new DSH session should not need prior chat
-history.
+Portable Alpha research workspace. A new DSH session should not need prior
+chat history.
 
 ## Start
 
 ```powershell
 python -m factor_lab bootstrap
 python -m factor_lab doctor
-python -m factor_lab campaign start --objective "研究因子"
+python -m factor_lab alpha memory
 ```
 
-Before starting a research campaign, create the full durable team from
-`factor_lab/team/roles.json`: `pathfinder`, `web-gateway`, `factor-builder`,
-`runner`, `evaluator`, `ml-planner`, `ml-monitor`, `supervisor`.
+Research commands are under `python -m factor_lab alpha ...`.
 
-Create all roles first, verify the roster, then create/assign research tasks.
-Do not create a blocked task DAG with only one teammate online.
-
-## Architecture
+## Engine
 
 ```text
-PathFinder
-  → Web Gateway / FactorBuilder / ML Engine
+PathFinder / Web Gateway / ML Planner / FactorBuilder / Reader
+  → Factor Library
   → Runner
-  → Research Adapter
-  → Evaluator / Supervisor
+  → Research Runtime
+  → Falsifier
+  → Edge Card
+  → Memory
+  → Campaign
+  → long-only deployability / allocator
 ```
 
-- PathFinder chooses research direction from history, data coverage and discovery.
-- Web Gateway generates search questions and retains cited results.
-- FactorBuilder writes versioned factors under `output/factor_lab/factors/generated/`.
-- Runner is a deterministic execution layer; it selects codes, builds a Panel through
-  `DataInterfaceGateway`, and submits one pre-registered experiment.
-- Research Runtime computes factor values and evidence; Evaluator emits deterministic caveats.
-- ML Engine is non-Deep-Learning only; ML Planner is the only LLM role in that branch.
-- Supervisor is deterministic: campaign rounds, budgets, readiness blockers and safe reclamation.
-- Alpha engine has 5 LLM roles: PathFinder, Web Gateway, ML Planner, FactorBuilder, Reader.
+Five model-facing roles only: PathFinder, Web Gateway, ML Planner,
+FactorBuilder, Reader. Runner, Research Runtime, Evaluator, Supervisor,
+Falsifier, Registrar, Allocator and ML Runtime are deterministic or tool
+services.
 
-## Data and evaluation boundary
+## Factor Library
+
+Versioned artifacts live under:
 
 ```text
-DataInterfaceGateway
-  → market / flow / margin / valuation / industry / regime / ML bundles
-  → build_factor_panel
-  → Panel + data_manifest
-  → research.report.runner.generate
-  → research.report.metrics.build_report
+output/factor_lab/factors/generated/<family>/<factor_id>/v1/
+  factor.dsl | factor.py
+  spec.json
+  test_factor.py
+  manifest.json
 ```
 
-Runner never computes a factor matrix and never accesses QuestDB directly.
-Factor artifacts must carry `factor_id`, category, version, code hash and
-`data_contract`; Runner validates the factor id and records the artifact in
-`data_manifest.json`.
+Versions are immutable. Edge Cards reference `factor_id`, `version`, and
+`code_hash`.
 
-Research Module metrics use a pandas/Polars backend:
+## Edge Cards and memory
 
-- `REPORT_METRICS_BACKEND=auto` (default)
-- Rank IC stays on pandas
-- Quantile NAV uses Polars for moderate cross-sections and pandas for the
-  full market
-- `FactorReport.metrics_engine` records the actual engines
-
-## Discovery
-
-```powershell
-python -m factor_lab discovery queries --question "研究问题"
-# DSH Gateway child may use web_search directly (tools inherited from preset)
-# or the main session may supply raw results
-# DSH LLM Gateway: factor_lab/workflows/web_gateway.js
-python -m factor_lab discovery ingest --result gateway_result.json
+```text
+output/factor_lab/alpha/memory/
+  attempts.jsonl
+  edge_cards.jsonl
+  failures.jsonl
+  discoveries.jsonl
+  summary.json
 ```
 
-## Alpha DSL
+`search` reads known expressions before generating candidates, records every
+attempt, writes top-candidate Edge Cards and finalizes the summary. `confirm`
+writes holdout cards.
+
+## Commands
 
 ```powershell
 python -m factor_lab alpha validate --expression "rank(ts_corr(rank(close), rank(volume), 20))"
-python -m factor_lab alpha holdout --end 2026-11-01 --save
+python -m factor_lab alpha eval --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --expression "rank(close)"
 python -m factor_lab alpha benchmark --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31
+python -m factor_lab alpha holdout --end 2026-11-01 --save
 python -m factor_lab alpha search --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --budget 80
 python -m factor_lab alpha confirm --codes output/factor_lab/hypotheses/pool200.txt --search output/factor_lab/alpha/search/ALPHA-....json
-python -m factor_lab alpha trials
 python -m factor_lab alpha memory
 python -m factor_lab alpha library
+python -m factor_lab alpha campaign --objective "研究应计" --max-rounds 5
+python -m factor_lab alpha ml --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --features close,volume,amount
+python -m factor_lab alpha discovery
 python -m factor_lab alpha deploy --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --expression "rank(close)"
 python -m factor_lab alpha allocate
+python -m factor_lab alpha cycle --factor-artifact <factor-dir-or-id> --campaign-id CAMP-...
 python -m factor_lab alpha roles
 ```
 
-Search runs only on the development window. The default holdout is the last
-12 months; `holdout.json` is locked and cannot be silently overwritten.
+## Data boundary
 
-## Rules
+Alpha uses:
 
-- One trial = hypothesis × pre-registered outcome.
-- N is family-scoped; confirmation runs do not enter development N.
-- Quarantine and ledger-repair gaps still count in N.
-- `control` is human-owned; stop drains work, it does not kill running workers.
-- Default max 5 campaign rounds; controller enforces 1–20, budget and duplicate stops.
-- Max 12 ML experiments per campaign; ML artifacts and model_card are required when ML applies.
-- LLM pricing: input ¥0.04 / 1M tokens, output ¥8.00 / 1M tokens.
-- Lab quota 150GB: 100 output + 20 cache + 30 archive; 50GB free floor.
-- Do not promote factors or change policy without human G4.
-- Generated factor code/spec/tests/manifests are runtime research data under
-  `output/factor_lab/factors/generated/`. Do not copy, mirror, or move them into
-  the repository; they are not portable design assets.
-- Portable design is limited to code, contracts, `factor_lab/team/roles.json`,
-  and `factor_lab/sources/catalog.json`. Never duplicate runtime state into Git.
-- The data axis is chosen by PathFinder from campaign-scoped `data_capabilities`.
-  Do not pre-narrow a round to `ohlcv_1d` or prohibit financial/moneyflow/margin.
-  Unverified services require a readiness probe.
+```text
+factor_lab.runtime.data_interface_adapter.DataInterfaceGateway
+factor_lab.runtime.panel_builder.build_factor_panel
+data_interface services
+```
+
+Do not add direct QuestDB/SQL access to Alpha. Data without PIT is not admitted.
+
+## Research rules
+
+- Search only on the development window; the default holdout is the last 12
+  months and is locked.
+- Research evidence uses long-short spreads; deployment is long-only.
+- Every label-touching candidate is trial-accounted.
+- Red Team failure cannot become a candidate.
+- No validated Edge Card means 100% broad-index baseline.
+- Research modes: `explore`, `validate`, `deploy`. Exploration is allowed to
+  be non-deployable, but still trial-accounted.
+- Campaigns enforce max rounds, budget, duplicate stops and stop decisions.
+- ML is non-deep-learning only; purged walk-forward with embargo is required.
+- Web Gateway discoveries require cited sources; raw HTML is not passed to
+  PathFinder.
 
 ## State
 
-All mutable state is under `output/factor_lab`:
-
 ```text
-control/       directive, budget, heartbeat, cycle, agents
-ledger/        trial ledger
-experiments/   immutable experiment artifacts
-campaigns/     campaign traces
-factors/       generated Lab factors (versioned runtime data)
-dashboard/     read-only dashboard
-ml/            ML datasets and outputs
+output/factor_lab/
+  alpha/          memory, search, confirm, campaigns, ml
+  factors/        versioned runtime factor artifacts
+  discovery/      Web Gateway artifacts
+  hypotheses/     code pools
 ```
 
-`factor_lab/team/` and `factor_lab/sources/` are tracked design/config inputs,
-not runtime state.
-
-If data credentials/configuration are absent, `doctor` must fail with an
-actionable blocker. Do not bypass `data_interface`.
+All mutable state is under `output/factor_lab`. Generated factor artifacts are
+runtime research data, not portable design assets.

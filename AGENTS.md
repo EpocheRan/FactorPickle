@@ -9,34 +9,35 @@ Git history carries changes. When editing docs, rewrite the current truth
 instead of appending "changed", "removed", "old" or "legacy" narratives.
 This applies to every README in the repository.
 
-This workspace is a Factor Lab research environment. If the user asks to
-research factors:
+## Alpha engine
+
+The workspace is an Alpha research engine. If the user asks to research
+factors or run an Alpha campaign:
 
 1. Read `FACTOR_LAB.md`.
-2. Read `factor_lab/team/roles.json` and create **all 8 durable teammates** from it in parallel.
-3. Verify the full team is running/inactive (Lead + 8) before creating any research task.
-4. Run `python -m factor_lab doctor`.
-5. If green, run `python -m factor_lab campaign start --objective "研究因子"`.
+2. Run `python -m factor_lab doctor`.
+3. If green, use `python -m factor_lab alpha ...`.
+4. Keep research state under `output/factor_lab`.
 
-Never create the R1 task DAG before the team roster exists. A task board is
-not a team; spawning one worker and queueing blocked tasks is a bootstrap bug.
+The five model-facing roles are `PathFinder`, `Web Gateway`, `ML Planner`,
+`FactorBuilder`, and `Reader`. Runner, Research Runtime, Evaluator,
+Supervisor, Falsifier, Registrar and Allocator are deterministic services.
+There is no legacy 8-role team bootstrap.
 
-Rules:
+## Rules
 
-- Do not edit production modules (`research/`, `factors/`, `data_interface/`) for a research run.
-- Runner data access must go through `data_interface`; never add direct QuestDB/SQL access to Factor Lab.
-- Do not promote factors or change policy; those require human G4.
+- Keep data access behind `data_interface`; Alpha loads panels through
+  `factor_lab.runtime.data_interface_adapter` and `panel_builder`.
+- Never add direct QuestDB/SQL access to Alpha modules.
 - Write all research state under `output/factor_lab`.
-- Generated factor code/spec/tests/manifests are runtime research data under
-  `output/factor_lab/factors/generated/`. Do not copy, mirror, or move them into
-  the repository; they are not portable design assets.
-- Portable design is limited to code, contracts, `factor_lab/team/roles.json`,
-  and `factor_lab/sources/catalog.json`. Never duplicate runtime state into Git.
-- Data axis is chosen by PathFinder from the campaign-scoped `data_capabilities`.
-  Do not write "ohlcv_1d only" / "no financial/moneyflow/margin" into a round
-  directive. Unverified services require a readiness probe, not a prohibition.
-- If the environment or data is not ready, report `blocker_feedback` and wait; do not fabricate results.
-- Web discovery: DSH subagents inherit tools by default. The `web_gateway.js` child may call `web_search` directly, or the main session may search and pass results in; then run
-  `python -m factor_lab discovery ingest --result <gateway-result.json>`. The Gateway LLM must keep URLs and citations.
-- Tool availability is a preset/composition property, not a prompt prohibition. If a child lacks tools, inspect its Agent preset plugins and service activation.
-- Budget pricing is configured at input ¥0.04 / output ¥8.00 per million tokens; record actual usage through `factor_lab.budget.record_usage`.
+- Generated factor artifacts are runtime data under
+  `output/factor_lab/factors/generated/`; do not copy them into Git.
+- Edge Cards are evidence, not promotion. Only validated/active cards may be
+  allocated; unvalidated cards never reach the account.
+- Research uses long-short signal evidence; deployment remains long-only.
+- Every expression that touches labels is trial-accounted; holdout is locked.
+- Missing data or environment readiness is a blocker; report it and do not
+  fabricate results.
+- Web discovery must preserve URLs, retrieval times, and citations. Raw HTML
+  is not admitted into PathFinder context.
+- Do not use LLM output to override a deterministic Gate verdict.
