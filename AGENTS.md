@@ -51,6 +51,22 @@ The agent runtime is DeepSeek Harness; do not build a separate agent runtime.
 The canonical protocol is emitted by `alpha team plan` under
 `campaign_protocol`.
 
+## Agent-team change control
+
+Any optimization to the agent-team logic is itself a source change. If we change
+routing, delegation, roles, campaign protocol, task-board workflow, manifest
+requirements or audit rules, the same change must update the relevant source of
+truth before use:
+
+- `factor_lab/alpha/team/roles.json` for roles and campaign policy;
+- behavior `system.md` / `contract.json` / `evals.jsonl` for model-facing rules;
+- `factor_lab/alpha/campaign.py`, `protocol_audit.py` and `preflight.py` for
+  enforcement;
+- regression tests and current docs.
+
+Conversation-only protocol changes are not binding. Do not rely on chat memory
+as the source of truth.
+
 ## Rules
 
 - Keep data access behind `data_interface`; Alpha loads panels through

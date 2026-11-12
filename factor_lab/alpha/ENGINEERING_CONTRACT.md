@@ -96,6 +96,15 @@ python -m factor_lab alpha team verify
 The DSH Lead then uses `list_agents`, `spawn_teammate`, and `list_agents`
 again. The repository supplies the plan; DSH supplies the runtime.
 
+### 3.0 Agent-team change control
+
+Any optimization to agent-team logic is a source change, not a chat-only
+decision. A change to routing, delegation, roles, campaign protocol, task-board
+workflow, manifest requirements or audit rules must update the relevant
+`roles.json`, behavior files, enforcement code (`campaign.py`,
+`protocol_audit.py`, `preflight.py`), tests and current docs in the same change.
+Conversation-only changes are not binding.
+
 ### 3.1 Campaign protocol (binding)
 
 The portable protocol is `campaign_protocol` in `roles.json` and is emitted by

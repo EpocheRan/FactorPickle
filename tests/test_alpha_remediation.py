@@ -171,3 +171,17 @@ def test_singlefold_protocol_is_codified() -> None:
     assert validate_singlefold_plan(plan)["ok"] is True
     wrong = make_ml_plan("wrong split", ["returns"], n_splits=4)
     assert validate_singlefold_plan(wrong)["ok"] is False
+
+
+def test_agent_team_change_control_codified() -> None:
+    import json
+    from pathlib import Path
+
+    agents = Path("AGENTS.md").read_text(encoding="utf-8")
+    contract = Path("factor_lab/alpha/ENGINEERING_CONTRACT.md").read_text(encoding="utf-8")
+    assert "Agent-team change control" in agents
+    assert "Conversation-only protocol changes are not binding" in agents
+    assert "Agent-team change control" in contract
+    roles = json.loads(Path("factor_lab/alpha/team/roles.json").read_text(encoding="utf-8"))
+    assert "change_control" in roles["campaign_protocol"]
+    assert Path("factor_lab/alpha/team/CHANGE_CONTROL.md").exists()

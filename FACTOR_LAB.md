@@ -94,6 +94,14 @@ five DSH teammates:
   campaign is invalid. Mechanical re-runs must be labeled
   `protocol: deterministic-maintenance` and must not generate new candidates.
 
+## Agent-team change control
+
+Agent-team logic is source-controlled. Any change to routing, delegation, roles,
+campaign protocol, task-board workflow, manifest requirements or audit rules must
+update `team/roles.json`, the relevant behavior files, enforcement code, tests
+and current docs in the same change. Conversation-only protocol changes are not
+binding. See `factor_lab/alpha/team/CHANGE_CONTROL.md`.
+
 ## Engine
 
 ```text

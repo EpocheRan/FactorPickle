@@ -97,6 +97,25 @@
       "default": "Every new alpha-campaign-v2 campaign must have an ML Planner decision: a pre-registered plan or an explicit falsifiable skip reason; ML experiments need not run every campaign, but silent omission is a protocol violation",
       "signal": "PathFinder must set ml_branch.request_ml_planner with an explicit reason; false is allowed only with a concrete falsifiable reason",
       "boundary": "ML remains research evidence; it cannot override the deterministic Gate or unlock holdout"
+    },
+    "change_control": {
+      "rule": "Any agent-team logic optimization must be codified in roles/behaviors/enforcement/tests/docs in the same change; conversation-only changes are not binding.",
+      "required": [
+        "roles.json",
+        "behaviors/*/system.md",
+        "behaviors/*/contract.json",
+        "behaviors/*/evals.jsonl",
+        "campaign.py",
+        "protocol_audit.py",
+        "preflight.py",
+        "tests",
+        "current docs"
+      ],
+      "verification": [
+        "python -m factor_lab alpha team verify",
+        "python -m factor_lab alpha behavior --behavior-action verify",
+        "python -m pytest -q"
+      ]
     }
   },
   "steps": [
