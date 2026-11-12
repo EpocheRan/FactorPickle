@@ -60,6 +60,7 @@ class CampaignController:
         (directory / "rounds").mkdir()
         record = {
             "schema": CAMPAIGN_SCHEMA,
+            "protocol_version": "alpha-campaign-v2",
             "campaign_id": campaign_id,
             "objective": str(objective),
             "max_rounds": int(max_rounds),

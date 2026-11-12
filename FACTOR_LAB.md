@@ -73,12 +73,13 @@ No previous session or absolute path is required.
 ### Campaign protocol (mandatory)
 
 `python -m factor_lab alpha team plan` emits the current `campaign_protocol`.
-Every new campaign or research round must delegate model-facing work to the
+Every new `alpha-campaign-v2` campaign must delegate model-facing work to the
 five DSH teammates:
 
-- required per campaign: PathFinder research question + FactorBuilder artifact;
-- recommended as needed: Web Gateway discovery, ML Planner experiment,
-  Reader evidence extraction;
+- required per campaign: PathFinder research question + FactorBuilder artifact
+  + Web Gateway cited discovery + ML Planner decision (plan or explicit
+  falsifiable skip reason);
+- Reader is used when external sources need structured event extraction;
 - one shared task per delegated role (claim → work → complete), plus
   `send_message` with a self-contained task and output contract;
 - record task ids and teammate outputs under
@@ -86,7 +87,9 @@ five DSH teammates:
 - write `team/team_manifest.json` and record `agents`, `team_tasks`, `protocol`
   on every campaign round;
 - run `python -m factor_lab alpha campaign-audit --campaign-id <id>`; a strict
-  audit must pass before calling the campaign protocol-compliant;
+  audit must pass before calling the campaign protocol-compliant; campaigns
+  created with `protocol_version=alpha-campaign-v2` require completed
+  web-gateway and ml-planner roles in the manifest;
 - the Lead may run deterministic services only on teammate outputs; a Lead-only
   campaign is invalid. Mechanical re-runs must be labeled
   `protocol: deterministic-maintenance` and must not generate new candidates.

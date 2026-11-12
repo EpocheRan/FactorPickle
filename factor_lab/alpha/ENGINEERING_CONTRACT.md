@@ -104,11 +104,14 @@ The portable protocol is `campaign_protocol` in `roles.json` and is emitted by
 Every new campaign or research round MUST delegate model-facing work to the
 five DSH teammates:
 
-- **Required per campaign**: a PathFinder research question and a FactorBuilder
-  artifact (or an explicit, recorded reason in the round file when a role is
-  genuinely not applicable).
-- **Recommended per campaign**: Web Gateway (cited discovery), ML Planner
-  (pre-registered experiment), Reader (structured evidence), as the round needs.
+- **Required per campaign**: a PathFinder research question, a FactorBuilder
+  artifact, a Web Gateway cited discovery map, and an ML Planner decision
+  (pre-registered plan or explicit falsifiable skip reason).
+- **Use when needed**: Reader (structured evidence extraction from cited
+  sources). The Gateway step must record "no new external evidence" rather than
+  silently skip.
+- **Enforcement**: new `alpha-campaign-v2` campaigns fail the strict campaign
+  audit if the team manifest lacks completed web-gateway or ml-planner evidence.
 - **Delegation mechanics**: one shared task per delegated role on the task
   board, claimed and completed; `send_message` with a self-contained task
   (role boundaries, inputs, output contract); wait for outputs.

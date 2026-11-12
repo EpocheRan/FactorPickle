@@ -97,3 +97,25 @@ def test_alpha_cost_model_uses_actual_a_share_fees() -> None:
     assert spec.cost.buy_fee_bps == pytest.approx(2.44)
     assert spec.cost.sell_fee_bps == pytest.approx(7.44)
     assert spec.cost.borrow_bps_per_year == pytest.approx(800.0)
+
+
+def test_new_campaigns_are_alpha_campaign_v2(tmp_path) -> None:
+    from factor_lab.alpha.campaign import CampaignController
+
+    controller = CampaignController(tmp_path / "campaigns")
+    record = controller.create("protocol v2 test", max_rounds=2)
+    assert record["protocol_version"] == "alpha-campaign-v2"
+    stored = controller.load(record["campaign_id"])
+    assert stored["protocol_version"] == "alpha-campaign-v2"
+
+
+def test_campaign_protocol_requires_gateway_and_ml_decision() -> None:
+    import json
+    from pathlib import Path
+
+    roles = json.loads(Path("factor_lab/alpha/team/roles.json").read_text(encoding="utf-8"))
+    protocol = roles["campaign_protocol"]
+    assert "web-gateway" in protocol["required_external_per_campaign"]
+    assert "ml-planner" in protocol["required_ml_decision_per_campaign"]
+    assert "every new alpha-campaign-v2 campaign" in protocol["external_evidence_policy"]["default"].lower()
+    assert "every new alpha-campaign-v2 campaign" in protocol["ml_planner_policy"]["default"].lower()

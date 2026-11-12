@@ -84,6 +84,31 @@ def audit_campaign(campaign_id: str, *, write: bool = False) -> dict[str, Any]:
             issues.append(f"{required} task has no task_id")
     evidence["roles"] = roles
 
+    protocol_version = str(campaign.get("protocol_version") or (team or {}).get("protocol_version") or "")
+    evidence["protocol_version"] = protocol_version or "legacy"
+    if protocol_version == "alpha-campaign-v2":
+        gateway_role = role_by_name.get("web-gateway") or {}
+        gateway_outputs = [Path(str(item)) for item in (gateway_role.get("outputs") or [])]
+        gateway_fallback = config.LAB_ROOT / "discovery" / f"discovery_map_{campaign_id}.json"
+        gateway_ok = any(path.exists() for path in gateway_outputs) or gateway_fallback.exists()
+        if str(gateway_role.get("status") or "") != "completed":
+            issues.append("alpha-campaign-v2 requires a completed web-gateway discovery role")
+        elif not gateway_role.get("task_id"):
+            issues.append("web-gateway role has no task_id")
+        elif not gateway_ok:
+            issues.append("web-gateway role has no existing discovery map output")
+        ml_role = role_by_name.get("ml-planner") or {}
+        ml_plan_exists = any(Path(str(item)).exists() for item in (ml_role.get("outputs") or []))
+        ml_skip = str(ml_role.get("ml_skip_reason") or (team or {}).get("ml_skip_reason") or "").strip()
+        if str(ml_role.get("status") or "") != "completed":
+            issues.append("alpha-campaign-v2 requires a completed ml-planner decision role")
+        elif not ml_role.get("task_id"):
+            issues.append("ml-planner role has no task_id")
+        elif not ml_plan_exists and not ml_skip:
+            issues.append("ml-planner role has neither a plan output nor an explicit ml_skip_reason")
+        evidence["external_evidence"] = {"gateway_outputs": [str(path) for path in gateway_outputs], "gateway_ok": gateway_ok}
+        evidence["ml_decision"] = {"plan_exists": ml_plan_exists, "skip_reason": ml_skip or None}
+
     artifact_rows = _factor_manifests(campaign_id)
     evidence["artifacts"] = [{"factor_id": row["factor_id"], "family": row["family"], "version": row["version"], "manifest_path": row["manifest_path"]} for row in artifact_rows]
     ml_artifact_ids = {str(item.get("factor_id")) for item in ((team or {}).get("ml_artifacts") or []) if isinstance(item, dict)}

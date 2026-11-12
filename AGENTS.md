@@ -21,11 +21,12 @@ factors or run an Alpha campaign:
    `list_agents` and spawn every missing member with `spawn_teammate` and the
    plan prompts; then `list_agents`, `python -m factor_lab alpha team verify`,
    and `python -m factor_lab alpha behavior --behavior-action verify`.
-5. **Campaign protocol (mandatory):** every new campaign or research round must
-   delegate model-facing work to the five DSH teammates via shared tasks and
-   `send_message`. Minimum per campaign: a PathFinder research question and a
-   FactorBuilder artifact; use Web Gateway / ML Planner / Reader as the round
-   needs. Record task ids and teammate outputs under
+5. **Campaign protocol (mandatory, alpha-campaign-v2):** every new campaign
+   must delegate model-facing work via shared tasks and `send_message`:
+   a PathFinder research question, a FactorBuilder artifact, a Web Gateway
+   cited discovery step, and an ML Planner decision (plan or explicit
+   falsifiable skip reason). Reader is used when external sources need
+   structured extraction. Record task ids and teammate outputs under
    `output/factor_lab/alpha/campaigns/<campaign_id>/team/`. A Lead-only research
    campaign is a protocol violation; the Lead may run deterministic services
    only on teammate outputs (or for a mechanical re-run explicitly labeled
@@ -36,9 +37,11 @@ factors or run an Alpha campaign:
    `python -m factor_lab alpha campaign-preflight --campaign-id <id>`; a strict
    audit failure is a protocol failure even when the factor evidence is
    reproducible. Do not retro-edit historical rounds.
-   ML routing: PathFinder must return `ml_branch`; request ML Planner when no
-   ML experiment appeared in the last two campaigns or new P0/P1 axes were
-   added since the last ML run. See `campaign_protocol.ml_planner_policy`.
+   ML routing: every new campaign has an explicit ML Planner decision; PathFinder
+   must return `ml_branch`, and a false branch needs a concrete falsifiable
+   reason. Web Gateway must produce a cited discovery map even when the answer
+   is "no new external evidence" (record reuse/gaps). See
+   `campaign_protocol.external_evidence_policy` and `ml_planner_policy`.
 6. Keep research state under `output/factor_lab`.
 
 The five model-facing roles are `PathFinder`, `Web Gateway`, `ML Planner`,

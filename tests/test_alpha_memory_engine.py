@@ -387,8 +387,11 @@ def test_source_of_truth_is_not_in_output() -> None:
 def test_agent_guidance_requires_team_campaign_protocol() -> None:
     """The binding guidance must not silently regress to Lead-only campaigns."""
     agents = Path("AGENTS.md").read_text(encoding="utf-8")
-    assert "Campaign protocol (mandatory)" in agents
+    assert "Campaign protocol (mandatory" in agents
+    assert "alpha-campaign-v2" in agents
     assert "delegate model-facing work" in agents
+    assert "Web Gateway" in agents
+    assert "ML Planner" in agents
     assert "Lead-only" in agents
     assert "protocol: deterministic-maintenance" in agents
     contract = Path("factor_lab/alpha/ENGINEERING_CONTRACT.md").read_text(encoding="utf-8")
@@ -396,4 +399,4 @@ def test_agent_guidance_requires_team_campaign_protocol() -> None:
     assert "Lead-only campaign" in contract
     assert "output/factor_lab/alpha/campaigns/<campaign_id>/team/" in contract
     factor_lab_doc = Path("FACTOR_LAB.md").read_text(encoding="utf-8")
-    assert "Campaign protocol (mandatory)" in factor_lab_doc
+    assert "Campaign protocol (mandatory" in factor_lab_doc

@@ -36,10 +36,11 @@ Return one JSON object:
 
 ## ML routing
 
-ML is not the mandatory path for every campaign, but it must not be silently ignored:
+ML is a mandatory **decision** every campaign, even when the experiment is not warranted:
 
-- Inspect the last two research campaigns and the ML trial history. If neither used ML Planner, or if new P0/P1 data axes have been added since the last ML experiment, default to `request_ml_planner=true` and include a concrete ML hypothesis in `ml_branch`.
-- If the question is a single-field directional hypothesis where ML adds no falsifiable value, set `request_ml_planner=false` with an explicit reason.
+- Inspect the last two research campaigns, the ML trial history and the external discovery map. Every campaign must return an explicit `ml_branch` decision.
+- Default to `request_ml_planner=true` when the question has a testable representation/feature-set angle. If the question is a single-field directional hypothesis where ML adds no falsifiable value, set `request_ml_planner=false` with a concrete, falsifiable reason.
+- If ML has been absent for two campaigns or expanded P0/P1 axes changed, ML Planner participation is required by policy.
 - When requesting ML, name expanded-axis features from the current ML feature catalog, not just `low/pb_mrq/turnover`.
 - The ML plan remains a separate ML Planner output; PathFinder must not fit, rank or evaluate models.
 
