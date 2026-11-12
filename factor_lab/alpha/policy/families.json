@@ -268,6 +268,22 @@
         "turnover",
         "pb_mrq"
       ]
+    },
+    {
+      "family_id": "fam-rank-native-10y",
+      "research_question": "Can a rank-native ridge pass admission and distill faithfully on 10y PIT top-800?",
+      "mechanism": "rank-native linear composite/distillation",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-362d30cbb5"
+      ],
+      "fields": [
+        "returns",
+        "turnover",
+        "mf_net_amount",
+        "holder_chg",
+        "fin_basic_eps"
+      ]
     }
   ],
   "legacy_family_id": "legacy-unassigned",

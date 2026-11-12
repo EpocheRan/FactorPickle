@@ -100,7 +100,10 @@ def audit_campaign(campaign_id: str, *, write: bool = False) -> dict[str, Any]:
             expressed = set()
     if expressed:
         from factor_lab.alpha.memory import canonical_expression
+        diagnostic_ids = {str(item) for item in ((team or {}).get("diagnostic_artifacts") or [])}
         for row in artifact_rows:
+            if str(row.get("factor_id")) in diagnostic_ids:
+                continue
             dsl_path = Path(row["manifest_path"]).parent / "factor.dsl"
             if dsl_path.exists():
                 expression = canonical_expression(dsl_path.read_text(encoding="utf-8").strip())

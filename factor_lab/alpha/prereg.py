@@ -22,7 +22,7 @@ from factor_lab.core.store import sha256_json, write_json_atomic
 
 PRE_REG_SCHEMA = "factor_lab.alpha.pre_registration.v1"
 FROZEN_SCHEMA = "factor_lab.alpha.pre_registration_frozen.v1"
-BASE_FIELDS = {"open", "high", "low", "close", "close_raw", "open_raw", "high_raw", "low_raw", "volume", "amount", "turnover", "float_mv", "total_mv"}
+BASE_FIELDS = {"open", "high", "low", "close", "close_raw", "open_raw", "high_raw", "low_raw", "volume", "amount", "turnover", "returns", "ret_1d", "log_close", "float_mv", "total_mv"}
 FORBIDDEN_TOKENS = {"forward", "future", "label", "target", "ret_fwd"}
 
 

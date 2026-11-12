@@ -71,3 +71,17 @@ def test_power_exposes_rank1_threshold() -> None:
     assert result["rank1_p"] == pytest.approx(0.10 / 145)
     assert result["rank1_z"] > 3.0
     assert 0.0 < result["pass_probability_under_observed_effect"] < 1.0
+
+
+def test_rank_native_ml_transforms_roundtrip() -> None:
+    from factor_lab.alpha.ml_branch import make_ml_plan, plan_from_dict
+
+    plan = make_ml_plan(
+        "rank-native test",
+        ["returns", "turnover"],
+        feature_transform="cs_rank",
+        target_transform="cs_rank",
+    )
+    loaded = plan_from_dict(plan.to_dict())
+    assert loaded.feature_transform == "cs_rank"
+    assert loaded.target_transform == "cs_rank"

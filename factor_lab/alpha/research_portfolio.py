@@ -166,12 +166,14 @@ def _rel_link(path: Path | str | None, base_dir: Path) -> str:
 
 
 def _kind_for(campaign_id: str, objective: str) -> str:
+    import re
+
     text = objective.lower()
     if campaign_id in {"CAMP-6efd50f0a4", "CAMP-76e3088958", "CAMP-a98589944b", "CAMP-f13fb8b93a"}:
         return "calibration"
     if "l0" in text or "smoke" in text:
         return "calibration"
-    if campaign_id == "CAMP-2b995bc651" or "p2" in text or "ml execution" in text or text.startswith("ml ") or "machine learning" in text or "ml expanded" in text or "ml branch" in text or "ml experiment" in text:
+    if campaign_id == "CAMP-2b995bc651" or "p2" in text or "ml execution" in text or text.startswith("ml ") or "machine learning" in text or "ml expanded" in text or "ml branch" in text or "ml experiment" in text or re.search(r"\bml\b", text):
         return "ml"
     if campaign_id == "CAMP-4319413b27" or "p3" in text or "discovery" in text:
         return "discovery"
@@ -534,7 +536,7 @@ def _campaign_record(
             evidence["ml-planner"]["files"].append(str(team_dir / "p2_run.json"))
             conclusion = str(p2_payload.get("conclusion") or conclusion)
     if ml_summary is None:
-        for name in ("ml_10y_summary.json", "ml_10y_run_v3.json", "ml_10y_run.json", "ml_expanded_run_v2.json", "ml_expanded_run.json", "p2_run.json"):
+        for name in ("rank_native_run.json", "ml_10y_summary.json", "ml_10y_run_v3.json", "ml_10y_run.json", "ml_expanded_run_v2.json", "ml_expanded_run.json", "p2_run.json"):
             path = team_dir / name
             if not path.exists():
                 continue
@@ -542,12 +544,17 @@ def _campaign_record(
             if not isinstance(payload, dict):
                 continue
             plan = payload.get("plan") or {}
-            admission = payload.get("admission") or {}
+            admission = payload.get("admission") or payload.get("ml_admission") or {}
+            metrics = payload.get("metrics") or payload.get("ml_metrics") or {}
+            conclusion = payload.get("conclusion")
+            if not conclusion and payload.get("ml_fidelity"):
+                conclusion = f"ML admission passed={admission.get('passed')}; distill fidelity={((payload.get('ml_fidelity') or {}).get('mean_rank_corr'))}; export={(payload.get('ml_export') or {}).get('error') or 'none'}"
             ml_summary = {
-                "metrics": payload.get("metrics") or {},
+                "metrics": metrics,
                 "admission": admission,
-                "conclusion": payload.get("conclusion") or f"ML admission passed={admission.get('passed')}; cycle={((payload.get('cycle') or {}).get('metrics') or {})}",
+                "conclusion": conclusion or f"ML admission passed={admission.get('passed')}; cycle={((payload.get('cycle') or {}).get('metrics') or {})}",
                 "plan_source": payload.get("plan_source"),
+                "fidelity": payload.get("ml_fidelity"),
                 "weights": ((payload.get("export") or {}).get("weights")) if isinstance(payload.get("export"), dict) else None,
         "standardized_weights": ((payload.get("export") or {}).get("standardized_weights")) if isinstance(payload.get("export"), dict) else None,
                 "standardized_weights": ((payload.get("export") or {}).get("standardized_weights")) if isinstance(payload.get("export"), dict) else None,

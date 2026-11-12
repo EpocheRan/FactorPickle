@@ -48,6 +48,8 @@ class MLPlan:
     n_splits: int = 4
     ridge_alpha: float = 1.0
     baseline: str = "zero"
+    feature_transform: str = "raw"
+    target_transform: str = "raw"
     created_at: str = field(default_factory=config.now_iso)
 
     def to_dict(self) -> dict[str, Any]:
@@ -63,6 +65,8 @@ class MLPlan:
             "n_splits": self.n_splits,
             "ridge_alpha": self.ridge_alpha,
             "baseline": self.baseline,
+            "feature_transform": self.feature_transform,
+            "target_transform": self.target_transform,
             "created_at": self.created_at,
         }
 
@@ -76,12 +80,18 @@ def make_ml_plan(
     embargo_days: int = 5,
     n_splits: int = 4,
     ridge_alpha: float = 1.0,
+    feature_transform: str = "raw",
+    target_transform: str = "raw",
 ) -> MLPlan:
     fields = [str(item) for item in features if str(item).strip()]
     if not fields:
         raise ValueError("ML plan requires at least one feature")
     if model_family not in {"ridge", "zero"}:
         raise ValueError("only non-DL baselines are implemented: ridge, zero")
+    if feature_transform not in {"raw", "cs_rank"}:
+        raise ValueError("feature_transform must be raw or cs_rank")
+    if target_transform not in {"raw", "cs_rank"}:
+        raise ValueError("target_transform must be raw or cs_rank")
     if target_horizon < 1:
         raise ValueError("target_horizon must be positive")
     return MLPlan(
@@ -93,6 +103,8 @@ def make_ml_plan(
         embargo_days=max(0, int(embargo_days)),
         n_splits=max(1, int(n_splits)),
         ridge_alpha=float(ridge_alpha),
+        feature_transform=feature_transform,
+        target_transform=target_transform,
     )
 
 
@@ -139,6 +151,8 @@ def plan_from_dict(payload: dict[str, Any]) -> MLPlan:
         n_splits=int(payload.get("n_splits") or 3),
         ridge_alpha=float(payload.get("ridge_alpha") or 1.0),
         baseline=str(payload.get("baseline") or "zero"),
+        feature_transform=str(payload.get("feature_transform") or "raw"),
+        target_transform=str(payload.get("target_transform") or "raw"),
         created_at=str(payload.get("created_at") or config.now_iso()),
     )
 
@@ -163,6 +177,15 @@ def build_ml_bundle(dataset: AlphaDataset, plan: MLPlan, *, max_rows: int | None
     else:
         target = close.shift(-int(plan.target_horizon)) / close - 1.0
     target_values = target.to_numpy(dtype=float)
+    if plan.feature_transform == "cs_rank":
+        ranked = np.full_like(feature_tensor, np.nan, dtype=float)
+        for feature_index in range(feature_tensor.shape[2]):
+            frame = pd.DataFrame(feature_tensor[:, :, feature_index], index=context.close.index, columns=context.close.columns)
+            ranked[:, :, feature_index] = frame.rank(axis=1, pct=True).to_numpy(dtype=float)
+        feature_tensor = ranked
+    if plan.target_transform == "cs_rank":
+        target_frame = pd.DataFrame(target_values, index=context.close.index, columns=context.close.columns)
+        target_values = target_frame.rank(axis=1, pct=True).to_numpy(dtype=float)
     n_dates, n_symbols, n_features = feature_tensor.shape
     if max_rows is not None:
         n_dates = min(n_dates, int(max_rows))
