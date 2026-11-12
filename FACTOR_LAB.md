@@ -30,6 +30,16 @@ Family FDR / freeze: `alpha family bootstrap --recost` builds the family ledger 
 
 The binding coding contract is `factor_lab/alpha/ENGINEERING_CONTRACT.md`.
 
+## Transaction costs
+
+Alpha research and deployment use the actual China A-share fee schedule rather than a blanket 20bps per side:
+
+- Buy: commission 1.8bps + handling 0.34bps + regulatory 0.20bps + transfer 0.10bps = **2.44bps**.
+- Sell: the same components + stamp duty 5.0bps = **7.44bps**.
+- Effective round-trip fee per one-way turnover: **9.88bps** (representative screenshot trade: 2.41bps buy / 7.45bps sell / 9.82bps round trip).
+- Short borrow: **800bps/year**; the 5-day hold cost is about 1.59bps per rebalance.
+- `factor_metrics` keeps the generic 20bps `CostModel` for calibrated research/parity; `alpha_gate_spec()` is the Alpha cost profile and uses the buy/sell fee schedule plus borrow.
+
 ## DSH team
 
 The agent runtime is DeepSeek Harness; the repository only carries the portable

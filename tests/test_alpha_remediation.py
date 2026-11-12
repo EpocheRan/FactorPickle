@@ -85,3 +85,15 @@ def test_rank_native_ml_transforms_roundtrip() -> None:
     loaded = plan_from_dict(plan.to_dict())
     assert loaded.feature_transform == "cs_rank"
     assert loaded.target_transform == "cs_rank"
+
+
+def test_alpha_cost_model_uses_actual_a_share_fees() -> None:
+    from factor_lab.alpha.gates import alpha_gate_spec, load_gate_policy
+
+    policy = load_gate_policy()
+    spec = alpha_gate_spec()
+    assert policy.commission_bps == 1.8
+    assert policy.stamp_duty_bps == 5.0
+    assert spec.cost.buy_fee_bps == pytest.approx(2.44)
+    assert spec.cost.sell_fee_bps == pytest.approx(7.44)
+    assert spec.cost.borrow_bps_per_year == pytest.approx(800.0)

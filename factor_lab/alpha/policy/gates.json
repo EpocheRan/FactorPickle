@@ -4,5 +4,10 @@
   "min_dates_warning": 60,
   "min_coverage": 0.9,
   "min_net_t": 2.0,
-  "borrow_bps_per_year": 800.0
+  "borrow_bps_per_year": 800.0,
+  "commission_bps": 1.8,
+  "handling_bps": 0.34,
+  "regulatory_bps": 0.2,
+  "transfer_bps": 0.1,
+  "stamp_duty_bps": 5.0
 }

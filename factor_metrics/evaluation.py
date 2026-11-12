@@ -94,6 +94,9 @@ def _effective_spec(
             bps=float(cost_bps),
             convention=base.cost.convention,
             bps_meaning=base.cost.bps_meaning,
+            buy_fee_bps=float(base.cost.buy_fee_bps),
+            sell_fee_bps=float(base.cost.sell_fee_bps),
+            borrow_bps_per_year=float(base.cost.borrow_bps_per_year),
         ),
     }
     if min_ic_names is not None:
@@ -134,7 +137,10 @@ def _spread_series(
         turnover_df.get(q_hi, pd.Series(dtype="float64")).reindex(gross.index).fillna(0.0)
         + turnover_df.get(q_lo, pd.Series(dtype="float64")).reindex(gross.index).fillna(0.0)
     )
-    cost = legs * float(cost_model.bps) * cost_model.one_way_cost_multiplier() / 10000.0
+    if float(cost_model.buy_fee_bps) or float(cost_model.sell_fee_bps):
+        cost = legs * (float(cost_model.buy_fee_bps) + float(cost_model.sell_fee_bps)) / 10000.0
+    else:
+        cost = legs * float(cost_model.bps) * cost_model.one_way_cost_multiplier() / 10000.0
     borrow = pd.Series(
         float(cost_model.borrow_bps_per_year) / 10000.0 * float(horizon) / 252.0,
         index=gross.index,
@@ -388,6 +394,8 @@ def evaluate_long_only(
     min_names: int = 10,
     universe: pd.DataFrame | None = None,
     spec: MetricsSpec | None = None,
+    buy_fee_bps: float = 0.0,
+    sell_fee_bps: float = 0.0,
 ) -> dict:
     """Long-only lens; statistics follow the calibrated ``_ls_stats`` formulas."""
     spec = (spec or ALPHA_GATE_SPEC).replace(
@@ -430,9 +438,12 @@ def evaluate_long_only(
         current = set(str(item) for item in top)
         turnover = float(len(current - previous) / max(1, len(current)))
         previous = current
-        # Long-only trades both sides of the turnover: per-side 20bps means
-        # 2 * turnover * bps, matching the LS leg convention.
-        cost = turnover * float(cost_bps) * 2.0 / 10000.0
+        # Long-only trades both sides of the turnover. Prefer the explicit
+        # buy/sell fee schedule; otherwise use the per-side bps convention.
+        if float(buy_fee_bps) or float(sell_fee_bps):
+            cost = turnover * (float(buy_fee_bps) + float(sell_fee_bps)) / 10000.0
+        else:
+            cost = turnover * float(cost_bps) * 2.0 / 10000.0
         net = gross - cost
         top_returns.append(float(valid.loc[top, "r"].mean()) - cost)
         benchmark_returns.append(float(valid["r"].mean()))

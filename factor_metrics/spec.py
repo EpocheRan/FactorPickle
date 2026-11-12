@@ -43,6 +43,12 @@ class CostModel:
     #: Annual short-borrow cost charged on the short leg. 0 keeps historical
     #: research metrics comparable; production/Alpha campaigns may set e.g. 800.
     borrow_bps_per_year: float = 0.0
+    #: Explicit China A-share one-way fee schedule. When either is non-zero,
+    #: ``_spread_series`` charges (buy_fee_bps + sell_fee_bps) per one-way
+    #: turnover instead of the generic ``bps`` convention. Stamp duty belongs
+    #: only to the sell side; commission/handling/regulatory/transfer are both.
+    buy_fee_bps: float = 0.0
+    sell_fee_bps: float = 0.0
 
     def one_way_cost_multiplier(self) -> float:
         return 1.0 if self.bps_meaning == "round_trip" else 2.0
@@ -53,6 +59,7 @@ class CostModel:
             "convention": self.convention,
             "bps_meaning": self.bps_meaning,
             **({"borrow_bps_per_year": float(self.borrow_bps_per_year)} if float(self.borrow_bps_per_year) != 0.0 else {}),
+            **({"buy_fee_bps": float(self.buy_fee_bps), "sell_fee_bps": float(self.sell_fee_bps)} if (float(self.buy_fee_bps) or float(self.sell_fee_bps)) else {}),
         }
 
 

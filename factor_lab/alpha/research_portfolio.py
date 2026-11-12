@@ -780,6 +780,12 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
             dataset["window_type"] = "dev"
     historical_holdout = sum(1 for dataset in dataset_rows if dataset.get("window_type") != "dev")
     policy = policy_snapshot()
+    try:
+        from factor_lab.alpha.gates import alpha_gate_spec, load_gate_policy
+        _gate = load_gate_policy()
+        cost_policy = {"gate": _gate.to_dict(), "cost": alpha_gate_spec().cost.to_dict()}
+    except Exception:  # noqa: BLE001
+        cost_policy = {}
     huses = holdout_uses()
     # Program-level population (not the raw ledger count).
     from factor_lab.alpha.fdr import program_fdr as _program_fdr, load_ledger as _load_ledger
@@ -876,6 +882,7 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
         "holdout": holdout,
         "holdout_uses": huses,
         "policy": policy,
+        "cost_policy": cost_policy,
         "git_commit": git_commit(),
         "ledger_hash": ledger_meta.get("ledger_hash"),
         "fdr_population": fdr_population,

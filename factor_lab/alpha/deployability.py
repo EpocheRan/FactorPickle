@@ -15,6 +15,7 @@ import pandas as pd
 
 from factor_metrics import ALPHA_GATE_SPEC, MetricsSpec, evaluate_long_only as _core_long_only
 from factor_lab.alpha.compiler import AlphaContext, compile_expression
+from factor_lab.alpha.gates import alpha_gate_spec
 
 
 def evaluate_long_only(
@@ -29,6 +30,7 @@ def evaluate_long_only(
     universe: pd.DataFrame | None = None,
     spec: MetricsSpec | None = None,
 ) -> dict[str, Any]:
+    cost_spec = spec or alpha_gate_spec()
     payload = _core_long_only(
         factor,
         close,
@@ -38,7 +40,9 @@ def evaluate_long_only(
         top_fraction=top_fraction,
         min_names=min_names,
         universe=universe,
-        spec=spec or ALPHA_GATE_SPEC,
+        spec=cost_spec,
+        buy_fee_bps=float(cost_spec.cost.buy_fee_bps),
+        sell_fee_bps=float(cost_spec.cost.sell_fee_bps),
     )
     return {"schema": "factor_lab.alpha.deployability.v1", **payload}
 
