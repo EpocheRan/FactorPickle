@@ -1,0 +1,8 @@
+{
+  "schema": "factor_lab.alpha.universe_policy.v1",
+  "name": "pit_v1",
+  "enabled": true,
+  "min_history_days": 60,
+  "min_close": 0.0,
+  "require_positive_volume": true
+}

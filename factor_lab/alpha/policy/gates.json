@@ -1,0 +1,6 @@
+{
+  "schema": "factor_lab.alpha.gates.v2",
+  "min_dates_insufficient": 30,
+  "min_dates_warning": 60,
+  "min_coverage": 0.5
+}

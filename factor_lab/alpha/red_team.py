@@ -7,20 +7,20 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from factor_lab.alpha.evaluation import _rank_corr, evaluate_factor
+from factor_metrics import rank_ic_frame
+from factor_lab.alpha.evaluation import evaluate_factor
+
+#: Red Team uses a looser cross-section threshold than the report gate; the
+#: rank-IC *formula* itself is the calibrated research one.
+_RED_TEAM_MIN_NAMES = 10
 
 
 def _ic_values(factor: pd.DataFrame, forward: pd.DataFrame, step: int = 1) -> list[float]:
-    values: list[float] = []
-    for date in factor.index[::max(1, int(step))]:
-        if date not in forward.index:
-            continue
-        pair = pd.concat([factor.loc[date].rename("f"), forward.loc[date].rename("r")], axis=1).dropna()
-        if len(pair) >= 10:
-            ic = _rank_corr(pair["f"], pair["r"])
-            if np.isfinite(ic):
-                values.append(float(ic))
-    return values
+    step = max(1, int(step))
+    sampled_factor = factor.iloc[::step]
+    sampled_forward = forward.iloc[::step]
+    series = rank_ic_frame(sampled_factor, sampled_forward, min_names=_RED_TEAM_MIN_NAMES)
+    return [float(value) for value in series.replace([np.inf, -np.inf], np.nan).dropna().tolist()]
 
 
 def red_team_review(
@@ -33,9 +33,9 @@ def red_team_review(
     min_ic: float = 0.015,
     min_coverage: float = 0.6,
     max_turnover: float = 1.5,
-    min_capacity: float = 3.0,
     permutations: int = 80,
     cost_bps: float = 20.0,
+    universe: pd.DataFrame | None = None,
     seed: int = 7,
 ) -> dict[str, Any]:
     """Try to falsify a candidate before it can become a candidate."""
@@ -56,12 +56,12 @@ def red_team_review(
     add("coverage", float(metrics.get("coverage", 0.0)) >= min_coverage, metrics.get("coverage"))
     add("net_spread_positive", float(metrics.get("net_spread", -1.0)) > 0.0, metrics.get("net_spread"))
     add("turnover", float(metrics.get("turnover", 999.0)) <= max_turnover, metrics.get("turnover"))
+    # Capacity is informational only (A_FULL adjudication #4): record it, never veto.
     capacity = metrics.get("capacity_multiple")
-    add("capacity", capacity is not None and float(capacity) >= min_capacity, capacity)
+    checks.append({"check": "capacity_informational", "passed": True, "detail": capacity})
     add("ic_magnitude", np.isfinite(actual_ic) and abs(actual_ic) >= min_ic, actual_ic)
-    w_net = float(metrics.get("winsorized_net_spread", float("nan")))
-    t_net = float(metrics.get("trimmed_net_spread", float("nan")))
-    add("tail_robustness", np.isfinite(w_net) and np.isfinite(t_net) and w_net > 0.0 and t_net > 0.0, {"winsorized": w_net, "trimmed": t_net})
+    w_net = float(metrics.get("winsorized_factor_net_spread", float("nan")))
+    add("tail_robustness", np.isfinite(w_net) and w_net > 0.0, {"winsorized_factor": w_net})
 
     # Split-half sign consistency, evaluated independently.
     mid = len(factor.index) // 2
@@ -78,6 +78,7 @@ def red_team_review(
                 cost_bps=cost_bps,
                 amount=None,
                 open_=open_,
+                universe=universe.loc[part.index] if universe is not None else None,
             )
             halves.append(float(result.get("ic_mean", float("nan"))))
         except Exception:  # noqa: BLE001

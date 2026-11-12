@@ -431,6 +431,30 @@ class DataInterfaceGateway:
             end=end,
         )
 
+    def event_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
+        """P1 event-axis features through data_interface.p1_events.
+
+        The raw tables are sparse; data_interface returns daily, zero-filled,
+        PIT-lagged date x code matrices.  This keeps Alpha free of SQL and of
+        event-specific aggregation logic.
+        """
+        try:
+            from data_interface.p1_events import load_p1_events
+        except Exception as exc:  # noqa: BLE001
+            raise DataGap(f"data_interface.p1_events unavailable: {type(exc).__name__}: {exc}") from exc
+        result = load_p1_events(codes, start, end, db=self._get_client())
+        frames = result.frames
+        manifest = DataManifest(
+            services=["p1_events"],
+            fields=sorted(frames),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=int(sum(result.raw_rows.values())),
+            data_hash=_frame_hash(frames),
+        )
+        return DataBundle(kind="p1_events", frames=frames, fields=sorted(frames), manifest=manifest)
+
     def valuation_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
         # Load every canonical valuation field the table exposes.  The bundle
         # is a date x code matrix; its columns are factor inputs, not a fixed

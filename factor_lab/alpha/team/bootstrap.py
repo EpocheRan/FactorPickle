@@ -20,6 +20,7 @@ from factor_lab.core.store import read_json
 
 
 TEAM_SCHEMA = "factor_lab.alpha.team.v1"
+CAMPAIGN_PROTOCOL_SCHEMA = "factor_lab.alpha.campaign_protocol.v1"
 
 
 def roles_path() -> Path:
@@ -73,6 +74,20 @@ def validate_roster(path: str | Path | None = None) -> dict[str, Any]:
         issues.append(f"required_team_size {expected} != roster size {len(roles)}")
     behavior_check = verify_behaviors(sorted(names))
     issues.extend(behavior_check["issues"])
+    protocol = roster.get("campaign_protocol")
+    if not isinstance(protocol, dict):
+        issues.append("team roster requires campaign_protocol")
+        protocol = {}
+    else:
+        if protocol.get("schema") != CAMPAIGN_PROTOCOL_SCHEMA:
+            issues.append(f"campaign_protocol schema must be {CAMPAIGN_PROTOCOL_SCHEMA}")
+        minimum = protocol.get("minimum_per_campaign") or []
+        if not isinstance(minimum, list) or not minimum:
+            issues.append("campaign_protocol requires minimum_per_campaign")
+        else:
+            unknown = [name for name in minimum if name not in names]
+            if unknown:
+                issues.append(f"campaign_protocol minimum roles not in roster: {unknown}")
     return {
         "ok": not issues,
         "issues": issues,
@@ -82,6 +97,7 @@ def validate_roster(path: str | Path | None = None) -> dict[str, Any]:
         "n_roles": len(names),
         "behaviors": behavior_check["behaviors"],
         "deterministic_services": roster.get("deterministic_services") or [],
+        "campaign_protocol": protocol,
     }
 
 
@@ -111,6 +127,7 @@ def bootstrap_plan(path: str | Path | None = None) -> dict[str, Any]:
         "lead": roster["lead"],
         "members": members,
         "verification": roster.get("verification") or {},
+        "campaign_protocol": roster.get("campaign_protocol") or {},
         "deterministic_services": roster.get("deterministic_services") or [],
         "steps": [
             "run `python -m factor_lab doctor`",
@@ -118,7 +135,9 @@ def bootstrap_plan(path: str | Path | None = None) -> dict[str, Any]:
             "spawn every missing member with `spawn_teammate` and the prompt below",
             "use `list_agents` again and verify all members are running or inactive",
             "run `python -m factor_lab alpha team verify` as the static roster check",
-            "start research with `python -m factor_lab alpha campaign ...` or an L0 cycle",
+            "before every campaign/round, delegate model-facing tasks to teammates via shared tasks and `send_message`",
+            "record task ids and teammate outputs under the campaign team directory; a Lead-only campaign is a protocol violation",
+            "start research with `python -m factor_lab alpha campaign ...` or an L0 cycle on teammate outputs",
         ],
         "portable": True,
         "source": str(roles_path()),
@@ -156,4 +175,5 @@ def session_brief() -> dict[str, Any]:
             "python -m factor_lab alpha library",
             "python -m factor_lab alpha roles",
         ],
+        "campaign_protocol": load_roster().get("campaign_protocol") or {},
     }

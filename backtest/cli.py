@@ -5,14 +5,11 @@ from __future__ import annotations
 import argparse
 import logging
 from dataclasses import replace
-from pathlib import Path
 from typing import Any
 
 from backtest.application.loader import list_strategies, load_strategy
-from backtest.application.registry import create_data_source
 from backtest.bootstrap import build_runner, load_settings
 from backtest.domain.errors import BacktestError
-from backtest.research import run_research
 
 
 def _parse_value(text: str) -> Any:
@@ -140,50 +137,6 @@ def _cmd_optimize(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_research(args: argparse.Namespace) -> int:
-    settings = load_settings()
-    if args.data:
-        settings = replace(settings, data=args.data)
-    codes = tuple(
-        part.strip() for part in str(args.codes).split(",") if part.strip()
-    )
-    if not codes:
-        raise SystemExit("--codes 不能为空")
-    horizons = tuple(
-        int(part.strip()) for part in str(args.horizons).split(",") if part.strip()
-    )
-    report = run_research(
-        data_source=create_data_source(settings.data),
-        codes=codes,
-        factor=args.factor,
-        start=args.start,
-        end=args.end,
-        freq=args.freq,
-        horizons=horizons,
-        q=args.q,
-        top_n=args.top_n,
-    )
-    print(f"factor: {report.factor}")
-    print("IC summary:")
-    print(report.summary.round(6).to_string())
-    print("turnover:")
-    if report.turnover.empty:
-        print("  (no observations)")
-    else:
-        print(
-            f"  mean={report.turnover.mean():.6f} last={report.turnover.iloc[-1]:.6f}"
-        )
-    outputs = {
-        part.strip() for part in str(args.out or "console").split(",") if part.strip()
-    }
-    if "csv" in outputs:
-        target = report.write_csv(
-            Path(settings.output_dir) / "research" / report.factor
-        )
-        print(f"research csv: {target}")
-    return 0
-
-
 def _cmd_validate(args: argparse.Namespace) -> int:
     loaded = load_strategy(args.strategy)
     strategy = loaded.strategy
@@ -239,19 +192,6 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--initial-cash", type=float, default=None)
     optimize.add_argument("--seed", type=int, default=None)
     optimize.set_defaults(func=_cmd_optimize)
-
-    research = sub.add_parser("research", help="因子研究（IC/分层/换手）")
-    research.add_argument("--factor", required=True, help="如 mom20 / atr14")
-    research.add_argument("--codes", required=True, help="逗号分隔的股票代码")
-    research.add_argument("--start", required=True)
-    research.add_argument("--end", required=True)
-    research.add_argument("--freq", default="d")
-    research.add_argument("--data", default=None, help="数据源: questdb")
-    research.add_argument("--out", default="console", help="输出: console,csv")
-    research.add_argument("--horizons", default="1,5,20")
-    research.add_argument("--q", type=int, default=5)
-    research.add_argument("--top-n", type=int, default=30)
-    research.set_defaults(func=_cmd_research)
 
     validate = sub.add_parser("validate", help="校验策略文件")
     validate.add_argument("strategy")

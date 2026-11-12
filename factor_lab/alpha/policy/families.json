@@ -1,0 +1,256 @@
+{
+  "schema": "factor_lab.alpha.families.v1",
+  "q": 0.1,
+  "n_eff": {
+    "method": "expression_jaccard",
+    "threshold": 0.7,
+    "sensitivity_thresholds": [
+      0.5,
+      0.7,
+      0.9
+    ]
+  },
+  "families": [
+    {
+      "family_id": "fam-max-lottery",
+      "research_question": "Does the MAX/lottery mechanism survive attribution, coverage and family-level multiple-testing in the A-share dev window?",
+      "mechanism_tags": [
+        "MAX_60",
+        "lottery-demand",
+        "MAX-conditioned"
+      ],
+      "campaign_ids": [
+        "CAMP-548013a26d",
+        "CAMP-9126b55d26",
+        "CAMP-e8d05b7311",
+        "CAMP-382cbc7893"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-low-price-value",
+      "research_question": "After MAX attribution was falsified, is the residual low-nominal-price + PB-value composite load-bearing and robust enough to freeze?",
+      "mechanism_tags": [
+        "low-nominal-price",
+        "pb-value"
+      ],
+      "campaign_ids": [
+        "CAMP-24d0c741d3",
+        "CAMP-4319413b27"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-p0-margin",
+      "research_question": "Does leverage crowding in margin financing predict negative 5-day long-short returns in the pool, so that a factor oriented high = low margin build / low margin balance relative to size earns a positive spread after costs?",
+      "mechanism": "Margin financing is exchange-disclosed after close (T+1 in expressions). Crowded leveraged longs and forced deleveraging should predict underperformance: recent margin-balance growth and margin balance relative to market cap are the crowding proxies. Both candidates are oriented high = low crowding => expected positive 5-day long-short spread.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "margin_rzye",
+        "margin_rqye",
+        "margin_rzmre",
+        "margin_rqyl",
+        "float_mv",
+        "total_mv"
+      ]
+    },
+    {
+      "family_id": "fam-p0-flow-structure",
+      "research_question": "Is 5-day order-size structure in moneyflow priced — large plus extra-large net buying positive and small-order net buying negative — in the cross-section of 5-day forward returns?",
+      "mechanism": "Order-size decomposition separates informed large-ticket flow from retail small-ticket flow; large-order net inflow should predict positive and retail small-order net inflow negative short-horizon returns. Flows are normalized by same-window amount to be cross-sectionally comparable; moneyflow is after-close and used with a T+1 lag.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "mf_buy_sm",
+        "mf_buy_lg",
+        "mf_buy_elg",
+        "mf_sell_sm",
+        "mf_sell_lg",
+        "mf_sell_elg",
+        "mf_net_amount",
+        "amount"
+      ]
+    },
+    {
+      "family_id": "fam-p0-quality",
+      "research_question": "Do accruals (earnings not backed by cash, negative) and gross profitability (positive) predict 5-day forward returns in the pool?",
+      "mechanism": "Quality/accrual anomaly: high accruals signal low earnings quality and subsequent underperformance, while high gross profit over total assets signals quality and outperformance. Financial statements are PIT-aligned to publish_date and carried forward by the panel; no label or future-return inputs.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "fin_net_income",
+        "fin_operating_cash_flow",
+        "fin_total_assets",
+        "fin_total_equity",
+        "fin_total_liabilities",
+        "fin_revenue",
+        "fin_gross_profit",
+        "fin_research_and_development_expense",
+        "fin_basic_eps"
+      ]
+    },
+    {
+      "family_id": "fam-p0-valuation",
+      "research_question": "Does a non-PB valuation multiple (low PS_TTM) add a positive 5-day value spread in the pool, distinct from the already-tested low-PB/low-price composite?",
+      "mechanism": "Sales-multiple value premium: low price-to-sales predicts higher subsequent returns; PS_TTM is selected over PB to keep novelty versus the existing low-price/low-PB composite. Valuation is daily PIT with coverage above 0.90; one candidate only to hold the family-level budget.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "pb_mrq",
+        "pe_ttm",
+        "ps_ttm",
+        "total_mv",
+        "float_mv"
+      ]
+    },
+    {
+      "family_id": "fam-p1-block-trade",
+      "research_question": "Does block-trade activity (amount share over 5 days, count intensity over 20 days) predict negative 5-day returns because block trades clear at discounts and signal large-holder supply?",
+      "mechanism": "Block trades are negotiated at discounts and mostly reflect large-holder distribution; the event table is announcement-dated and p1_events lags it one trading day, so the features are PIT-safe. High block-trade intensity should predict underperformance; candidates are oriented high = low block intensity. Event flow is zero-filled (true zero) upstream.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "block_amount",
+        "block_vol",
+        "block_vwap",
+        "block_count",
+        "amount",
+        "volume",
+        "close"
+      ]
+    },
+    {
+      "family_id": "fam-p1-top-list",
+      "research_question": "Does Dragon-Tiger-list buying pressure positively and raw listing intensity negatively predict 5-day returns in the pool?",
+      "mechanism": "Top-list large-seat net buying relative to amount carries positive short-horizon information, while raw listing intensity reflects attention-driven crowding and predicts reversal. The event table is after-close disclosed and p1_events lags it one trading day; non-stock rows are filtered upstream and event flow is zero-filled.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "top_amount",
+        "top_l_buy",
+        "top_l_sell",
+        "top_net_amount",
+        "top_count",
+        "amount"
+      ]
+    },
+    {
+      "family_id": "fam-p1-holder-number",
+      "research_question": "Does a declining shareholder count (chip concentration) predict positive 5-day returns in the pool?",
+      "mechanism": "Fewer holders per stock means concentrated chips and lower retail crowding; holder-number disclosures are announcement-dated, p1_events lags them one trading day, and the state is forward-filled. Candidates use the disclosed change (holder_chg) and its 60-day smoothed level, both oriented high = holder decline.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "holder_num",
+        "holder_chg",
+        "holder_days_since"
+      ]
+    },
+    {
+      "family_id": "fam-p1-repurchase",
+      "research_question": "Does actual repurchase execution (amount intensity relative to float cap over 20 days, execution-count persistence) predict positive 5-day returns as a management-confidence signal?",
+      "mechanism": "Executed buybacks are a costly signal of undervaluation and reduce float; repurchase announcements are announcement-dated and p1_events lags them one trading day, with execution fields zero-filled when there is no repurchase. Amount intensity is normalized by float market cap to avoid a pure size bet; the second candidate measures execution persistence via event count.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "rep_amount",
+        "rep_vol",
+        "rep_count",
+        "float_mv"
+      ]
+    },
+    {
+      "family_id": "fam-p1-holder-robust",
+      "research_question": "Does holder-number robustness survive orthogonalization and concentration variants?",
+      "mechanism": "Shareholder-count changes reflect ownership concentration/retail crowding; robustness vs turnover/size and level variants.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-35db6b3056"
+      ],
+      "fields": [
+        "holder_num",
+        "holder_chg",
+        "holder_days_since",
+        "turnover",
+        "float_mv",
+        "amount"
+      ]
+    },
+    {
+      "family_id": "fam-expanded-incremental",
+      "research_question": "Do P0/P1 expanded axes add incremental information in combinations?",
+      "mechanism": "Incremental combinations/residuals of margin, flow, block/top events, holder/repurchase against price/value/turnover controls.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-a54ad429f3"
+      ],
+      "fields": [
+        "margin_rzye",
+        "margin_rqye",
+        "margin_rzmre",
+        "margin_rqyl",
+        "mf_buy_lg",
+        "mf_buy_elg",
+        "mf_sell_lg",
+        "mf_sell_elg",
+        "block_amount",
+        "top_net_amount",
+        "rep_amount",
+        "holder_chg",
+        "turnover",
+        "float_mv",
+        "pb_mrq",
+        "amount"
+      ]
+    },
+    {
+      "family_id": "fam-ml-expanded-control",
+      "research_question": "Does a deterministic expanded-axis control provide a benchmark for the ML experiment?",
+      "mechanism": "Deterministic non-ML control: top-list net buying minus margin purchase intensity.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-d07a274118"
+      ],
+      "fields": [
+        "top_net_amount",
+        "margin_rzmre",
+        "amount"
+      ]
+    },
+    {
+      "family_id": "ml_signal",
+      "research_question": "Does a distilled ML model add falsifiable signal over deterministic controls?",
+      "mechanism": "Non-deep-learning ML distilled to DSL; admission-gated, program-FDR counted.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-d07a274118"
+      ],
+      "fields": [
+        "margin_rzmre",
+        "mf_net_amount",
+        "top_net_amount",
+        "holder_chg",
+        "pb_mrq",
+        "turnover"
+      ]
+    }
+  ],
+  "legacy_family_id": "legacy-unassigned"
+}

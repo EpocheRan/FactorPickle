@@ -6,6 +6,10 @@ This is a deliberately small, deterministic and auditable implementation:
 - validation uses purged walk-forward splits with embargo;
 - models are ridge / linear baselines, not deep learning;
 - signal evidence is long-short research evidence, not automatic capital.
+
+The daily rank-IC metric is imported from ``factor_metrics`` (one-way
+dependency on the calibrated core); CV scheme, embargo, model fitting and the
+ML monitor remain owned by this deterministic runtime.
 """
 
 from __future__ import annotations
@@ -19,7 +23,10 @@ from typing import Any, Iterable
 import numpy as np
 import pandas as pd
 
+from factor_metrics import rank_ic_frame
+
 from factor_lab.alpha.data import AlphaDataset
+from factor_lab.alpha.universe import UniversePolicy, universe_summary
 from factor_lab.core import config
 from factor_lab.core.store import write_json_atomic
 
@@ -96,7 +103,47 @@ def _stack_panel(frame: pd.DataFrame) -> tuple[np.ndarray, list[pd.Timestamp], l
     return values, dates, symbols
 
 
-def build_ml_bundle(dataset: AlphaDataset, plan: MLPlan, *, max_rows: int | None = None) -> dict[str, Any]:
+def validate_ml_features(features: list[str], available_fields: Iterable[str] | None = None) -> dict[str, Any]:
+    """Validate ML features against the panel and expose the expanded-axis catalog.
+
+    ML features remain explicit (no auto-injection), but this check makes a
+    missing expanded field fail with the catalog hint instead of an opaque
+    tensor-shape error.
+    """
+    from factor_lab.alpha.data_axes import ml_feature_catalog
+
+    catalog = ml_feature_catalog()
+    expanded = set(catalog.get("expanded_fields") or [])
+    names = [str(item) for item in features if str(item).strip()]
+    missing = sorted({name for name in names if available_fields is not None and name not in set(available_fields)})
+    if missing:
+        raise ValueError(f"unknown ML features: {missing}; expanded fields available: {sorted(expanded)}")
+    return {"features": names, "expanded_features": sorted(set(names) & expanded), "catalog": catalog}
+
+
+def plan_from_dict(payload: dict[str, Any]) -> MLPlan:
+    """Load a pre-registered ML plan from JSON (ML Planner output)."""
+    if not isinstance(payload, dict):
+        raise ValueError("ML plan must be a JSON object")
+    features = [str(item) for item in (payload.get("features") or []) if str(item).strip()]
+    if not features:
+        raise ValueError("ML plan requires features")
+    return MLPlan(
+        plan_id=str(payload.get("plan_id") or f"MLP-{uuid.uuid4().hex[:10]}"),
+        hypothesis=str(payload.get("hypothesis") or ""),
+        features=features,
+        target_horizon=int(payload.get("target_horizon") or payload.get("horizon") or 5),
+        model_family=str(payload.get("model_family") or "ridge"),
+        cv_scheme=str(payload.get("cv_scheme") or "purged_walk_forward"),
+        embargo_days=int(payload.get("embargo_days") or 5),
+        n_splits=int(payload.get("n_splits") or 3),
+        ridge_alpha=float(payload.get("ridge_alpha") or 1.0),
+        baseline=str(payload.get("baseline") or "zero"),
+        created_at=str(payload.get("created_at") or config.now_iso()),
+    )
+
+
+def build_ml_bundle(dataset: AlphaDataset, plan: MLPlan, *, max_rows: int | None = None, universe: pd.DataFrame | None = None) -> dict[str, Any]:
     """Build a date-aligned feature/label bundle with PIT masks."""
     context = dataset.context
     missing = [name for name in plan.features if name not in context.fields]
@@ -121,6 +168,17 @@ def build_ml_bundle(dataset: AlphaDataset, plan: MLPlan, *, max_rows: int | None
     date_index = np.repeat(np.arange(n_dates), n_symbols)
     symbol_index = np.tile(np.arange(n_symbols), n_dates)
     finite = np.isfinite(flat_x).all(axis=1) & np.isfinite(flat_y)
+    if universe is not None:
+        eligible = (
+            universe.reindex(index=context.close.index, columns=context.close.columns)
+            .fillna(False)
+            .to_numpy(dtype=bool)
+        )
+        eligible_flat = eligible[:n_dates].reshape(-1)
+    else:
+        eligible_flat = np.ones(n_dates * n_symbols, dtype=bool)
+    finite = finite & eligible_flat
+    n_eligible_rows = int(eligible_flat.sum())
     bundle = {
         "schema": "factor_lab.alpha.ml_data_bundle.v1",
         "plan_id": plan.plan_id,
@@ -133,6 +191,7 @@ def build_ml_bundle(dataset: AlphaDataset, plan: MLPlan, *, max_rows: int | None
         "n_symbols": int(n_symbols),
         "n_features": int(n_features),
         "n_finite_rows": int(finite.sum()),
+        "n_eligible_rows": n_eligible_rows,
         "masks": {
             "train": {"start": str(context.close.index[0].date()), "end": str(context.close.index[max(0, n_dates - 1)].date())},
             "embargo_days": int(plan.embargo_days),
@@ -191,18 +250,33 @@ def _fit_ridge(x: np.ndarray, y: np.ndarray, alpha: float) -> tuple[np.ndarray, 
     return coef / scale, y_mean - float((mean / scale) @ coef)
 
 
-def _rank_ic(predictions: np.ndarray, target: np.ndarray, groups: np.ndarray) -> list[float]:
-    values: list[float] = []
-    for group in np.unique(groups):
-        mask = groups == group
-        if mask.sum() < 5:
-            continue
-        pred = pd.Series(predictions[mask]).rank()
-        truth = pd.Series(target[mask]).rank()
-        if pred.std(ddof=0) == 0 or truth.std(ddof=0) == 0:
-            continue
-        values.append(float(pred.corr(truth)))
-    return values
+def _rank_ic(
+    predictions: np.ndarray,
+    target: np.ndarray,
+    groups: np.ndarray,
+    symbols: np.ndarray,
+    *,
+    min_names: int = 5,
+) -> list[float]:
+    """Daily cross-sectional rank IC using the calibrated core implementation.
+
+    The ML runtime keeps its own purged CV / embargo / model fitting, but the
+    rank-IC formula is the shared research-calibrated one (one-way dependency:
+    ``factor_lab -> factor_metrics``).
+    """
+    frame = pd.DataFrame(
+        {
+            "date": np.asarray(groups),
+            "symbol": np.asarray(symbols),
+            "pred": np.asarray(predictions, dtype="float64"),
+            "truth": np.asarray(target, dtype="float64"),
+        }
+    )
+    pred_wide = frame.pivot(index="date", columns="symbol", values="pred")
+    truth_wide = frame.pivot(index="date", columns="symbol", values="truth")
+    series = rank_ic_frame(pred_wide, truth_wide, min_names=int(min_names))
+    clean = series.replace([np.inf, -np.inf], np.nan).dropna()
+    return [float(value) for value in clean.tolist()]
 
 
 def run_ml_experiment(
@@ -210,15 +284,20 @@ def run_ml_experiment(
     plan: MLPlan,
     *,
     out_dir: str | Path | None = None,
+    universe: pd.DataFrame | None = None,
+    universe_policy: UniversePolicy | None = None,
 ) -> dict[str, Any]:
-    bundle = build_ml_bundle(dataset, plan)
+    validate_ml_features(plan.features, dataset.context.fields.keys())
+    bundle = build_ml_bundle(dataset, plan, universe=universe)
     x = bundle["arrays"]["x"]
     y = bundle["arrays"]["y"]
     finite = bundle["arrays"]["finite"]
     dates = bundle["arrays"]["dates"]
+    symbols = bundle["arrays"]["symbols"]
     flat_x = x[finite]
     flat_y = y[finite]
     flat_dates = dates[finite]
+    flat_symbols = symbols[finite]
     if len(flat_y) == 0:
         raise ValueError("ML bundle has no finite rows")
     purge_days = max(int(plan.embargo_days), int(plan.target_horizon))
@@ -230,6 +309,7 @@ def run_ml_experiment(
     oos_predictions: list[np.ndarray] = []
     oos_targets: list[np.ndarray] = []
     oos_dates: list[np.ndarray] = []
+    oos_symbols: list[np.ndarray] = []
     fold_rows: list[dict[str, Any]] = []
     last_coef = np.zeros(flat_x.shape[1])
     for fold, (train_dates, test_dates) in enumerate(splits, start=1):
@@ -246,7 +326,8 @@ def run_ml_experiment(
         pred = flat_x[test_mask] @ coef + intercept
         truth = flat_y[test_mask]
         fold_dates = flat_dates[test_mask]
-        ics = _rank_ic(pred, truth, fold_dates)
+        fold_symbols = flat_symbols[test_mask]
+        ics = _rank_ic(pred, truth, fold_dates, fold_symbols)
         fold_rows.append(
             {
                 "fold": fold,
@@ -259,18 +340,21 @@ def run_ml_experiment(
         oos_predictions.append(pred)
         oos_targets.append(truth)
         oos_dates.append(fold_dates)
+        oos_symbols.append(fold_symbols)
     if not fold_rows:
         raise ValueError("no valid purged CV folds")
     predictions = np.concatenate(oos_predictions)
     targets = np.concatenate(oos_targets)
     groups = np.concatenate(oos_dates)
-    oos_ics = _rank_ic(predictions, targets, groups)
+    symbols_oos = np.concatenate(oos_symbols)
+    oos_ics = _rank_ic(predictions, targets, groups, symbols_oos)
     mean_ic = float(np.mean(oos_ics)) if oos_ics else 0.0
     std_ic = float(np.std(oos_ics, ddof=1)) if len(oos_ics) > 1 else 0.0
     t_stat = mean_ic / (std_ic / math.sqrt(len(oos_ics))) if std_ic > 0 else 0.0
     model_card = {
         "schema": MODEL_CARD_SCHEMA,
         "plan_id": plan.plan_id,
+        "evaluation_spec_version": "ml-runtime-v1",
         "model_family": plan.model_family,
         "features": list(plan.features),
         "feature_importance": {name: float(value) for name, value in zip(plan.features, last_coef)},
@@ -299,6 +383,18 @@ def run_ml_experiment(
         },
         "model_card": model_card,
         "created_at": config.now_iso(),
+        "evaluation_spec": {
+            "version": "ml-runtime-v1",
+            "metric": "daily_rank_ic",
+            "rank_ic_source": "factor_metrics.rank_ic_frame",
+            "depends_on": ["factor_metrics"],
+            "cv_scheme": plan.cv_scheme,
+            "target_horizon": int(plan.target_horizon),
+            "embargo_days": int(plan.embargo_days),
+            "model_family": plan.model_family,
+            "comparable_with_cross_section_core": False,
+        },
+        "universe": universe_summary(universe, universe_policy),
     }
     result["monitor"] = monitor_ml_result(result)
     if out_dir is not None:

@@ -1,3 +1,4 @@
 {"id": "MLP-001", "input": "Predict 5-day forward return from close and volume.", "must": ["features", "target_horizon", "cv_scheme", "embargo_days"], "forbid": ["random_kfold"]}
 {"id": "MLP-002", "input": "Feature set has no PIT guarantees.", "must": ["stop_conditions"], "forbid": ["proceed"]}
 {"id": "MLP-003", "input": "Campaign horizon is 60 days.", "must": ["embargo_days"], "forbid": ["embargo shorter than 60"]}
+{"id": "MLP-004", "input": "Expanded margin, moneyflow, block/top and holder fields are available.", "must": ["features", "expected_failure_mode"], "forbid": ["auto_feature_injection", "default_low_pb_turnover_only"]}

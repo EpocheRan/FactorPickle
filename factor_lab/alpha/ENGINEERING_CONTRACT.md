@@ -21,6 +21,8 @@ The following are source-of-truth and MUST live in the repository:
 - holdout policy
 - campaign policy
 - model / CV policy
+- universe policy
+- evaluation metric contract and profiles
 - portable team bootstrap
 
 The following MUST live under `output/factor_lab`:
@@ -94,6 +96,37 @@ python -m factor_lab alpha team verify
 The DSH Lead then uses `list_agents`, `spawn_teammate`, and `list_agents`
 again. The repository supplies the plan; DSH supplies the runtime.
 
+### 3.1 Campaign protocol (binding)
+
+The portable protocol is `campaign_protocol` in `roles.json` and is emitted by
+`python -m factor_lab alpha team plan` / session brief.
+
+Every new campaign or research round MUST delegate model-facing work to the
+five DSH teammates:
+
+- **Required per campaign**: a PathFinder research question and a FactorBuilder
+  artifact (or an explicit, recorded reason in the round file when a role is
+  genuinely not applicable).
+- **Recommended per campaign**: Web Gateway (cited discovery), ML Planner
+  (pre-registered experiment), Reader (structured evidence), as the round needs.
+- **Delegation mechanics**: one shared task per delegated role on the task
+  board, claimed and completed; `send_message` with a self-contained task
+  (role boundaries, inputs, output contract); wait for outputs.
+- **Recording**: task ids and teammate outputs live under
+  `output/factor_lab/alpha/campaigns/<campaign_id>/team/`. Each campaign has a
+  `team_manifest.json`; each round records `agents`, `team_tasks` and
+  `protocol`. `alpha campaign-audit --campaign-id <id>` must pass with
+  `strict: true` before a campaign is described as protocol-compliant.
+- **No silent provenance gap**: a campaign whose rounds lack agent/task
+  provenance is a process failure even if its factor evidence is reproducible.
+  Do not retro-edit round files; record the audit defect and fix future rounds.
+- **Lead boundary**: the Lead may execute deterministic services
+  (cycle/search/eval/campaign recording/Allocator) only on teammate outputs.
+  The Lead must not generate, rank or interpret candidates alone.
+- **Violation**: a Lead-only campaign is a protocol violation and is invalid as
+  research. Mechanical re-runs are allowed only when explicitly labeled
+  `protocol: deterministic-maintenance` and must not generate new candidates.
+
 ## 4. Behavior is current-only
 
 Each agent has exactly one current behavior directory:
@@ -140,11 +173,17 @@ The current agent must load only the current behavior files.
 The current package is:
 
 ```text
+factor_metrics/                     # IO-free, research-calibrated evaluation core
+data_interface/panel.py             # neutral Panel data container
 factor_lab/alpha/
 factor_lab/core/
 factor_lab/runtime/data_interface_adapter.py
 factor_lab/runtime/panel_builder.py
+research/report/                    # production factor report (thin product over the core)
 ```
+
+Alpha evaluation algorithms must live in `factor_metrics`; neither
+`factor_lab` nor `research` may fork a private formula implementation.
 
 Do not resurrect the removed Factor Lab research stack:
 
@@ -160,11 +199,37 @@ factor_lab/templates/
 Alpha reads data only through `DataInterfaceGateway` and
 `build_factor_panel`. No direct QuestDB/SQL access.
 
+P1 event features are loaded through `DataInterfaceGateway.event_bundle`
+(`data_interface.p1_events`); they are zero-filled event flows and PIT-lagged
+one trading day. Financial statement fields are carried forward from their
+PIT announcement dates before entering the daily panel. P0/P1 field coverage is
+recorded under `output/factor_lab/alpha/data_axes/coverage.json`.
+
 ## 7. Research invariants
 
 - Search only on the development window.
+- Universe is point-in-time: eligibility uses trailing data only. Delisted,
+  suspended and not-yet-seasoned names leave or stay out of the universe and
+  are never forward-filled. The policy lives in
+  `factor_lab/alpha/policy/universe.json`.
+- Factor evaluation algorithms are shared through `factor_metrics`; every
+  result records its `metrics_spec` profile/version. `factor_lab` must not
+  import `research`, and `research` must not import `factor_lab`.
+- Every new campaign or research round delegates model-facing work to the five
+  DSH teammates and records their outputs; a Lead-only campaign is invalid.
+- Instrument calibration (cheat / random / known probes) runs before a large
+  search campaign; probes are calibration reports, not candidate trials.
+- Holdout confirmation requires a passed freeze decision; freeze uses the
+  program-wide FDR denominator (all pre-registered families on the same
+  standardized pool/window), not a small family-only denominator.
+- Verdicts are tri-state (`pass` / `fail` / `insufficient_evidence`); missing
+  or non-finite metrics never become pass or fail. Capacity is informational
+  only and never vetoes a candidate.
 - Locked holdout is never used for candidate generation.
 - Every label-touching candidate is trial-accounted.
+- Pre-registration is frozen with a hash before evaluation; artifacts must match the frozen expressions exactly. Attempts record `family_id` and `pre_registered`.
+- ML features are explicit and pre-registered; the runtime validates that expanded P0/P1 fields exist, but never auto-injects them. PathFinder must expose `ml_branch` and route to ML Planner after two ML-free campaigns or when expanded axes changed.
+- Event features carry the disclosure/trade date already present as `ts`; the p1_events adapter applies exactly one trading-day lag. Do not apply a second arbitrary lag in factor expressions.
 - Red Team failure cannot become a candidate.
 - Research uses long-short signal evidence; deployment is long-only.
 - Only validated/active Edge Cards may be allocated.
@@ -203,7 +268,13 @@ The intended guard tests are:
 - no config/behavior files exist under `output/`
 - behavior directories contain only current files
 - no imports of removed modules
-- team plan contains exactly five roles
+- team plan contains exactly five roles and a `campaign_protocol`
+- every research campaign records teammate task ids and outputs (or is labeled
+  `protocol: deterministic-maintenance`)
+- `factor_lab` does not import `research` (and vice versa)
+- the research report output matches the frozen characterization fixture
+- `alpha probe` produces a cheat/random/known calibration report
+- `alpha freeze` rejects candidates without program FDR; `alpha confirm` rejects without a passed freeze
 - full test suite passes
 
 ## 10. Definition of done

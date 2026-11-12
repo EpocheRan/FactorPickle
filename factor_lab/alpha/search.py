@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from factor_lab.alpha.baselines import HUMAN_BASELINES
+from factor_lab.alpha.gates import load_gate_policy
 from factor_lab.alpha.compiler import AlphaContext, compile_expression
 from factor_lab.alpha.data import AlphaDataset, HoldoutWindow
 from factor_lab.alpha.evaluation import evaluate_factor
@@ -20,6 +21,7 @@ from factor_lab.alpha.factor_library import write_factor_artifact
 from factor_lab.alpha.memory import AlphaMemory, canonical_expression, make_edge_card
 from factor_lab.alpha.red_team import red_team_review
 from factor_lab.alpha.trials import append_trial, benjamini_hochberg, p_value_from_t
+from factor_lab.alpha.universe import UniversePolicy, universe_summary
 from factor_lab.alpha.validation import validate
 from factor_lab.core import config
 from factor_lab.core.store import write_json_atomic
@@ -39,12 +41,9 @@ class Candidate:
         ic = float(self.metrics.get("ic_mean", 0.0))
         turnover = float(self.metrics.get("turnover", 1.0))
         # Net spread dominates; IC is a small tie-breaker; turnover is penalized.
-        capacity = self.metrics.get("capacity_multiple")
-        cap_penalty = 0.0
-        if capacity is not None and float(capacity) < 3.0:
-            cap_penalty = 0.002 * (3.0 - float(capacity))
         nodes = int((self.validation.get("complexity") or {}).get("nodes", 0))
-        return net + 0.05 * ic - 0.002 * turnover - cap_penalty - 0.00002 * nodes
+        # Capacity is informational only (A_FULL adjudication #4): no hard penalty.
+        return net + 0.05 * ic - 0.002 * turnover - 0.00002 * nodes
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -57,7 +56,7 @@ class Candidate:
         }
 
 
-def _candidate(context: AlphaContext, expression: str, *, horizon: int, cost_bps: float, source: str, generation: int, start: str, end: str) -> Candidate | None:
+def _candidate(context: AlphaContext, expression: str, *, horizon: int, cost_bps: float, source: str, generation: int, start: str, end: str, universe: pd.DataFrame | None = None) -> Candidate | None:
     try:
         report = validate(expression, known_fields=context.field_names)
         if not report.ok:
@@ -73,8 +72,12 @@ def _candidate(context: AlphaContext, expression: str, *, horizon: int, cost_bps
             cost_bps=cost_bps,
             amount=amount.loc[factor.index] if amount is not None else None,
             open_=context.fields.get("open").loc[factor.index] if context.fields.get("open") is not None else None,
+            universe=universe,
         )
-        if int(metrics.get("n_dates", 0)) < 20:
+        policy = load_gate_policy()
+        if int(metrics.get("n_dates", 0)) < int(policy.min_dates_insufficient):
+            return None
+        if not (np.isfinite(float(metrics.get("net_spread", float("nan")))) and np.isfinite(float(metrics.get("ic_mean", float("nan"))))):
             return None
     except Exception:  # noqa: BLE001 - invalid candidates are skipped
         return None
@@ -87,17 +90,40 @@ def _candidate(context: AlphaContext, expression: str, *, horizon: int, cost_bps
     )
 
 
-def _fields(context: AlphaContext) -> list[str]:
-    preferred = [
-        "close", "open", "high", "low", "volume", "amount", "turnover",
-        "returns", "ret_1d", "log_close", "float_mv", "total_mv",
-        "fin_revenue", "fin_net_income", "fin_total_assets", "fin_total_equity",
-        "fin_operating_cash_flow", "fin_gross_profit", "fin_roe",
-        "dividend_yield", "earnings_yield", "pe_ttm", "pb_mrq",
-    ]
+BASE_SEARCH_FIELDS = [
+    "close", "open", "high", "low", "volume", "amount", "turnover",
+    "returns", "ret_1d", "log_close", "float_mv", "total_mv",
+    "dividend_yield", "earnings_yield", "pe_ttm", "pb_mrq",
+]
+# P0/P1 axes are part of the default search space, not a separate campaign.
+# Order matters only when a defensive limit is applied; all P0/P1 fields fit.
+EXPANDED_SEARCH_FIELDS = [
+    "margin_rzye", "margin_rqye", "margin_rzmre", "margin_rqyl",
+    "mf_buy_sm", "mf_sell_sm", "mf_buy_lg", "mf_sell_lg", "mf_buy_elg", "mf_sell_elg", "mf_net_amount",
+    "fin_net_income", "fin_operating_cash_flow", "fin_total_assets", "fin_total_equity",
+    "fin_total_liabilities", "fin_revenue", "fin_gross_profit",
+    "fin_research_and_development_expense", "fin_basic_eps",
+    "ps_ttm",
+    "block_amount", "block_vol", "block_vwap", "block_count",
+    "top_amount", "top_l_buy", "top_l_sell", "top_net_amount", "top_count",
+    "rep_amount", "rep_vol", "rep_count",
+    "holder_num", "holder_chg", "holder_days_since",
+]
+
+
+def _fields(context: AlphaContext, limit: int = 60) -> list[str]:
+    """Return the default DSL search space, including P0/P1 data axes.
+
+    The earlier implementation capped the pool at 28 base fields, which meant
+    the expanded margin/flow/financial/valuation and P1 event fields were
+    available to the panel but never sampled by ``alpha search``.  Keep the
+    deterministic priority order and a defensive limit large enough for all
+    expanded axes; fall back to remaining context fields after that.
+    """
+    preferred = BASE_SEARCH_FIELDS + EXPANDED_SEARCH_FIELDS
     names = [name for name in preferred if name in context.field_names]
     names += [name for name in context.field_names if name not in names]
-    return names[:28]
+    return names[: max(1, int(limit))]
 
 
 def _ts_ops() -> list[str]:
@@ -163,6 +189,8 @@ def run_search(
     out_path: str | None = None,
     memory: AlphaMemory | None = None,
     factor_library_root: str | Path | None = None,
+    universe: pd.DataFrame | None = None,
+    universe_policy: UniversePolicy | None = None,
 ) -> dict[str, Any]:
     """Search only on the development segment; holdout is never touched."""
     if holdout is not None:
@@ -189,6 +217,7 @@ def run_search(
             generation=generation,
             start=dataset.start,
             end=dataset.end,
+            universe=universe,
         )
         if candidate is None:
             memory.record_attempt(
@@ -296,6 +325,7 @@ def run_search(
                 open_=context.fields.get("open").loc[factor.index] if context.fields.get("open") is not None else None,
                 cost_bps=cost_bps,
                 permutations=60,
+                universe=universe,
             )
         except Exception as exc:  # noqa: BLE001
             review = {"passed": False, "findings": [{"check": "exception", "detail": str(exc)}], "checks": []}
@@ -355,6 +385,8 @@ def run_search(
             factor_ref=factor_ref,
             research_mode="explore",
         )
+        if universe is not None:
+            card["universe"] = universe_summary(universe, universe_policy)
         memory.record_edge_card(card)
 
     memory.finalize()
@@ -371,6 +403,7 @@ def run_search(
         "n_evaluated": len(candidates),
         "n_ranked": len(ranked),
         "fdr": {"q": 0.1, "n_trials": len(pvalues), "n_attempted": attempted, "passed": passed_count},
+        "universe": universe_summary(universe, universe_policy),
         "top": [item.to_dict() for item in ranked[:10]],
         "confirmed": confirmed,
         "confirmed_passed": [item["expression"] for item in confirmed if item.get("red_team", {}).get("passed")],

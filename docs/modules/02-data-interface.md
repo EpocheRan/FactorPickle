@@ -85,7 +85,7 @@ MarketDataLoader.ohlc(codes, start, end, freq, adjust)
 | `MoneyflowService` | `get_by_code` / `get_by_date` / `rank` / `sync` | 资金流 |
 | `ConceptService` | `sync_boards` / `stock_boards(code)` / `compute_board_daily` / `sync_stock_boards` | 板块 |
 | `DisclosureService` | `calendar(code)` / `upcoming(days)` / `announcements(code)` | 披露 |
-| `TradingCalendar` | `is_trading_day` / `trading_days(start, end)` | 交易日历 |
+| `TradingCalendar` | `is_trading_day` / `trading_days(start, end)` | 交易日历：库内覆盖不足时才补齐（Tushare `trade_cal` → AkShare） |
 
 ### 2.2 用法
 

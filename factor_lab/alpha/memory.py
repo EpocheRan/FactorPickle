@@ -121,7 +121,7 @@ def make_edge_card(
             or [
                 "long_short_t < 2",
                 "long_short_net_spread <= 0",
-                "capacity_multiple < 2",
+                "turnover > 0.8",
             ]
         ),
         "created_at": config.now_iso(),
@@ -245,6 +245,15 @@ class AlphaMemory:
         cost_bps: float = 20.0,
         search_id: str = "",
         p_value: float | None = None,
+        campaign_id: str = "",
+        family_id: str = "",
+        round_id: str = "",
+        stage: str = "dev",
+        trial_type: str = "",
+        island: str = "",
+        pre_registered: bool = False,
+        p_net: float | None = None,
+        p_ic: float | None = None,
     ) -> dict[str, Any]:
         canonical = canonical_expression(expression)
         record = {
@@ -261,6 +270,15 @@ class AlphaMemory:
             "cost_bps": float(cost_bps),
             "search_id": search_id,
             "p_value": p_value,
+            "campaign_id": campaign_id,
+            "family_id": family_id,
+            "round_id": round_id,
+            "stage": stage,
+            "trial_type": trial_type,
+            "island": island,
+            "pre_registered": bool(pre_registered),
+            "p_net": p_net,
+            "p_ic": p_ic,
             "metrics": metrics or {},
             "created_at": config.now_iso(),
         }

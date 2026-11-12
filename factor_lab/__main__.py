@@ -33,6 +33,7 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
             "validate",
             "eval",
             "benchmark",
+            "probe",
             "search",
             "confirm",
             "holdout",
@@ -40,8 +41,13 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
             "memory",
             "library",
             "campaign",
+            "campaign-audit",
+            "family",
+            "report",
+            "freeze",
             "ml",
             "discovery",
+            "axes",
             "roles",
             "deploy",
             "allocate",
@@ -64,6 +70,8 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
     parser.add_argument("--horizon", type=int, default=5)
     parser.add_argument("--cost-bps", type=float, default=20.0)
     parser.add_argument("--budget", type=int, default=120)
+    parser.add_argument("--random-n", type=int, default=200)
+    parser.add_argument("--probe-seed", type=int, default=20261112)
     parser.add_argument("--include-holdout", action="store_true")
     parser.add_argument("--save", action="store_true")
     parser.add_argument("--out", default="")
@@ -78,11 +86,17 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
     parser.add_argument("--ml-splits", type=int, default=4)
     parser.add_argument("--ml-embargo", type=int, default=5)
     parser.add_argument("--ml-out", default="")
+    parser.add_argument("--ml-plan", default="")
     parser.add_argument("--discovery-file", default="")
+    parser.add_argument("--report-out", default="")
     parser.add_argument("--round-file", default="")
     parser.add_argument("--factor-artifact", default="")
+    parser.add_argument("--family-id", default="")
+    parser.add_argument("--q", type=float, default=None)
+    parser.add_argument("--recost", action="store_true", help="re-evaluate legacy attempts with the current CostModel")
     parser.add_argument("--team-action", choices=["plan", "verify", "brief"], default="plan")
     parser.add_argument("--behavior-action", choices=["list", "show", "verify"], default="show")
+    parser.add_argument("--no-pit-universe", action="store_true", help="disable the point-in-time universe gate")
     parser.add_argument("--agent", default="")
 
 
@@ -104,7 +118,35 @@ def _run_alpha(args: argparse.Namespace) -> int:
     from factor_lab.alpha.search import run_search
     from factor_lab.alpha.supervisor import Supervisor
     from factor_lab.alpha.trials import summarize_trials
+    from factor_lab.alpha.universe import build_pit_universe, load_universe_policy, universe_summary
     from factor_lab.alpha.validation import validate
+
+    def pit_universe(dataset: Any, *, restrict: bool = True) -> tuple[Any, Any]:
+        """Build the point-in-time universe for a loaded dataset (CLI policy).
+
+        ``restrict`` limits the mask to the dataset evaluation window; the mask
+        itself is always derived from the full trailing history (warm-up rows
+        included), so no eligibility information is lost.
+        """
+        if args.no_pit_universe:
+            return None, None
+        policy = load_universe_policy()
+        if not policy.enabled:
+            return None, None
+        mask = build_pit_universe(dataset.context, policy)
+        if restrict:
+            wanted = [
+                ts
+                for ts in mask.index
+                if dataset.start <= ts.strftime("%Y-%m-%d") <= dataset.end
+            ]
+            mask = mask.loc[wanted]
+        return mask, policy
+
+    def attach_universe(payload: dict[str, Any], universe: Any, policy: Any) -> dict[str, Any]:
+        if universe is not None:
+            payload["universe"] = universe_summary(universe, policy)
+        return payload
 
     if args.action == "validate":
         if not args.expression:
@@ -190,6 +232,11 @@ def _run_alpha(args: argparse.Namespace) -> int:
             raise SystemExit("alpha campaign requires --objective or --campaign-id")
         _print(controller.create(args.objective, max_rounds=args.max_rounds, budget=args.campaign_budget or None))
         return 0
+    if args.action == "axes":
+        from factor_lab.alpha.data_axes import catalog
+
+        _print(catalog())
+        return 0
     if args.action == "cycle":
         if not args.factor_artifact or not args.campaign_id:
             raise SystemExit("alpha cycle requires --factor-artifact and --campaign-id")
@@ -199,6 +246,7 @@ def _run_alpha(args: argparse.Namespace) -> int:
         if not cycle_codes:
             raise SystemExit("no codes supplied")
         dataset = load_alpha_dataset(cycle_codes, args.start, args.end, warmup_days=args.warmup)
+        universe, policy = pit_universe(dataset)
         payload = run_research_cycle(
             args.campaign_id,
             load_artifact(args.factor_artifact),
@@ -207,6 +255,8 @@ def _run_alpha(args: argparse.Namespace) -> int:
             cost_bps=args.cost_bps,
             supervisor=Supervisor(),
             memory=AlphaMemory(),
+            universe=universe,
+            universe_policy=policy,
         )
         _print(
             {
@@ -216,8 +266,74 @@ def _run_alpha(args: argparse.Namespace) -> int:
                 "round": payload["round"],
                 "evaluation": payload["evaluation"],
                 "edge_card": payload["edge_card"]["edge_id"],
+                "universe": payload.get("universe"),
             }
         )
+        return 0
+
+    if args.action == "report":
+        from factor_lab.alpha.research_atlas import write_portfolio_report
+
+        _print(write_portfolio_report(args.report_out or None))
+        return 0
+    if args.action == "campaign-audit":
+        if not args.campaign_id:
+            raise SystemExit("alpha campaign-audit requires --campaign-id")
+        from factor_lab.alpha.protocol_audit import audit_campaign
+
+        _print(audit_campaign(args.campaign_id, write=True))
+        return 0
+    if args.action == "family":
+        from factor_lab.alpha.fdr import (
+            build_ledger,
+            family_dir,
+            family_fdr,
+            family_list,
+            ledger_summary,
+            reclassify_edge_cards,
+        )
+        from factor_lab.core.store import write_json_atomic
+
+        command = args.team_command or "list"
+        if command in {"bootstrap", "backfill", "rebuild"}:
+            summary = build_ledger(recost=bool(args.recost), start=args.start or None, end=args.dev_end or None)
+            _print(summary)
+        elif command == "fdr":
+            family_ids = [args.family_id] if args.family_id else [item["family_id"] for item in family_list()]
+            results = []
+            for family_id in family_ids:
+                result = family_fdr(family_id, q=args.q)
+                write_json_atomic(family_dir(family_id) / "fdr.json", result)
+                results.append(result)
+            _print(results if len(results) != 1 else results[0])
+        elif command == "reclassify":
+            _print(reclassify_edge_cards(write=True))
+        elif command == "summary":
+            _print(ledger_summary())
+        else:
+            _print(family_list())
+        return 0
+    if args.action == "freeze":
+        from factor_lab.alpha.freeze import freeze_expression, freeze_list
+
+        if args.team_command == "list":
+            _print(freeze_list())
+            return 0
+        expression = args.expression
+        if args.factor_artifact and not expression:
+            artifact = Path(args.factor_artifact)
+            dsl = artifact / "factor.dsl" if artifact.is_dir() else artifact
+            if dsl.exists():
+                expression = dsl.read_text(encoding="utf-8").strip()
+        if not expression:
+            raise SystemExit("alpha freeze requires --expression or --factor-artifact")
+        payload = freeze_expression(
+            expression,
+            family_id=args.family_id or None,
+            campaign_id=args.campaign_id or None,
+            q=args.q,
+        )
+        _print(payload)
         return 0
 
     codes = _codes(args.codes)
@@ -244,20 +360,30 @@ def _run_alpha(args: argparse.Namespace) -> int:
         if not args.expression:
             raise SystemExit("alpha eval requires --expression")
         dataset = load_alpha_dataset(codes, args.start, args.end, warmup_days=args.warmup)
-        _print(evaluate_expression(args.expression, dataset.context, horizon=args.horizon, cost_bps=args.cost_bps, start=args.start, end=args.end))
+        universe, policy = pit_universe(dataset)
+        payload = evaluate_expression(args.expression, dataset.context, horizon=args.horizon, cost_bps=args.cost_bps, start=args.start, end=args.end, universe=universe)
+        _print(attach_universe(payload, universe, policy))
         return 0
     if args.action == "deploy":
         if not args.expression:
             raise SystemExit("alpha deploy requires --expression")
         dataset = load_alpha_dataset(codes, args.start, args.end, warmup_days=args.warmup)
-        _print(evaluate_long_only_expression(args.expression, dataset.context, horizon=args.horizon, cost_bps=args.cost_bps, start=args.start, end=args.end))
+        universe, policy = pit_universe(dataset)
+        payload = evaluate_long_only_expression(args.expression, dataset.context, horizon=args.horizon, cost_bps=args.cost_bps, start=args.start, end=args.end, universe=universe)
+        _print(attach_universe(payload, universe, policy))
         return 0
     if args.action == "ml":
+        from factor_lab.alpha.ml_branch import plan_from_dict
+
         dataset = load_alpha_dataset(codes, args.start, args.end, warmup_days=args.warmup)
-        features = [item.strip() for item in args.features.split(",") if item.strip()]
-        plan = make_ml_plan("CLI ML experiment", features, target_horizon=args.horizon, n_splits=args.ml_splits, embargo_days=args.ml_embargo)
-        result = run_ml_experiment(dataset, plan, out_dir=args.ml_out or str(config.LAB_ROOT / "alpha" / "ml"))
-        _print({"plan_id": plan.plan_id, "metrics": result["metrics"], "cv": result["cv"], "monitor": result["monitor"], "path": args.ml_out or str(config.LAB_ROOT / "alpha" / "ml")})
+        universe, policy = pit_universe(dataset, restrict=False)
+        if args.ml_plan:
+            plan = plan_from_dict(read_json(Path(args.ml_plan)))
+        else:
+            features = [item.strip() for item in args.features.split(",") if item.strip()]
+            plan = make_ml_plan("CLI ML experiment", features, target_horizon=args.horizon, n_splits=args.ml_splits, embargo_days=args.ml_embargo)
+        result = run_ml_experiment(dataset, plan, out_dir=args.ml_out or str(config.LAB_ROOT / "alpha" / "ml"), universe=universe, universe_policy=policy)
+        _print({"plan_id": plan.plan_id, "metrics": result["metrics"], "cv": result["cv"], "monitor": result["monitor"], "universe": result.get("universe"), "path": args.ml_out or str(config.LAB_ROOT / "alpha" / "ml")})
         return 0
     if args.action == "benchmark":
         locked = load_holdout()
@@ -283,8 +409,9 @@ def _run_alpha(args: argparse.Namespace) -> int:
             )
             data_end = args.end
         dataset = load_alpha_dataset(codes, bench_window.dev_start, data_end, warmup_days=args.warmup)
-        payload = run_benchmark(dataset, holdout=bench_window, horizon=args.horizon, cost_bps=args.cost_bps, include_holdout=args.include_holdout, out_path=args.out or None)
-        _print({"benchmark_id": payload["benchmark_id"], "summary": payload["summary"], "path": args.out or str(config.LAB_ROOT / "alpha" / "benchmark")})
+        universe, policy = pit_universe(dataset)
+        payload = run_benchmark(dataset, holdout=bench_window, horizon=args.horizon, cost_bps=args.cost_bps, include_holdout=args.include_holdout, out_path=args.out or None, universe=universe, universe_policy=policy)
+        _print({"benchmark_id": payload["benchmark_id"], "summary": payload["summary"], "universe": payload.get("universe"), "path": args.out or str(config.LAB_ROOT / "alpha" / "benchmark")})
         return 0
     if args.action == "confirm":
         if not args.search:
@@ -295,11 +422,44 @@ def _run_alpha(args: argparse.Namespace) -> int:
         dataset = load_alpha_dataset(codes, locked.holdout_start, locked.holdout_end, warmup_days=args.warmup)
         dataset.start = locked.holdout_start
         dataset.end = locked.holdout_end
-        payload = confirm_search(args.search, dataset, horizon=args.horizon, cost_bps=args.cost_bps, holdout=locked)
-        _print({"expression": payload["expression"], "passed": payload["passed"], "metrics": {key: payload["metrics"].get(key) for key in ("ic_mean", "net_spread", "turnover", "capacity_multiple")}, "long_only": payload.get("long_only"), "red_team_passed": payload["red_team"].get("passed"), "path": payload["path"]})
+        universe, policy = pit_universe(dataset)
+        try:
+            payload = confirm_search(args.search, dataset, horizon=args.horizon, cost_bps=args.cost_bps, holdout=locked, universe=universe, universe_policy=policy)
+        except ValueError as exc:
+            raise SystemExit(f"alpha confirm: {exc}") from exc
+        _print({"expression": payload["expression"], "passed": payload["passed"], "evidence_status": payload.get("evidence_status"), "metrics": {key: payload["metrics"].get(key) for key in ("ic_mean", "net_spread", "turnover", "capacity_multiple")}, "long_only": payload.get("long_only"), "red_team_passed": payload["red_team"].get("passed"), "universe": payload.get("universe"), "path": payload["path"]})
+        return 0
+    if args.action == "probe":
+        from factor_lab.alpha.probes import run_probes
+
+        dataset = load_alpha_dataset(codes, window.dev_start, window.dev_end, warmup_days=args.warmup)
+        dataset.start = window.dev_start
+        dataset.end = window.dev_end
+        universe, policy = pit_universe(dataset)
+        payload = run_probes(
+            dataset,
+            horizon=args.horizon,
+            cost_bps=args.cost_bps,
+            universe=universe,
+            universe_summary=universe_summary(universe, policy),
+            random_n=args.random_n,
+            seed=args.probe_seed,
+            out_path=args.out or None,
+        )
+        _print(
+            {
+                "probe_id": payload["probe_id"],
+                "cheat_passed": payload["cheat"]["passed"],
+                "random": {k: payload["random"].get(k) for k in ("n", "expected_rate", "observed_rate", "n_passed", "binomial_ci95")},
+                "known": {k: payload["known"].get(k) for k in ("n", "expected_min", "n_passed", "passed")},
+                "conclusion": payload["conclusion"],
+                "path": payload["path"],
+            }
+        )
         return 0
     if args.action == "search":
         dataset = load_alpha_dataset(codes, window.dev_start, window.dev_end, warmup_days=args.warmup)
+        universe, policy = pit_universe(dataset)
         seed_expressions = []
         if args.seed_file:
             raw = read_json(Path(args.seed_file))
@@ -307,8 +467,8 @@ def _run_alpha(args: argparse.Namespace) -> int:
                 seed_expressions = [str(item) for item in raw]
             elif isinstance(raw, dict):
                 seed_expressions = [str(item) for item in (raw.get("expressions") or [])]
-        payload = run_search(dataset, budget=args.budget, horizon=args.horizon, cost_bps=args.cost_bps, holdout=window, seed=args.seed, seed_expressions=seed_expressions, out_path=args.out or None)
-        _print({"search_id": payload["search_id"], "n_evaluated": payload["n_evaluated"], "n_ranked": payload["n_ranked"], "fdr": payload["fdr"], "top": [{"expression": item["expression"], "score": item["score"], "net": item["metrics"].get("net_spread"), "ic": item["metrics"].get("ic_mean")} for item in payload["top"][:5]], "confirmed": len([item for item in payload["confirmed"] if item.get("red_team", {}).get("passed")]), "path": args.out or str(config.LAB_ROOT / "alpha" / "search" / f"{payload['search_id']}.json")})
+        payload = run_search(dataset, budget=args.budget, horizon=args.horizon, cost_bps=args.cost_bps, holdout=window, seed=args.seed, seed_expressions=seed_expressions, out_path=args.out or None, universe=universe, universe_policy=policy)
+        _print({"search_id": payload["search_id"], "n_evaluated": payload["n_evaluated"], "n_ranked": payload["n_ranked"], "fdr": payload["fdr"], "top": [{"expression": item["expression"], "score": item["score"], "net": item["metrics"].get("net_spread"), "ic": item["metrics"].get("ic_mean")} for item in payload["top"][:5]], "confirmed": len([item for item in payload["confirmed"] if item.get("red_team", {}).get("passed")]), "universe": payload.get("universe"), "path": args.out or str(config.LAB_ROOT / "alpha" / "search" / f"{payload['search_id']}.json")})
         return 0
     raise SystemExit(f"unknown alpha action: {args.action}")
 

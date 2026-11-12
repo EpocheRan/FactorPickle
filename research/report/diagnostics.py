@@ -7,7 +7,8 @@
 - ``tradeability_interval``：用价差置信区间（而不是点估计）判断能否覆盖成本；
 - ``direction_prior``：设计方向与实测 IC 是否相反（方向错，而不是「没信号」）。
 
-所有断言只返回结构化结果，不抛异常——正常生成时写入报告，审计脚本里可升级为失败。
+基础统计原语（spearman / group_monotonicity / spread_stats 等）位于
+``factor_metrics.stats``，这里只保留报告自检与归因逻辑。
 """
 
 from __future__ import annotations
@@ -18,6 +19,8 @@ from typing import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
+
+from factor_metrics.stats import group_monotonicity, spearman, spearman_p, spread_stats
 
 #: 正态分布下五分位 Q5 与 Q1 的均值差（以横截面收益标准差为单位）。
 #: φ(0.8)/0.2 = 1.395，两侧相减为 2.79；1.76 只是**单侧** 10% 尾部的均值，
@@ -46,73 +49,6 @@ def _status_ok(status: str) -> bool:
     return status in ("pass", "skip")
 
 
-# ---------------------------------------------------------------- 基础统计
-def spearman(values: Sequence[float], labels: Sequence[float] | None = None) -> float:
-    """无 scipy 的 Spearman 相关；``labels`` 缺省为等距组序号 1..n。"""
-    arr = np.asarray(values, dtype="float64")
-    ok = np.isfinite(arr)
-    arr = arr[ok]
-    if arr.size < 3:
-        return float("nan")
-    if labels is None:
-        lab = np.arange(1, arr.size + 1, dtype="float64")
-    else:
-        lab = np.asarray(labels, dtype="float64")[ok]
-    if np.unique(arr).size < 2 or np.unique(lab).size < 2:
-        return float("nan")
-    rho = float(pd.Series(arr).rank().corr(pd.Series(lab).rank()))
-    return rho
-
-
-def spearman_p(rho: float, n: int) -> float:
-    """Spearman ρ 的 t 近似双尾 p 值（n 为组数，仅作量级参考）。"""
-    if not np.isfinite(rho) or n < 3:
-        return float("nan")
-    rho = max(-0.999999, min(0.999999, rho))
-    from math import erfc, sqrt
-
-    t = rho * sqrt((n - 2) / (1 - rho * rho))
-    # t 分布尾概率用正态近似；n=5 时只用于提示，不作显著性结论
-    return float(erfc(abs(t) / sqrt(2)))
-
-
-def group_monotonicity(means: dict[str, float] | pd.Series) -> tuple[float, float]:
-    """按 Q1..Qn 顺序计算有符号单调性 ρ 与近似 p 值。"""
-    if isinstance(means, dict):
-        keys = sorted(means, key=lambda k: int(re.sub(r"\D", "", k) or 0))
-        values = [means[k] for k in keys]
-    else:
-        values = list(means.to_numpy())
-    rho = spearman(values)
-    return rho, spearman_p(rho, len(values))
-
-
-def spread_stats(series: pd.Series) -> dict:
-    """期均值、标准误、t 与 95% CI（价差用每期收益，不用年化）。"""
-    clean = series.replace([np.inf, -np.inf], np.nan).dropna()
-    n = len(clean)
-    if n < 3:
-        return {
-            "mean": float(clean.mean()) if n else float("nan"),
-            "se": float("nan"),
-            "t": float("nan"),
-            "ci_lo": float("nan"),
-            "ci_hi": float("nan"),
-            "n": int(n),
-        }
-    mean = float(clean.mean())
-    se = float(clean.std(ddof=1) / np.sqrt(n))
-    return {
-        "mean": mean,
-        "se": se,
-        "t": float(mean / se) if se > 0 else float("nan"),
-        "ci_lo": float(mean - 1.96 * se),
-        "ci_hi": float(mean + 1.96 * se),
-        "n": int(n),
-    }
-
-
-# ---------------------------------------------------------------- 断言
 def rho_spread_identity(rho: float, spread: float, groups: int = 5) -> Check:
     """ρ 与 G5−G1 的方向自洽性。
 
@@ -243,7 +179,6 @@ def reproduction_check(left: dict, right: dict, keys: Iterable[str]) -> Check:
                  "逐点相等", "")
 
 
-# ---------------------------------------------------------------- 归因
 def attribute_failure(report) -> dict:
     """给 D 级因子一个可复核的失效归因，而不是笼统的「无效」。"""
     stats = report.ic_stats
@@ -316,46 +251,6 @@ def overall_status(checks: Sequence[Check]) -> str:
     return "pass"
 
 
-# ---------------------------------------------------------------- 家族
-#: 族名 → 中文标签；族用于「局部评级」与相关性聚类，不用于跨族比较。
-_FAMILY_RULES: tuple[tuple[str, str, str], ...] = (
-    (r"^liquidity\.turnover_std_bias", "liquidity.turnover_std_bias", "换手波动偏离"),
-    (r"^liquidity\.turnover_bias", "liquidity.turnover_bias", "换手偏离"),
-    (r"^liquidity\.turnover_std", "liquidity.turnover_std", "换手波动"),
-    (r"^liquidity\.turnover_ma", "liquidity.turnover_ma", "换手均值"),
-    (r"^liquidity\.turnover_to_mv", "liquidity.turnover_to_mv", "换手/市值"),
-    (r"^liquidity\.amount_ma", "liquidity.amount_ma", "成交额均值"),
-    (r"^liquidity\.absret_amount", "liquidity.absret_amount", "收益×成交额"),
-    (r"^liquidity\.vol_alpha", "liquidity.vol_alpha", "成交量 alpha"),
-    (r"^momentum\.alpha", "momentum.alpha", "动量 alpha"),
-    (r"^momentum\.ret|^reversal\.ret", "momentum.ret", "区间收益"),
-    (r"^momentum\.macd|^momentum\.dif|^momentum\.dea", "momentum.macd", "MACD 族"),
-    (r"^momentum\.rsrs", "momentum.rsrs", "RSRS"),
-    (r"^momentum\.ma_", "momentum.ma", "均线位置"),
-    (r"^momentum\.updown", "momentum.updown", "连涨连跌"),
-    (r"^momentum\.intraday", "momentum.intraday", "日内位置"),
-    (r"^reversal\.rsi", "reversal.rsi", "RSI"),
-    (r"^reversal\.round_gap", "reversal.round_gap", "跳空"),
-    (r"^risk\.beta", "risk.beta", "Beta"),
-    (r"^risk\.ivol|^risk\.vol_beta", "risk.ivol", "特质波动"),
-    (r"^risk\.vol_", "risk.vol", "波动率"),
-    (r"^risk\.high_low", "risk.high_low", "高低价"),
-    (r"^risk\.sharpe", "risk.sharpe", "滚动夏普"),
-    (r"^risk\.band_break", "risk.band_break", "带宽突破"),
-    (r"^risk\.log_price", "risk.log_price", "对数价格"),
-    (r"^quality\.delta_", "quality.delta", "质量变化"),
-    (r"^quality\.(roe|roa|eps|parent_roe)", "quality.profit", "盈利水平"),
-    (r"^quality\.(gross|net|operating)_margin", "quality.margin", "利润率"),
-    (r"^quality\.(asset|fixed|equity|inventory|receivable)_turnover", "quality.turnover", "周转率"),
-    (r"^quality\.(debt|de|fin_leverage|mv_leverage)", "quality.leverage", "杠杆"),
-    (r"^quality\.(current|quick|cash)_ratio", "quality.liquidity", "流动性比率"),
-    (r"^quality\.(interest|cash_interest)_cover", "quality.cover", "利息保障"),
-    (r"^quality\.", "quality", "其它质量"),
-    (r"^value\.", "value", "估值"),
-    (r"^size\.", "size", "规模"),
-)
-
-
 def family_of(factor_id: str) -> str:
     key = str(factor_id)
     for pattern, family, _label in _FAMILY_RULES:
@@ -420,26 +315,3 @@ def retention_note(ratio: float, max_corr: float, ic_raw: float = float("nan")) 
     if max_corr >= 0.95:
         return f"与同类因子相关 {max_corr:.2f}，基本是同一因子，增量性 0 分。"
     return f"残差 IC 保留 {ratio:.0%}（同类最高相关 {max_corr:.2f}）。"
-
-
-__all__ = [
-    "Check",
-    "GRADE_ORDER",
-    "QUINTILE_SPREAD_MULTIPLIER",
-    "attribute_failure",
-    "direction_prior",
-    "family_label",
-    "family_of",
-    "family_table",
-    "grade_distribution",
-    "group_monotonicity",
-    "ic_spread_transmission",
-    "overall_status",
-    "reproduction_check",
-    "retention_note",
-    "rho_spread_identity",
-    "spearman",
-    "spearman_p",
-    "spread_stats",
-    "tradeability_interval",
-]

@@ -14,6 +14,20 @@ python -m factor_lab alpha memory
 
 Research commands are under `python -m factor_lab alpha ...`.
 
+Instrument calibration: `python -m factor_lab alpha probe --codes <pool> --start <s> --end <e>` runs the cheat / random / known probes before large search campaigns; probe reports live under `output/factor_lab/alpha/probes/`.
+
+All-research dashboard: `python -m factor_lab alpha report` reads campaign rounds, team outputs, memory, family ledger, probes, data axes and holdout policy and writes `output/deliverables/research_portfolio.html` plus a JSON sidecar.
+
+Pre-registration: `factor_lab.alpha.prereg` validates and freezes a PathFinder pre-registration with a hash before evaluation; FactorBuilder artifacts must match the frozen expressions exactly, and the campaign round records the hash.
+
+ML uses explicit pre-registered features, never auto-injection. `python -m factor_lab alpha axes` includes an `ml` feature catalog; ML Planner should include expanded P0/P1 fields when relevant. PathFinder now returns `ml_branch` and requests ML Planner after two campaigns without ML or after new axes; see `campaign_protocol.ml_planner_policy`.
+
+Default search includes the expanded P0/P1 axes: `alpha search` samples base OHLCV/valuation fields plus margin, moneyflow, financial quality and P1 event fields. ML plans remain explicit (features are pre-registered, not auto-expanded).
+
+Data axes: P0 fields (margin, moneyflow structure, financial quality, valuation) are loaded by PanelBuilder. P1 event fields (block_trade, top_list, repurchase, stk_holdernumber) are loaded through DataInterfaceGateway.event_bundle from data_interface.p1_events; event flows are zero-filled and all features are PIT-lagged one trading day. `alpha axes` prints the P0/P1 axis catalog; coverage evidence lives under `output/factor_lab/alpha/data_axes/`.
+
+Family FDR / freeze: `alpha family bootstrap --recost` builds the family ledger (re-costing legacy attempts); `alpha family fdr` computes FDR; `alpha family reclassify` applies program FDR to historical Edge Cards; `alpha freeze` is the only path to a holdout confirmation. `alpha confirm` refuses candidates without a passed freeze decision.
+
 The binding coding contract is `factor_lab/alpha/ENGINEERING_CONTRACT.md`.
 
 ## DSH team
@@ -41,9 +55,31 @@ New session / new environment:
    using the plan prompts.
 4. `list_agents` again; verify all five teammates are running or inactive.
 5. `python -m factor_lab alpha team verify`
-6. Start `alpha campaign` or an L0 cycle.
+6. `python -m factor_lab alpha behavior --behavior-action verify`
+7. Start `alpha campaign` or an L0 cycle **through the campaign protocol**.
 
 No previous session or absolute path is required.
+
+### Campaign protocol (mandatory)
+
+`python -m factor_lab alpha team plan` emits the current `campaign_protocol`.
+Every new campaign or research round must delegate model-facing work to the
+five DSH teammates:
+
+- required per campaign: PathFinder research question + FactorBuilder artifact;
+- recommended as needed: Web Gateway discovery, ML Planner experiment,
+  Reader evidence extraction;
+- one shared task per delegated role (claim → work → complete), plus
+  `send_message` with a self-contained task and output contract;
+- record task ids and teammate outputs under
+  `output/factor_lab/alpha/campaigns/<campaign_id>/team/`;
+- write `team/team_manifest.json` and record `agents`, `team_tasks`, `protocol`
+  on every campaign round;
+- run `python -m factor_lab alpha campaign-audit --campaign-id <id>`; a strict
+  audit must pass before calling the campaign protocol-compliant;
+- the Lead may run deterministic services only on teammate outputs; a Lead-only
+  campaign is invalid. Mechanical re-runs must be labeled
+  `protocol: deterministic-maintenance` and must not generate new candidates.
 
 ## Engine
 
@@ -63,6 +99,15 @@ Five model-facing roles only: PathFinder, Web Gateway, ML Planner,
 FactorBuilder, Reader. Runner, Research Runtime, Evaluator, Supervisor,
 Falsifier, Registrar, Allocator and ML Runtime are deterministic or tool
 services.
+
+## Evaluation core
+
+Factor-evaluation algorithms live once, in the IO-free `factor_metrics` core
+(the production report's calibrated implementations). Alpha chooses the
+`alpha-gate-v1` profile (non-overlapping sampling, plain t, PIT universe); the
+report chooses `research-report-v1` (daily IC + Newey-West). Products must not
+fork formulas. The binding reference is
+`docs/design/factor_evaluation_contract.md`.
 
 ## Factor Library
 
@@ -106,8 +151,11 @@ python -m factor_lab alpha confirm --codes output/factor_lab/hypotheses/pool200.
 python -m factor_lab alpha memory
 python -m factor_lab alpha library
 python -m factor_lab alpha campaign --objective "研究应计" --max-rounds 5
+python -m factor_lab alpha campaign-audit --campaign-id CAMP-...
+python -m factor_lab alpha report --report-out output/deliverables/research_portfolio.html
 python -m factor_lab alpha ml --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --features close,volume,amount
 python -m factor_lab alpha discovery
+python -m factor_lab alpha axes
 python -m factor_lab alpha deploy --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --expression "rank(close)"
 python -m factor_lab alpha allocate
 python -m factor_lab alpha cycle --factor-artifact <factor-dir-or-id> --campaign-id CAMP-...
@@ -130,7 +178,14 @@ Do not add direct QuestDB/SQL access to Alpha. Data without PIT is not admitted.
 
 - Search only on the development window; the holdout policy lives in
   `factor_lab/alpha/policy/holdout.json`, not in `output/`, and is locked.
+- The universe is point-in-time: eligibility comes from trailing data only
+  (delisted/suspended/newly listed names are excluded, never forward-filled);
+  the policy lives in `factor_lab/alpha/policy/universe.json`. Every research
+  command applies it by default; `--no-pit-universe` is for fixed-pool
+  comparison only.
 - Research evidence uses long-short spreads; deployment is long-only.
+- Verdicts are tri-state (`pass` / `fail` / `insufficient_evidence`); missing
+  metrics never become pass or fail. Capacity is informational, not a gate.
 - Every label-touching candidate is trial-accounted.
 - Red Team failure cannot become a candidate.
 - No validated Edge Card means 100% broad-index baseline.

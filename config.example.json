@@ -33,6 +33,10 @@
             "sina",
             "baostock"
         ],
+        "calendar_source_priority": [
+            "tushare",
+            "akshare"
+        ],
         "default_ohlc_frequency": "d"
     },
     "boards": {

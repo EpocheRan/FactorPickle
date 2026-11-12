@@ -6,9 +6,12 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from factor_lab.alpha.baselines import HUMAN_BASELINES
 from factor_lab.alpha.data import AlphaDataset, HoldoutWindow
 from factor_lab.alpha.evaluation import evaluate_expression
+from factor_lab.alpha.universe import UniversePolicy, universe_summary
 from factor_lab.core import config
 from factor_lab.core.store import write_json_atomic
 
@@ -21,6 +24,8 @@ def run_benchmark(
     cost_bps: float = 20.0,
     include_holdout: bool = False,
     out_path: str | None = None,
+    universe: pd.DataFrame | None = None,
+    universe_policy: UniversePolicy | None = None,
 ) -> dict[str, Any]:
     """Evaluate the public human corpus on development and (optionally) holdout.
 
@@ -41,6 +46,7 @@ def run_benchmark(
                 cost_bps=cost_bps,
                 start=dev_start,
                 end=dev_end,
+                universe=universe,
             )
             results.append(
                 {
@@ -84,6 +90,7 @@ def run_benchmark(
                     cost_bps=cost_bps,
                     start=holdout.holdout_start,
                     end=holdout.holdout_end,
+                    universe=universe,
                 )
                 holdout_result.append({"name": baseline.name, "family": baseline.family, "metrics": metrics})
             except Exception as exc:  # noqa: BLE001
@@ -97,6 +104,7 @@ def run_benchmark(
         "holdout_window": holdout.to_dict() if holdout else None,
         "horizon": horizon,
         "cost_bps": cost_bps,
+        "universe": universe_summary(universe, universe_policy),
         "summary": summary,
         "baselines": results,
         "holdout_metrics": holdout_result,

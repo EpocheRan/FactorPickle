@@ -21,7 +21,7 @@ from typing import Any
 
 import pandas as pd
 
-from research.report.panel import Panel
+from data_interface.panel import Panel
 
 from factor_lab.runtime.data_interface_adapter import DataBundle, DataGap, DataInterfaceGateway, DataManifest
 
@@ -150,11 +150,25 @@ def build_factor_panel(
     # Data availability is not a factor-category decision.  Fetch every
     # optional matrix the gateway exposes; a missing service only removes its
     # columns and is recorded in the manifest, never blocks an unrelated factor.
-    for method in ("flow_bundle", "margin_bundle", "valuation_bundle", "financial_bundle"):
+    for method in ("flow_bundle", "margin_bundle", "valuation_bundle", "financial_bundle", "event_bundle"):
         bundle = _safe_bundle(gateway, method, codes, fetch_start, end)
         if bundle is not None:
             extras.update(_pivot_extras(bundle.frames))
             manifests.append(bundle.manifest)
+
+    # Optional matrices are aligned to the market panel.  Financial statement
+    # fields are reported on sparse announcement dates; carry the latest
+    # published value forward so they are usable as daily factor fields (the
+    # announcement date itself is already PIT-aligned by data_interface).
+    aligned_extras: dict[str, pd.DataFrame] = {}
+    for name, frame in extras.items():
+        aligned = align(frame)
+        if aligned is None:
+            continue
+        if str(name).lower().startswith("fin_"):
+            aligned = aligned.ffill()
+        aligned_extras[name] = aligned
+    extras = aligned_extras
 
     benchmark = None
     returns = close.pct_change(fill_method=None).mean(axis=1)

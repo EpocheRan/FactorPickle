@@ -1,0 +1,282 @@
+{
+ "schema": "factor_lab.alpha_metrics_baseline.v1",
+ "captured_at": "pre-A-full",
+ "expressions": {
+  "rank(close)": {
+   "n_dates": 63,
+   "n_symbols": 60,
+   "coverage": 1.0,
+   "ic_mean": -0.01833,
+   "ic_std": 0.134594,
+   "icir": -0.947434,
+   "ic_t": -1.0809,
+   "ic_win": 0.4921,
+   "gross_spread": -0.00051,
+   "gross_t": -0.2881,
+   "net_spread": -0.00177,
+   "net_t": -0.9959,
+   "turnover": 0.157407,
+   "cost_per_period": 0.001259,
+   "sharpe": -0.8729,
+   "monotonicity": -0.6,
+   "group_means": [
+    0.001535,
+    0.003664,
+    0.001612,
+    0.000635,
+    0.001025
+   ],
+   "capacity_multiple": 1.4607,
+   "capacity_target_aum": 50000000.0,
+   "capacity_participation": 0.1,
+   "winsorized_factor_net_spread": -0.00177,
+   "extras": {
+    "trimmed_net_spread": -0.002182,
+    "trimmed_net_spread_experimental": true
+   },
+   "universe_size_avg": null,
+   "horizon": 5,
+   "rebalance": 5,
+   "entry_rule": "next_open",
+   "groups": 5,
+   "cost_bps": 20.0,
+   "metrics_spec": {
+    "version": "alpha-gate-v1",
+    "entry": "next_open",
+    "horizon": 5,
+    "sampling": "non_overlapping",
+    "groups": 5,
+    "min_ic_names": 10,
+    "min_book_names": 10,
+    "t_method": "plain",
+    "nw_lag": null,
+    "winsorize": [
+     0.01,
+     0.99
+    ],
+    "trim": [
+     0.01,
+     0.99
+    ],
+    "cost": {
+     "bps": 20.0,
+     "convention": "two_leg",
+     "bps_meaning": "per_side"
+    },
+    "capacity": {
+     "formula": "research_adv",
+     "target_aum": 50000000.0,
+     "participation": 0.1,
+     "build_days": 3
+    },
+    "universe_denominator": true,
+    "config_hash": "160debfbcecdb941"
+   },
+   "expression": "rank(close)",
+   "validation": {
+    "expression": "rank(close)",
+    "ok": true,
+    "mode": "panel",
+    "fields": [
+     "close"
+    ],
+    "operators": [
+     "rank"
+    ],
+    "complexity": {
+     "nodes": 2,
+     "depth": 2,
+     "operators": 1,
+     "parameters": 0
+    },
+    "issues": [],
+    "warnings": []
+   }
+  },
+  "neg(ts_max(returns, 60))": {
+   "n_dates": 56,
+   "n_symbols": 60,
+   "coverage": 0.903125,
+   "ic_mean": -0.024327,
+   "ic_std": 0.123475,
+   "icir": -1.370681,
+   "ic_t": -1.4744,
+   "ic_win": 0.4107,
+   "gross_spread": -0.003703,
+   "gross_t": -1.9814,
+   "net_spread": -0.004876,
+   "net_t": -2.6132,
+   "turnover": 0.146577,
+   "cost_per_period": 0.001173,
+   "sharpe": -2.4294,
+   "monotonicity": -0.3,
+   "group_means": [
+    0.004649,
+    0.000337,
+    0.001653,
+    0.002529,
+    0.000946
+   ],
+   "capacity_multiple": 1.0401,
+   "capacity_target_aum": 50000000.0,
+   "capacity_participation": 0.1,
+   "winsorized_factor_net_spread": -0.004876,
+   "extras": {
+    "trimmed_net_spread": -0.005196,
+    "trimmed_net_spread_experimental": true
+   },
+   "universe_size_avg": null,
+   "horizon": 5,
+   "rebalance": 5,
+   "entry_rule": "next_open",
+   "groups": 5,
+   "cost_bps": 20.0,
+   "metrics_spec": {
+    "version": "alpha-gate-v1",
+    "entry": "next_open",
+    "horizon": 5,
+    "sampling": "non_overlapping",
+    "groups": 5,
+    "min_ic_names": 10,
+    "min_book_names": 10,
+    "t_method": "plain",
+    "nw_lag": null,
+    "winsorize": [
+     0.01,
+     0.99
+    ],
+    "trim": [
+     0.01,
+     0.99
+    ],
+    "cost": {
+     "bps": 20.0,
+     "convention": "two_leg",
+     "bps_meaning": "per_side"
+    },
+    "capacity": {
+     "formula": "research_adv",
+     "target_aum": 50000000.0,
+     "participation": 0.1,
+     "build_days": 3
+    },
+    "universe_denominator": true,
+    "config_hash": "160debfbcecdb941"
+   },
+   "expression": "neg(ts_max(returns, 60))",
+   "validation": {
+    "expression": "neg(ts_max(returns, 60))",
+    "ok": true,
+    "mode": "time_series",
+    "fields": [
+     "returns"
+    ],
+    "operators": [
+     "neg",
+     "ts_max"
+    ],
+    "complexity": {
+     "nodes": 4,
+     "depth": 3,
+     "operators": 2,
+     "parameters": 1
+    },
+    "issues": [],
+    "warnings": []
+   }
+  },
+  "rank(ts_corr(rank(close), rank(volume), 20))": {
+   "n_dates": 61,
+   "n_symbols": 60,
+   "coverage": 0.958594,
+   "ic_mean": 0.025378,
+   "ic_std": 0.09552,
+   "icir": 1.848382,
+   "ic_t": 2.0751,
+   "ic_win": 0.5902,
+   "gross_spread": 0.002329,
+   "gross_t": 1.7388,
+   "net_spread": -0.001796,
+   "net_t": -1.3547,
+   "turnover": 0.51571,
+   "cost_per_period": 0.004126,
+   "sharpe": -1.2067,
+   "monotonicity": 0.4,
+   "group_means": [
+    0.000554,
+    0.003326,
+    0.000632,
+    0.001577,
+    0.002883
+   ],
+   "capacity_multiple": 1.0414,
+   "capacity_target_aum": 50000000.0,
+   "capacity_participation": 0.1,
+   "winsorized_factor_net_spread": -0.001796,
+   "extras": {
+    "trimmed_net_spread": -0.001106,
+    "trimmed_net_spread_experimental": true
+   },
+   "universe_size_avg": null,
+   "horizon": 5,
+   "rebalance": 5,
+   "entry_rule": "next_open",
+   "groups": 5,
+   "cost_bps": 20.0,
+   "metrics_spec": {
+    "version": "alpha-gate-v1",
+    "entry": "next_open",
+    "horizon": 5,
+    "sampling": "non_overlapping",
+    "groups": 5,
+    "min_ic_names": 10,
+    "min_book_names": 10,
+    "t_method": "plain",
+    "nw_lag": null,
+    "winsorize": [
+     0.01,
+     0.99
+    ],
+    "trim": [
+     0.01,
+     0.99
+    ],
+    "cost": {
+     "bps": 20.0,
+     "convention": "two_leg",
+     "bps_meaning": "per_side"
+    },
+    "capacity": {
+     "formula": "research_adv",
+     "target_aum": 50000000.0,
+     "participation": 0.1,
+     "build_days": 3
+    },
+    "universe_denominator": true,
+    "config_hash": "160debfbcecdb941"
+   },
+   "expression": "rank(ts_corr(rank(close), rank(volume), 20))",
+   "validation": {
+    "expression": "rank(ts_corr(rank(close), rank(volume), 20))",
+    "ok": true,
+    "mode": "panel",
+    "fields": [
+     "close",
+     "volume"
+    ],
+    "operators": [
+     "rank",
+     "ts_corr"
+    ],
+    "complexity": {
+     "nodes": 7,
+     "depth": 4,
+     "operators": 4,
+     "parameters": 1
+    },
+    "issues": [],
+    "warnings": []
+   }
+  }
+ }
+}

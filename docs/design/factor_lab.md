@@ -63,9 +63,29 @@ Old versions are immutable. Edge Cards reference `factor_id`, `version` and
 
 ## Evaluation
 
+All factor-evaluation algorithms live in the IO-free ``factor_metrics`` core,
+which carries the production report's calibrated implementations.  The Alpha
+gate and the production report are thin products over that core; neither keeps
+a private formula copy.  The binding reference is
+[docs/design/factor_evaluation_contract.md](factor_evaluation_contract.md).
+
+- Profiles: ``alpha-gate-v1`` (non-overlapping sampling, plain t, PIT universe)
+  and ``research-report-v1`` (daily IC + Newey-West); every result records its
+  ``metrics_spec`` identity.
 - Signal evidence: long-short IC / spread.
 - Deployment: long-only next-open excess after tax and cost.
-- Gates: alpha_per_turn, DSR, residual correlation, capacity, holdout.
+- Universe: point-in-time eligibility from trailing data only (delisted,
+  suspended and not-yet-seasoned names are excluded); policy in
+  `factor_lab/alpha/policy/universe.json`, applied by every research command
+  unless `--no-pit-universe` is passed.
+- Verdicts are tri-state (`pass` / `fail` / `insufficient_evidence`); null
+  metrics never become pass or fail.
+- Research protocol: model-facing work is delegated to the five DSH roles
+  (shared tasks + messages, outputs recorded under the campaign `team/`
+  directory); the Lead runs deterministic services only. A Lead-only campaign
+  is invalid; mechanical re-runs are labeled `protocol: deterministic-maintenance`.
+- Gates: net spread, IC, turnover, holdout. Capacity is informational only and
+  never vetoes a candidate.
 - Edge Card statuses: research, signal_validated, validated, active, parked,
   not_deployable, retired, killed.
 - No validated edge means the allocator stays at the broad-index baseline.
@@ -79,7 +99,10 @@ max rounds, budget, duplicate stops and researcher stop/pause.
 
 The ML branch is non-deep-learning. It uses purged walk-forward splits with
 embargo at least as long as the target horizon, a model card, and an ML Monitor.
-Artifacts live under `output/factor_lab/alpha/ml/`.
+Its daily rank-IC metric depends one-way on the shared
+`factor_metrics.rank_ic_frame`; CV, model fitting and the monitor remain
+runtime-owned. Its results carry `evaluation_spec` and are not comparable with
+cross-sectional factor metrics. Artifacts live under `output/factor_lab/alpha/ml/`.
 
 ## Data
 

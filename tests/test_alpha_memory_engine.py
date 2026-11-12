@@ -32,7 +32,7 @@ from factor_lab.alpha.runner import prepare_research_request
 from factor_lab.alpha.search import run_search
 
 
-def _context(days: int = 180, symbols: int = 18) -> AlphaContext:
+def _context(days: int = 200, symbols: int = 30) -> AlphaContext:
     rng = np.random.default_rng(7)
     dates = pd.bdate_range("2023-01-02", periods=days)
     columns = [f"{index:06d}" for index in range(symbols)]
@@ -192,6 +192,12 @@ def test_ml_branch_purged_experiment(tmp_path) -> None:
         embargo_days=3,
     )
     result = run_ml_experiment(dataset, plan, out_dir=tmp_path / "ml")
+    assert result["evaluation_spec"]["version"] == "ml-runtime-v1"
+    assert result["evaluation_spec"]["comparable_with_cross_section_core"] is False
+    assert result["evaluation_spec"]["rank_ic_source"] == "factor_metrics.rank_ic_frame"
+    assert result["evaluation_spec"]["depends_on"] == ["factor_metrics"]
+    assert result["metrics"]["n_oos_dates"] > 0
+    assert result["model_card"]["evaluation_spec_version"] == "ml-runtime-v1"
     assert result["schema"] == "factor_lab.alpha.ml_result.v1"
     assert result["data_bundle"]["pit"]["required"] is True
     assert result["cv"]["embargo_days"] == 5
@@ -290,13 +296,42 @@ def test_end_to_end_research_cycle(tmp_path) -> None:
         dataset,
         supervisor=Supervisor(controller),
         memory=AlphaMemory(tmp_path / "memory"),
+        protocol_context={"agents": ["factor-builder"], "team_tasks": ["task-20"], "protocol": "pre_registered"},
     )
     assert payload["schema"] == "factor_lab.alpha.research_cycle.v1"
+    assert payload["round"]["agents"] == ["factor-builder"]
+    assert payload["round"]["team_tasks"] == ["task-20"]
     assert payload["round"]["round_number"] == 1
     assert payload["edge_card"]["factor_ref"]["factor_id"] == "close_rank_cycle"
     assert payload["edge_card"]["status"] in {"research", "killed"}
     assert payload["memory"]["n_attempts"] >= 1
     assert controller.load(campaign["campaign_id"])["n_rounds"] == 1
+
+
+def test_campaign_round_records_team_provenance(tmp_path) -> None:
+    controller = CampaignController(tmp_path / "campaigns")
+    campaign = controller.create("provenance", max_rounds=2)
+    record = controller.record_round(
+        campaign["campaign_id"],
+        {
+            "research_question": "pre-registered test",
+            "agents": ["pathfinder", "factor-builder"],
+            "team_tasks": ["task-19", "task-20"],
+            "protocol": "pre_registered",
+            "decision": "continue",
+        },
+    )
+    assert record["agents"] == ["pathfinder", "factor-builder"]
+    assert record["team_tasks"] == ["task-19", "task-20"]
+    assert record["protocol"] == "pre_registered"
+
+
+def test_campaign_audit_rejects_missing_campaign() -> None:
+    from factor_lab.alpha.protocol_audit import audit_campaign
+
+    result = audit_campaign("CAMP-DOES-NOT-EXIST")
+    assert result["ok"] is False
+    assert result["issues"]
 
 
 def test_portable_team_roster_and_bootstrap_plan() -> None:
@@ -313,9 +348,17 @@ def test_portable_team_roster_and_bootstrap_plan() -> None:
         "factor-builder",
         "reader",
     }
+    protocol = plan["campaign_protocol"]
+    assert protocol["schema"] == "factor_lab.alpha.campaign_protocol.v1"
+    assert set(protocol["minimum_per_campaign"]) <= {
+        member["target"] for member in plan["members"]
+    }
+    assert protocol["record_path"].startswith("output/factor_lab/alpha/campaigns/")
+    assert protocol["deterministic_maintenance_label"] == "protocol: deterministic-maintenance"
     brief = session_brief()
     assert brief["schema"] == "factor_lab.alpha.session_brief.v1"
     assert brief["team"]["n_roles"] == 5
+    assert brief["campaign_protocol"]["schema"] == "factor_lab.alpha.campaign_protocol.v1"
     assert "commands" in brief
     behaviors = list_behaviors()
     assert len(behaviors) == 5
@@ -337,3 +380,18 @@ def test_source_of_truth_is_not_in_output() -> None:
     assert behaviors.exists()
     version_dirs = [path for path in behaviors.rglob("*") if path.is_dir() and path.name.startswith("v") and path.name[1:].isdigit()]
     assert version_dirs == []
+
+
+def test_agent_guidance_requires_team_campaign_protocol() -> None:
+    """The binding guidance must not silently regress to Lead-only campaigns."""
+    agents = Path("AGENTS.md").read_text(encoding="utf-8")
+    assert "Campaign protocol (mandatory)" in agents
+    assert "delegate model-facing work" in agents
+    assert "Lead-only" in agents
+    assert "protocol: deterministic-maintenance" in agents
+    contract = Path("factor_lab/alpha/ENGINEERING_CONTRACT.md").read_text(encoding="utf-8")
+    assert "Campaign protocol (binding)" in contract
+    assert "Lead-only campaign" in contract
+    assert "output/factor_lab/alpha/campaigns/<campaign_id>/team/" in contract
+    factor_lab_doc = Path("FACTOR_LAB.md").read_text(encoding="utf-8")
+    assert "Campaign protocol (mandatory)" in factor_lab_doc

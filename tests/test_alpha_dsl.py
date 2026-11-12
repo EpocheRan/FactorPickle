@@ -13,7 +13,7 @@ from factor_lab.alpha.validation import validate
 from factor_lab.alpha.data import AlphaDataset, default_holdout
 
 
-def _context(days: int = 180, symbols: int = 18) -> AlphaContext:
+def _context(days: int = 200, symbols: int = 30) -> AlphaContext:
     rng = np.random.default_rng(3)
     dates = pd.bdate_range("2023-01-02", periods=days)
     columns = [f"{index:06d}" for index in range(symbols)]
@@ -70,7 +70,10 @@ def test_evaluator_and_red_team() -> None:
     assert metrics["n_dates"] > 5
     assert metrics["ic_mean"] > 0.5
     assert metrics["capacity_target_aum"] == 50_000_000.0
-    assert "winsorized_net_spread" in metrics
+    assert "winsorized_factor_net_spread" in metrics
+    assert "winsorized_net_spread" not in metrics
+    assert "trimmed_net_spread" not in metrics
+    assert metrics["extras"]["trimmed_net_spread_experimental"] is True
     review = red_team_review(forward, context.close, metrics, horizon=5, permutations=8)
     assert "checks" in review
     assert review["permutation_p"] <= 1.0

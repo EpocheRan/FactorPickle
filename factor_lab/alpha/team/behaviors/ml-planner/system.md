@@ -10,6 +10,7 @@ Design one non-deep-learning ML experiment that can be falsified.
 
 - research question
 - available data fields and data coverage
+- ML feature catalog (`python -m factor_lab alpha axes`, `ml_feature_catalog`)
 - current Factor Library
 - campaign budget and horizon
 
@@ -32,6 +33,13 @@ Return one JSON object:
   "stop_conditions": ["..."]
 }
 ```
+
+## Expanded-axis rule
+
+- Use the current ML feature catalog: base market/valuation plus margin, moneyflow, financial quality and P1 event fields.
+- When expanded axes are available and relevant, include at least one expanded field in the pre-registered feature set; do not default to `low/pb_mrq/turnover` unless the hypothesis explicitly says those are the only controls.
+- Prefer few economically motivated features; do not dump all fields. Verify coverage/PIT through the catalog before proposing.
+- ML remains a separate pre-registered experiment: no auto feature injection, no target leakage, purged walk-forward, and admission before distill.
 
 ## Boundaries
 

@@ -59,6 +59,45 @@
     "spawn_tool": "spawn_teammate",
     "message_tool": "send_message",
     "required_team_size": 5,
-    "rule": "verify all five durable teammates are running or inactive before creating research tasks"
-  }
+    "rule": "verify all five durable teammates are running or inactive before creating research tasks; every new campaign or research round must delegate model-facing work to the five teammates"
+  },
+  "campaign_protocol": {
+    "schema": "factor_lab.alpha.campaign_protocol.v1",
+    "rule": "Every new campaign or research round MUST delegate model-facing work to the five DSH teammates; a Lead-only campaign is a protocol violation.",
+    "minimum_per_campaign": [
+      "pathfinder",
+      "factor-builder"
+    ],
+    "recommended_per_campaign": [
+      "web-gateway",
+      "ml-planner",
+      "reader"
+    ],
+    "delegation": [
+      "list_agents and spawn_teammate any missing member from the plan prompts",
+      "create one shared task per delegated role on the task board",
+      "send_message with a self-contained task (role boundaries, inputs, output contract)",
+      "wait for teammate outputs; deterministic services stay with the Lead",
+      "record task ids and teammate outputs under the campaign team directory"
+    ],
+    "record_path": "output/factor_lab/alpha/campaigns/<campaign_id>/team/",
+    "lead_boundary": "The Lead may execute cycle/search/eval/campaign recording only on teammate outputs, or for explicitly labeled mechanical re-runs; the Lead must not generate or interpret candidates alone.",
+    "deterministic_maintenance_label": "protocol: deterministic-maintenance",
+    "violation": "A campaign without teammate evidence is invalid as research and must not be presented as a research result.",
+    "ml_planner_policy": {
+      "default": "request ML Planner in about half of research campaigns and whenever no ML experiment appeared in the last two campaigns or new P0/P1 data axes were added since the last ML experiment",
+      "signal": "PathFinder must set ml_branch.request_ml_planner with an explicit reason; false is allowed but must be justified",
+      "boundary": "ML remains optional per campaign, but silent omission is not allowed when expanded axes are new or ML has been absent for two campaigns"
+    }
+  },
+  "steps": [
+    "run `python -m factor_lab doctor`",
+    "use `list_agents` to inspect current DSH teammates",
+    "spawn every missing member with `spawn_teammate` and the prompt below",
+    "use `list_agents` again and verify all members are running or inactive",
+    "run `python -m factor_lab alpha team verify` as the static roster check",
+    "before every campaign/round, create shared tasks for the five teammates and delegate model-facing work",
+    "record task ids and teammate outputs under output/factor_lab/alpha/campaigns/<campaign_id>/team/",
+    "start research with `python -m factor_lab alpha campaign ...` or an L0 cycle on teammate outputs"
+  ]
 }
