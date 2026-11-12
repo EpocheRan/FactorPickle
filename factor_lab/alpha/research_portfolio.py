@@ -31,6 +31,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from factor_lab.alpha.governance import git_commit, holdout_uses, policy_snapshot
 from factor_lab.core import config
 
 
@@ -170,7 +171,7 @@ def _kind_for(campaign_id: str, objective: str) -> str:
         return "calibration"
     if "l0" in text or "smoke" in text:
         return "calibration"
-    if campaign_id == "CAMP-2b995bc651" or "p2" in text or "ml execution" in text:
+    if campaign_id == "CAMP-2b995bc651" or "p2" in text or "ml execution" in text or text.startswith("ml ") or "machine learning" in text or "ml expanded" in text:
         return "ml"
     if campaign_id == "CAMP-4319413b27" or "p3" in text or "discovery" in text:
         return "discovery"
@@ -292,21 +293,22 @@ def _agent_evidence(
             continue
         evidence["factor-builder"]["notes"].append(f"artifact {artifact.get('factor_id')}")
         evidence["factor-builder"]["files"].append(str(artifact.get("manifest_path") or ""))
-        for task in spec.get("team_tasks") or []:
-            if task:
-                for role in evidence:
-                    if role in {"pathfinder", "factor-builder"}:
-                        evidence[role]["tasks"].add(str(task))
-        for agent in spec.get("agents") or []:
-            if agent in evidence:
-                evidence[agent]["notes"].append(f"artifact {artifact.get('factor_id')}")
+        spec_agents = [str(item) for item in (spec.get("agents") or []) if item in evidence]
+        spec_tasks = [str(item) for item in (spec.get("team_tasks") or []) if item]
+        for agent, task in zip(spec_agents, spec_tasks):
+            evidence[agent]["tasks"].add(task)
+        for agent in spec_agents:
+            evidence[agent]["notes"].append(f"artifact {artifact.get('factor_id')}")
     for row in rounds:
-        for agent in row.get("agents") or []:
+        agents = [str(agent) for agent in (row.get("agents") or [])]
+        tasks = [str(task) for task in (row.get("team_tasks") or [])]
+        for agent in agents:
             if agent in evidence:
                 evidence[agent]["notes"].append(f"{row.get('round_id')}")
-        for task in row.get("team_tasks") or []:
-            for role in ("pathfinder", "factor-builder"):
-                evidence[role]["tasks"].add(str(task))
+        # Pair by index; do not attribute one task to every role.
+        for agent, task in zip(agents, tasks):
+            if agent in evidence and task:
+                evidence[agent]["tasks"].add(task)
     # P2 reused the ML Planner plan from campaign 4; record the dependency explicitly.
     if campaign_id == "CAMP-2b995bc651":
         source = next((p for p, v in team_files if p.name == "p2_run.json"), None)
@@ -400,6 +402,30 @@ def _holdout_status(rounds: list[dict[str, Any]]) -> bool | None:
     return None
 
 
+def _two_sided_p(value: Any) -> float | None:
+    from statistics import NormalDist
+
+    try:
+        z = abs(float(value))
+        if z != z or z == float("inf"):
+            return None
+        return float(2.0 * (1.0 - NormalDist().cdf(z)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _one_sided_p(value: Any) -> float | None:
+    from statistics import NormalDist
+
+    try:
+        z = float(value)
+        if z != z or z == float("inf"):
+            return None
+        return float(1.0 - NormalDist().cdf(z)) if z > 0 else 1.0
+    except (TypeError, ValueError):
+        return None
+
+
 def _campaign_record(
     campaign_dir: Path,
     *,
@@ -470,6 +496,8 @@ def _campaign_record(
                 "program_fdr": (fdr.get("program_fdr") or {}).get("passed") if isinstance(fdr.get("program_fdr"), dict) else None,
                 "program_p": (fdr.get("program_fdr") or {}).get("p_net") if isinstance(fdr.get("program_fdr"), dict) else None,
                 "program_threshold": (fdr.get("program_fdr") or {}).get("bh_threshold") if isinstance(fdr.get("program_fdr"), dict) else None,
+                "p_two_sided": _two_sided_p(metrics.get("net_t")),
+                "p_one_sided_positive": _one_sided_p(metrics.get("net_t")),
                 "family_fdr": (fdr.get("family_fdr") or {}).get("passed") if isinstance(fdr.get("family_fdr"), dict) else None,
                 "round_id": row.get("round_id"),
             }
@@ -521,6 +549,8 @@ def _campaign_record(
                 "conclusion": payload.get("conclusion") or f"ML admission passed={admission.get('passed')}; cycle={((payload.get('cycle') or {}).get('metrics') or {})}",
                 "plan_source": payload.get("plan_source"),
                 "weights": ((payload.get("export") or {}).get("weights")) if isinstance(payload.get("export"), dict) else None,
+        "standardized_weights": ((payload.get("export") or {}).get("standardized_weights")) if isinstance(payload.get("export"), dict) else None,
+                "standardized_weights": ((payload.get("export") or {}).get("standardized_weights")) if isinstance(payload.get("export"), dict) else None,
                 "cycle": payload.get("cycle"),
                 "bundle": payload.get("bundle"),
                 "path": path,
@@ -705,6 +735,10 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
         axis_usage_rows = []
 
     # Memory / ledger / axes / probes / holdout.
+    from factor_lab.alpha.trial_sink import event_summary as _event_summary
+
+    trial_events = _event_summary()
+    ledger_meta = _read_json(lab_root / "alpha" / "families" / "summary.json", {}) or {}
     memory = _read_json(lab_root / "alpha" / "memory" / "summary.json", {}) or {}
     ledger = _read_json(lab_root / "alpha" / "families" / "summary.json", {}) or {}
     axes_coverage = _read_json(lab_root / "alpha" / "data_axes" / "coverage.json", {}) or {}
@@ -730,6 +764,26 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
         else:
             dataset["window_type"] = "dev"
     historical_holdout = sum(1 for dataset in dataset_rows if dataset.get("window_type") != "dev")
+    policy = policy_snapshot()
+    huses = holdout_uses()
+    # Program-level population (not the raw ledger count).
+    from factor_lab.alpha.fdr import program_fdr as _program_fdr, load_ledger as _load_ledger
+    try:
+        _ledger = _load_ledger()
+        _candidate = next((row.get("canonical_expression") for row in _ledger if row.get("canonical_expression") and row.get("family_id") != "legacy-unassigned"), "rank(close)")
+        _prog = _program_fdr(_candidate, ledger=_ledger)
+        from statistics import NormalDist
+
+        fdr_population = {key: _prog.get(key) for key in ("n_trials", "n_unique", "n_eff", "q", "rank", "bh_threshold", "bh_threshold_t")}
+        if fdr_population.get("n_eff"):
+            rank1_p = float(fdr_population["q"]) / float(fdr_population["n_eff"])
+            fdr_population["rank1_p"] = rank1_p
+            fdr_population["rank1_t"] = NormalDist().inv_cdf(1.0 - rank1_p / 2.0)
+    except Exception:  # noqa: BLE001
+        fdr_population = {}
+    # Edge Cards that cannot be attributed to a campaign (rendered explicitly, never dropped).
+    attributed_card_ids = {str(card.get("edge_id")) for row in campaigns for card in row.get("edge_cards") or []}
+    unattributed_cards = sorted({str(card.get("edge_id")) for card in latest_cards.values() if str(card.get("edge_id")) not in attributed_card_ids})
 
     # Campaign-level idea/agent/result conclusions for the portfolio section.
     meaningful = [row for row in campaigns if row["kind"] != "calibration"]
@@ -788,6 +842,13 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
             "agents_used": len({role for row in campaigns for role in row.get("agents_used") or []}),
             "datasets": len(dataset_rows),
             "historical_holdout_datasets": historical_holdout,
+            "holdout_uses": len(huses),
+            "audited_campaigns": sum(1 for row in campaigns if isinstance(row.get("protocol_audit"), dict)),
+            "audit_ok": sum(1 for row in campaigns if isinstance(row.get("protocol_audit"), dict) and row["protocol_audit"].get("ok")),
+            "audit_failed": sum(1 for row in campaigns if isinstance(row.get("protocol_audit"), dict) and not row["protocol_audit"].get("ok")),
+            "unattributed_cards": len(unattributed_cards),
+            "trial_events": trial_events.get("n"),
+            "trial_events_by_stage": trial_events.get("by_stage"),
         },
         "campaigns": campaigns,
         "datasets": dataset_rows,
@@ -798,5 +859,11 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
         "ledger": ledger,
         "probes": probes,
         "holdout": holdout,
+        "holdout_uses": huses,
+        "policy": policy,
+        "git_commit": git_commit(),
+        "ledger_hash": ledger_meta.get("ledger_hash"),
+        "fdr_population": fdr_population,
+        "unattributed_cards": unattributed_cards,
         "portfolio_conclusions": portfolio_conclusions,
     }

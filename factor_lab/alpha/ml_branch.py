@@ -156,7 +156,12 @@ def build_ml_bundle(dataset: AlphaDataset, plan: MLPlan, *, max_rows: int | None
         axis=-1,
     )
     close = context.close
-    target = close.shift(-int(plan.target_horizon)) / close - 1.0
+    open_ = context.fields.get("open")
+    if open_ is not None:
+        # Match the Alpha Gate entry rule: enter at next open, exit at close[t+h].
+        target = close.shift(-int(plan.target_horizon)) / open_.shift(-1) - 1.0
+    else:
+        target = close.shift(-int(plan.target_horizon)) / close - 1.0
     target_values = target.to_numpy(dtype=float)
     n_dates, n_symbols, n_features = feature_tensor.shape
     if max_rows is not None:
@@ -237,17 +242,18 @@ def purged_walk_forward_splits(
     return splits
 
 
-def _fit_ridge(x: np.ndarray, y: np.ndarray, alpha: float) -> tuple[np.ndarray, float]:
+def _fit_ridge(x: np.ndarray, y: np.ndarray, alpha: float) -> tuple[np.ndarray, float, np.ndarray, np.ndarray, np.ndarray]:
     if x.size == 0:
-        return np.zeros(x.shape[1]), 0.0
+        return np.zeros(x.shape[1]), 0.0, np.zeros(x.shape[1]), np.ones(x.shape[1]), np.zeros(x.shape[1])
     mean = x.mean(axis=0)
     scale = x.std(axis=0)
     scale[scale == 0] = 1.0
     z = (x - mean) / scale
     y_mean = float(y.mean())
     gram = z.T @ z + float(alpha) * np.eye(z.shape[1])
-    coef = np.linalg.solve(gram, z.T @ (y - y_mean))
-    return coef / scale, y_mean - float((mean / scale) @ coef)
+    coef_z = np.linalg.solve(gram, z.T @ (y - y_mean))
+    coef = coef_z / scale
+    return coef, y_mean - float((mean / scale) @ coef), coef_z, mean, scale
 
 
 def _rank_ic(
@@ -312,6 +318,10 @@ def run_ml_experiment(
     oos_symbols: list[np.ndarray] = []
     fold_rows: list[dict[str, Any]] = []
     last_coef = np.zeros(flat_x.shape[1])
+    last_coef_z = np.zeros(flat_x.shape[1])
+    last_mean = np.zeros(flat_x.shape[1])
+    last_scale = np.ones(flat_x.shape[1])
+    fold_coefficients = []
     for fold, (train_dates, test_dates) in enumerate(splits, start=1):
         train_mask = np.isin(flat_dates, train_dates)
         test_mask = np.isin(flat_dates, test_dates)
@@ -320,9 +330,16 @@ def run_ml_experiment(
         if plan.model_family == "zero":
             coef = np.zeros(flat_x.shape[1])
             intercept = 0.0
+            coef_z = np.zeros(flat_x.shape[1])
+            mean = np.zeros(flat_x.shape[1])
+            scale = np.ones(flat_x.shape[1])
         else:
-            coef, intercept = _fit_ridge(flat_x[train_mask], flat_y[train_mask], plan.ridge_alpha)
+            coef, intercept, coef_z, mean, scale = _fit_ridge(flat_x[train_mask], flat_y[train_mask], plan.ridge_alpha)
         last_coef = np.asarray(coef)
+        last_coef_z = np.asarray(coef_z)
+        last_mean = np.asarray(mean)
+        last_scale = np.asarray(scale)
+        fold_coefficients.append({"fold": fold, "raw": last_coef.tolist(), "standardized": last_coef_z.tolist(), "mean": last_mean.tolist(), "scale": last_scale.tolist()})
         pred = flat_x[test_mask] @ coef + intercept
         truth = flat_y[test_mask]
         fold_dates = flat_dates[test_mask]
@@ -351,6 +368,10 @@ def run_ml_experiment(
     mean_ic = float(np.mean(oos_ics)) if oos_ics else 0.0
     std_ic = float(np.std(oos_ics, ddof=1)) if len(oos_ics) > 1 else 0.0
     t_stat = mean_ic / (std_ic / math.sqrt(len(oos_ics))) if std_ic > 0 else 0.0
+    # Overlapping h-day labels shrink the effective independent sample. Keep
+    # both the naive daily t (for audit) and the effective t used by admission.
+    n_effective = max(1.0, len(oos_ics) / max(1.0, float(plan.target_horizon)))
+    t_effective = mean_ic / (std_ic / math.sqrt(n_effective)) if std_ic > 0 else 0.0
     model_card = {
         "schema": MODEL_CARD_SCHEMA,
         "plan_id": plan.plan_id,
@@ -358,6 +379,10 @@ def run_ml_experiment(
         "model_family": plan.model_family,
         "features": list(plan.features),
         "feature_importance": {name: float(value) for name, value in zip(plan.features, last_coef)},
+        "standardized_feature_importance": {name: float(value) for name, value in zip(plan.features, last_coef_z)},
+        "feature_mean": {name: float(value) for name, value in zip(plan.features, last_mean)},
+        "feature_scale": {name: float(value) for name, value in zip(plan.features, last_scale)},
+        "fold_coefficients": fold_coefficients,
         "cv_scheme": plan.cv_scheme,
         "embargo_days": purge_days,
         "n_splits": len(fold_rows),
@@ -378,7 +403,9 @@ def run_ml_experiment(
             "oos_rank_ic_mean": mean_ic,
             "oos_rank_ic_std": std_ic,
             "oos_rank_ic_t": t_stat,
+            "oos_rank_ic_t_effective": t_effective,
             "n_oos_dates": int(len(oos_ics)),
+            "n_effective_oos": float(n_effective),
             "n_oos_rows": int(len(targets)),
         },
         "model_card": model_card,
@@ -395,14 +422,28 @@ def run_ml_experiment(
             "comparable_with_cross_section_core": False,
         },
         "universe": universe_summary(universe, universe_policy),
+        # Kept in memory for a deterministic distill-fidelity check; stripped
+        # before writing the JSON result to disk.
+        "_fidelity_data": {
+            "predictions": predictions,
+            "dates": groups,
+            "symbols": symbols_oos,
+        },
     }
+    try:
+        from factor_lab.alpha.trial_sink import record_event
+
+        record_event("ml", {"plan_id": plan.plan_id, "features": list(plan.features), "metrics": result["metrics"], "cv_scheme": plan.cv_scheme, "target_horizon": plan.target_horizon})
+    except Exception:  # noqa: BLE001
+        pass
     result["monitor"] = monitor_ml_result(result)
     if out_dir is not None:
         root = Path(out_dir)
         root.mkdir(parents=True, exist_ok=True)
         write_json_atomic(root / f"{plan.plan_id}.plan.json", plan.to_dict())
         write_json_atomic(root / f"{plan.plan_id}.bundle.json", {k: v for k, v in bundle.items() if k != "arrays"})
-        write_json_atomic(root / f"{plan.plan_id}.result.json", result)
+        persistent = {key: value for key, value in result.items() if not key.startswith("_")}
+        write_json_atomic(root / f"{plan.plan_id}.result.json", persistent)
         write_json_atomic(root / f"{plan.plan_id}.model_card.json", model_card)
     return result
 
@@ -412,9 +453,9 @@ def monitor_ml_result(result: dict[str, Any]) -> dict[str, Any]:
     metrics = result.get("metrics") or {}
     cv = result.get("cv") or {}
     warnings: list[str] = []
-    t_stat = metrics.get("oos_rank_ic_t")
+    t_stat = metrics.get("oos_rank_ic_t_effective", metrics.get("oos_rank_ic_t"))
     if t_stat is None or abs(float(t_stat)) < 2.0:
-        warnings.append("oos rank IC t below 2")
+        warnings.append("overlap-adjusted OOS rank IC t below 2")
     if int(metrics.get("n_oos_dates") or 0) < 20:
         warnings.append("too few OOS dates")
     embargo = int((cv or {}).get("embargo_days") or (result.get("plan") or {}).get("embargo_days") or 0)

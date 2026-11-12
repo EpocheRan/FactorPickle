@@ -252,5 +252,6 @@
       ]
     }
   ],
-  "legacy_family_id": "legacy-unassigned"
+  "legacy_family_id": "legacy-unassigned",
+  "policy_version": "2026-11-12.1"
 }

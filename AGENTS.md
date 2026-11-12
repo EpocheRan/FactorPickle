@@ -32,7 +32,8 @@ factors or run an Alpha campaign:
    `protocol: deterministic-maintenance`).
    Each campaign writes `team/team_manifest.json`; every campaign round records
    `agents`, `team_tasks` and `protocol`. Run
-   `python -m factor_lab alpha campaign-audit --campaign-id <id>`; a strict
+   `python -m factor_lab alpha campaign-audit --campaign-id <id>` and
+   `python -m factor_lab alpha campaign-preflight --campaign-id <id>`; a strict
    audit failure is a protocol failure even when the factor evidence is
    reproducible. Do not retro-edit historical rounds.
    ML routing: PathFinder must return `ml_branch`; request ML Planner when no
@@ -63,7 +64,8 @@ The canonical protocol is emitted by `alpha team plan` under
 - Edge Cards are evidence, not promotion. Only validated/active cards may be
   allocated; unvalidated cards never reach the account.
 - Research uses long-short signal evidence; deployment remains long-only.
-- Every expression that touches labels is trial-accounted; holdout is locked.
+- Every expression that touches labels is trial-accounted. Search/dev/ML/holdout events also go to the append-only `output/factor_lab/alpha/trial_events.jsonl` sink; holdout is locked and its use log is `output/factor_lab/alpha/holdout_uses.jsonl`.
+- Before opening or resuming a campaign, run `python -m factor_lab alpha campaign-preflight --campaign-id <id>`; it verifies frozen policy, pre-registration, team provenance, artifact membership and holdout state.
 - Missing data or environment readiness is a blocker; report it and do not
   fabricate results.
 - Web discovery must preserve URLs, retrieval times, and citations. Raw HTML

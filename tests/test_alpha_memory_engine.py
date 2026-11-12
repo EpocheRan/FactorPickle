@@ -103,9 +103,11 @@ def test_search_reads_memory_and_skips_known_expressions(tmp_path) -> None:
     assert cards
     assert cards[0]["factor_ref"]["factor_id"].startswith("search_")
     assert (tmp_path / "factors").exists()
+    known = set(memory.known_expressions())
     second = run_search(dataset, budget=4, horizon=5, seed=3, out_path=str(tmp_path / "b.json"), memory=memory, factor_library_root=tmp_path / "factors")
-    assert second["n_attempted"] == 0
-    assert second["n_evaluated"] == 0
+    # Search may continue with fresh candidates, but must not re-evaluate known ones.
+    assert second["n_attempted"] <= 4
+    assert {item["expression"] for item in second.get("top") or []}.isdisjoint(known)
 
 
 def test_factor_library_is_versioned_and_immutable(tmp_path) -> None:

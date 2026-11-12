@@ -1,0 +1,73 @@
+"""Regression tests for the research-review P0/P1 remediation batch."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pandas as pd
+import pytest
+
+from factor_lab.alpha.governance import (
+    assert_holdout_unused,
+    holdout_uses,
+    policy_snapshot,
+    record_holdout_use,
+)
+from factor_lab.alpha.power import analyze_power
+from factor_lab.alpha.tradability import build_tradability_mask
+
+
+def test_policy_snapshot_is_deterministic() -> None:
+    first = policy_snapshot()
+    second = policy_snapshot()
+    assert first["policy_hash"] == second["policy_hash"]
+    assert first["policy_version"]
+    assert first["files"]
+
+
+def test_holdout_guard_treats_historical_confirm_as_consumed(tmp_path, monkeypatch) -> None:
+    import factor_lab.alpha.governance as governance
+
+    monkeypatch.setattr(governance.config, "LAB_ROOT", tmp_path)
+    confirm = tmp_path / "alpha" / "confirm"
+    confirm.mkdir(parents=True)
+    (confirm / "ALPHA-test.json").write_text(
+        json.dumps(
+            {
+                "expression": "rank(close)",
+                "dataset": {"start": "2025-11-01", "end": "2026-11-01", "data_hash": "x"},
+                "evidence_status": "fail",
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert len(holdout_uses()) == 1
+    with pytest.raises(ValueError, match="already been consumed"):
+        assert_holdout_unused()
+    with pytest.raises(ValueError, match="already consumed"):
+        record_holdout_use(expression="rank(close)", data_hash="x")
+
+
+def test_tradability_mask_blocks_limit_and_suspension() -> None:
+    dates = pd.date_range("2024-01-01", periods=3)
+    columns = ["600000", "000001"]
+    close = pd.DataFrame(
+        [[10.0, 10.0], [11.0, 10.0], [11.0, 10.0]], index=dates, columns=columns
+    )
+    high = close.copy()
+    low = close.copy()
+    volume = pd.DataFrame([[100.0, 100.0], [100.0, 0.0], [100.0, 100.0]], index=dates, columns=columns)
+    ctx = type("Ctx", (), {"close": close, "fields": {"high": high, "low": low, "volume": volume}})()
+    mask = build_tradability_mask(ctx)
+    # The 600000 close reaches its 10% limit on day 2 (can't buy); 000001 is
+    # suspended on day 2 (zero volume).
+    assert not bool(mask.loc[dates[1], "600000"])
+    assert not bool(mask.loc[dates[1], "000001"])
+
+
+def test_power_exposes_rank1_threshold() -> None:
+    result = analyze_power(n_periods=148, n_trials=276, n_eff=145, observed_t=2.3228)
+    assert result["rank1_p"] == pytest.approx(0.10 / 145)
+    assert result["rank1_z"] > 3.0
+    assert 0.0 < result["pass_probability_under_observed_effect"] < 1.0

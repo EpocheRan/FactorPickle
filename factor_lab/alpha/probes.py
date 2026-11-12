@@ -170,6 +170,7 @@ def _run_random(
     rng = np.random.default_rng(int(seed))
     passed = 0
     positive_net = 0
+    net_t_above_2 = 0
     details: list[dict[str, Any]] = []
     for i in range(int(n)):
         factor = pd.DataFrame(
@@ -187,6 +188,7 @@ def _run_random(
         ok = _signal_pass(metrics)
         passed += int(ok)
         positive_net += int(_finite(metrics.get("net_spread")) and float(metrics["net_spread"]) > 0)
+        net_t_above_2 += int(_finite(metrics.get("net_t")) and float(metrics["net_t"]) >= 2.0)
         if len(details) < 5:
             details.append({"sample": i, "passed": ok, "metrics": _metrics_subset(metrics)})
     rate = passed / max(1, int(n))
@@ -199,6 +201,7 @@ def _run_random(
         "definition": "|IC t| two-sided p < 0.05 (signal calibration; post-cost net is reported only for audit)",
         "n_passed": passed,
         "n_positive_net": positive_net,
+        "net_t_above_2_rate": net_t_above_2 / max(1, int(n)),
         "binomial_ci95": _binomial_ci(rate, int(n)),
         "details": details,
     }
@@ -244,8 +247,10 @@ def _run_known(
                 }
             )
     passed = sum(1 for row in rows if row["passed"])
+    net_t_positive = sum(1 for row in rows if _finite((row.get("metrics") or {}).get("net_t")) and float((row.get("metrics") or {})["net_t"]) > 0)
     return {
         "n": len(rows),
+        "n_net_t_positive": net_t_positive,
         "expected_min": min(KNOWN_EXPECTED_MIN, len(rows)),
         "n_passed": passed,
         "definition": "|IC t| two-sided p < 0.05; direction is reported per factor but not used for calibration",

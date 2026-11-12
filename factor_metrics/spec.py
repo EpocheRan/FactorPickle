@@ -40,6 +40,9 @@ class CostModel:
     #: - "per_side": fee charged per unit of traded notional on each side
     #:   (买入或卖出各收一次).  ``cost = 2 × one_way_turnover × bps``.
     bps_meaning: BpsMeaning = "round_trip"
+    #: Annual short-borrow cost charged on the short leg. 0 keeps historical
+    #: research metrics comparable; production/Alpha campaigns may set e.g. 800.
+    borrow_bps_per_year: float = 0.0
 
     def one_way_cost_multiplier(self) -> float:
         return 1.0 if self.bps_meaning == "round_trip" else 2.0
@@ -49,6 +52,7 @@ class CostModel:
             "bps": float(self.bps),
             "convention": self.convention,
             "bps_meaning": self.bps_meaning,
+            **({"borrow_bps_per_year": float(self.borrow_bps_per_year)} if float(self.borrow_bps_per_year) != 0.0 else {}),
         }
 
 

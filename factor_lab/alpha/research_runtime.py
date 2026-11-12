@@ -5,8 +5,9 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from factor_lab.alpha.gates import GatePolicy, load_gate_policy
+from factor_lab.alpha.gates import GatePolicy, alpha_gate_spec, load_gate_policy
 from factor_lab.alpha.data import AlphaDataset
+from factor_metrics import ALPHA_GATE_SPEC, CostModel
 from factor_lab.alpha.evaluation import evaluate_expression
 from factor_lab.alpha.memory import make_edge_card
 
@@ -35,6 +36,8 @@ def run_research(
         start=dataset.start,
         end=dataset.end,
         universe=universe,
+        use_tradability=True,
+        spec=alpha_gate_spec(),
     )
     return {
         "schema": RESULT_SCHEMA,
@@ -71,11 +74,12 @@ def evidence_status(
         n_dates = 0
     if missing or n_dates < int(policy.min_dates_insufficient):
         return "insufficient_evidence"
-    reasons = _failure_reasons(metrics)
+    reasons = _failure_reasons(metrics, policy)
     return "fail" if reasons else "pass"
 
 
-def _failure_reasons(metrics: dict[str, Any]) -> list[str]:
+def _failure_reasons(metrics: dict[str, Any], policy: GatePolicy | None = None) -> list[str]:
+    policy = policy or load_gate_policy()
     reasons: list[str] = []
     net = metrics.get("net_spread")
     ic = metrics.get("ic_mean")
@@ -86,6 +90,12 @@ def _failure_reasons(metrics: dict[str, Any]) -> list[str]:
         reasons.append("IC non-positive")
     if _finite(turnover) and float(turnover) > 0.8:
         reasons.append("turnover high for long-only deployment")
+    net_t = metrics.get("net_t")
+    if _finite(net_t) and float(net_t) < float(policy.min_net_t):
+        reasons.append(f"net_t below significance floor {float(policy.min_net_t):g}")
+    coverage = metrics.get("coverage")
+    if _finite(coverage) and float(coverage) < float(policy.min_coverage):
+        reasons.append(f"coverage below gate floor {float(policy.min_coverage):g}")
     return reasons
 
 
@@ -137,7 +147,7 @@ def explain_result(
         ]
         next_action = "collect_more_evidence"
     elif status == "fail":
-        reasons = _failure_reasons(metrics)
+        reasons = _failure_reasons(metrics, policy)
         next_action = "record_failure"
     else:
         reasons = []

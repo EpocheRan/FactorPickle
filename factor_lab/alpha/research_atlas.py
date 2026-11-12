@@ -121,11 +121,12 @@ def _candidate_table(campaign: dict[str, Any]) -> str:
             f"<td class='num'>{_num(metrics.get('net_spread'))}</td>"
             f"<td class='num'>{_num(metrics.get('net_t'))}</td>"
             f"<td class='num'>{_num(metrics.get('coverage'))}</td>"
+            f"<td class='num'>{_num(row.get('p_one_sided_positive'), 4)} / {_num(row.get('p_two_sided'), 4)}</td>"
             f"<td>{fdr_html}</td>"
             f"<td>{_e(row.get('round_id') or '—')}</td>"
             "</tr>"
         )
-    return '<table class="data"><thead><tr><th>Candidate</th><th>Family</th><th>Gate</th><th>net</th><th>net_t</th><th>coverage</th><th>Program FDR</th><th>Round</th></tr></thead><tbody>' + "".join(body) + "</tbody></table>"
+    return '<table class="data"><thead><tr><th>Candidate</th><th>Family</th><th>Gate</th><th>net</th><th>net_t</th><th>coverage</th><th>p(pos/two)</th><th>Program FDR</th><th>Round</th></tr></thead><tbody>' + "".join(body) + "</tbody></table>"
 
 
 def _idea_block(campaign: dict[str, Any], base: Path) -> str:
@@ -250,8 +251,8 @@ def _axes_table(axes: dict[str, Any]) -> str:
         return '<p class="muted">没有 P0/P1 数据轴覆盖文件。</p>'
     rows = []
     for name, value in sorted(fields.items()):
-        rows.append(f"<tr><td>{_tag(str(value.get('group', '')).upper(), 'info')}</td><td><code>{_e(name)}</code></td><td>{_e(value.get('axis'))}</td><td class='num'>{_num(value.get('coverage'))}</td></tr>")
-    return '<table class="data"><thead><tr><th>Group</th><th>Field</th><th>Axis</th><th>Coverage</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
+        rows.append(f"<tr><td>{_tag(str(value.get('group', '')).upper(), 'info')}</td><td><code>{_e(name)}</code></td><td>{_e(value.get('axis'))}</td><td class='num'>{_num(value.get('coverage'))}</td><td class='num'>{_num(value.get('nonzero'))}</td></tr>")
+    return '<table class="data"><thead><tr><th>Group</th><th>Field</th><th>Axis</th><th>Coverage</th><th>Nonzero</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
 
 
 def _axis_usage_table(portfolio: dict[str, Any]) -> str:
@@ -290,12 +291,12 @@ def render_portfolio(portfolio: dict[str, Any]) -> str:
     return f"""<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Factor Lab · Research Atlas</title><style>{CSS}</style></head><body>
 <header class="hero"><div class="wrap"><div class="eyebrow">Factor Lab · research portfolio · structured-data aggregation</div><h1>Research Atlas</h1>
 <p class="lead">所有研究 campaign 的迭代、想法来源、agent 参与、测试结果、数据集与结论。只读聚合；不引入新的 LLM 判断。</p>
-<div class="meta">generated {_e(portfolio.get('generated_at'))} · {_e(kpis.get('campaigns'))} campaigns · {_e(kpis.get('attempts'))} attempts · {_e(kpis.get('ledger_trials'))} ledger trials · holdout locked={_e(holdout.get('locked'))}</div>
+<div class="meta">generated {_e(portfolio.get('generated_at'))} · {_e(kpis.get('campaigns'))} campaigns · {_e(kpis.get('attempts'))} attempts · {_e(kpis.get('ledger_trials'))} ledger trials · holdout locked={_e(holdout.get('locked'))} · holdout uses={_e(kpis.get('holdout_uses'))} · trial events={_e(kpis.get('trial_events'))}<br>git {_e(str(portfolio.get('git_commit') or 'unknown')[:12])} · policy {_e(str((portfolio.get('policy') or {}).get('policy_hash') or '')[:12])} · fdr rank1 t={_e((portfolio.get('fdr_population') or {}).get('rank1_t'))}</div>
 <div class="kpis"><div class="kpi"><b>{_e(kpis.get('campaigns'))}</b><span>campaigns</span></div><div class="kpi"><b>{_e(kpis.get('attempts'))}</b><span>attempts</span></div><div class="kpi"><b>{_e(kpis.get('ledger_trials'))}</b><span>ledger trials</span></div><div class="kpi"><b>{_e(kpis.get('edge_cards'))}</b><span>Edge Cards</span></div><div class="kpi"><b>{_e(kpis.get('validated'))}</b><span>validated</span></div><div class="kpi"><b>{_num(kpis.get('best_net_t'))}</b><span>best dev net_t</span></div></div></div></header>
 <div class="questions"><a class="question" href="#evolution"><b>01 迭代</b>研究如何推进</a><a class="question" href="#ideas"><b>02 想法</b>问题/地图/预注册</a><a class="question" href="#agents"><b>03 Agent</b>谁参与、产出</a><a class="question" href="#results"><b>04 测试</b>Gate/net_t/FDR</a><a class="question" href="#datasets"><b>05 数据</b>窗口/字段/覆盖</a><a class="question" href="#conclusions"><b>06 结论</b>现在知道什么</a></div>
 <div class="layout"><nav class="toc"><h2>Atlas</h2><a href="#snapshot">研究快照</a><a href="#evolution">01 研究迭代</a><a href="#ideas">02 想法是怎么来的</a><a href="#agents">03 Agent 调用</a><a href="#results">04 测试结果</a><a href="#datasets">05 数据集</a><a href="#conclusions">06 结论</a><a href="#method">方法与边界</a></nav><main>
 <section id="snapshot"><h2>研究快照</h2><p class="sub">先看当前状态，再逐层展开证据。</p>
-<div class="grid g4"><div class="card"><div class="big">{_e(kpis.get('campaigns'))}</div><p>campaigns（{_e(kpis.get('meaningful_campaigns'))} 个研究/discovery/ML；{_e(kpis.get('calibration_campaigns'))} 个 L0 smoke）</p></div><div class="card"><div class="big">{_e(kpis.get('edge_cards'))}</div><p>Edge Cards：{_e(kpis.get('killed'))} killed / {_e(kpis.get('research_cards'))} research / {_e(kpis.get('validated'))} validated</p></div><div class="card"><div class="big">{_e(kpis.get('agents_used'))} / 5</div><p>出现过的 model-facing roles；{audit_ok} audit ok / {audit_fail} audit failed</p></div><div class="card"><div class="big">{_num(kpis.get('best_net_t'))}</div><p>历史 best dev net_t（{_e(kpis.get('best_factor'))}）；不是 freeze 证据</p></div></div>
+<div class="grid g4"><div class="card"><div class="big">{_e(kpis.get('campaigns'))}</div><p>campaigns（{_e(kpis.get('meaningful_campaigns'))} 个研究/discovery/ML；{_e(kpis.get('calibration_campaigns'))} 个 L0 smoke）</p></div><div class="card"><div class="big">{_e(kpis.get('edge_cards'))}</div><p>Edge Cards：{_e(kpis.get('killed'))} killed / {_e(kpis.get('research_cards'))} research / {_e(kpis.get('validated'))} validated</p></div><div class="card"><div class="big">{_e(kpis.get('agents_used'))} / 5</div><p>model-facing roles；{_e(kpis.get('audited_campaigns'))}/{_e(kpis.get('campaigns'))} audited（{audit_ok} ok / {audit_fail} failed）</p></div><div class="card"><div class="big">{_num(kpis.get('best_net_t'))}</div><p>历史 best dev net_t（{_e(kpis.get('best_factor'))}）；不是 freeze 证据</p></div></div>
 <div class="callout warn"><b>读法：</b>Gate pass ≠ freeze；family FDR pass ≠ program FDR pass。holdout 仍 {_e('locked' if holdout.get('locked') else 'not locked')}；没有 validated/active 卡。</div>
 <div class="callout"><b>P0 probe：</b>{_e(latest.get('probe_id'))} · {_e(probe.get('code'))} · instrument_trusted={_e(probe.get('instrument_trusted'))}</div></section>
 
@@ -313,7 +314,8 @@ def render_portfolio(portfolio: dict[str, Any]) -> str:
 
 <section id="results"><h2>04 · 测试结果</h2><p class="sub">Gate / metrics / Edge Cards / program FDR。候选表只展示有独立 metrics 的 cycle；ML admission 单独展示。</p>{_results_table(campaigns)}
 {_ml_summary(campaigns, base)}
-<div class="grid g2" style="margin-top:14px"><div class="card"><b>全局 observed best</b><p>{_e(kpis.get('best_factor'))} · net_t {_num(kpis.get('best_net_t'))}<br>dev evidence only；不是 freeze。</p></div><div class="card"><b>FDR 纪律</b><p>program FDR pass={_e('yes' if kpis.get('fdr_any') else 'no')}；killed cards={_e(kpis.get('killed'))}；validated/active=0。</p></div></div>
+<div class="card"><b>Program FDR population</b><p>n_trials {_e((portfolio.get('fdr_population') or {}).get('n_trials'))} · n_unique {_e((portfolio.get('fdr_population') or {}).get('n_unique'))} · n_eff {_e((portfolio.get('fdr_population') or {}).get('n_eff'))} · rank1 p {_e((portfolio.get('fdr_population') or {}).get('rank1_p'))} · rank1 |t| {_e((portfolio.get('fdr_population') or {}).get('rank1_t'))}</p></div>
+<div class="grid g2" style="margin-top:14px"><div class="card"><b>全局 observed best</b><p>{_e(kpis.get('best_factor'))} · net_t {_num(kpis.get('best_net_t'))}<br>dev evidence only；不是 freeze。</p></div><div class="card"><b>FDR 纪律</b><p>program FDR pass={_e('yes' if kpis.get('fdr_any') else 'no')}；killed cards={_e(kpis.get('killed'))}；validated/active={_e(kpis.get('validated'))}；unattributed cards={_e(kpis.get('unattributed_cards'))}。</p></div></div>
 <details class="block"><summary>展开 candidate 明细</summary>{''.join(f'<h4>P{c.get("phase"):02d} · {_e(c.get("label"))}</h4>{_candidate_table(c)}' for c in meaningful)}</details></section>
 
 <section id="datasets"><h2>05 · 用到了怎样的数据集</h2><p class="sub">来自 data_manifest / P0/P1 data axes / holdout policy；不推断未记录的数据。</p>
@@ -377,7 +379,7 @@ def _ml_summary(campaigns: list[dict[str, Any]], base: Path) -> str:
             f'admission passed={_e(admission.get("passed"))} · blocked={_e(admission.get("blocked_reasons"))}</p>'
             f'<p>{_e(ml.get("conclusion") or "")}</p>'
             + (f'<p>cycle={_e((ml.get("cycle") or {}).get("metrics"))}</p>' if ml.get("cycle") else "")
-            + (f'<p>weights={_e(ml.get("weights"))}</p>' if ml.get("weights") else "")
+            + (f'<p>weights={_e(ml.get("standardized_weights") or ml.get("weights"))}</p>' if ml.get("weights") else "")
             + "</div>"
         )
     if not rows:

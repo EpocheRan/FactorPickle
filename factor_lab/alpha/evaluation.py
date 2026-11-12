@@ -21,6 +21,7 @@ from factor_metrics import (
     evaluate_factor as _core_evaluate_factor,
 )
 from factor_lab.alpha.compiler import AlphaContext, compile_expression
+from factor_lab.alpha.tradability import build_tradability_mask
 
 
 def evaluate_factor(
@@ -35,6 +36,7 @@ def evaluate_factor(
     min_names: int | None = None,
     universe: pd.DataFrame | None = None,
     spec: MetricsSpec | None = None,
+    tradeable: pd.DataFrame | None = None,
 ) -> dict[str, Any]:
     """Evaluate a factor matrix with the calibrated research algorithms.
 
@@ -52,6 +54,7 @@ def evaluate_factor(
         universe=universe,
         spec=spec or ALPHA_GATE_SPEC,
         min_ic_names=min_names,
+        tradeable=tradeable,
     )
     return result.to_dict()
 
@@ -67,8 +70,12 @@ def evaluate_expression(
     end: Any | None = None,
     universe: pd.DataFrame | None = None,
     spec: MetricsSpec | None = None,
+    tradeable: pd.DataFrame | None = None,
+    use_tradability: bool = False,
 ) -> dict[str, Any]:
     factor, report = compile_expression(expression, context)
+    if use_tradability and tradeable is None:
+        tradeable = build_tradability_mask(context)
     if start is not None or end is not None:
         factor = factor.loc[
             (factor.index >= pd.Timestamp(start) if start is not None else True)
@@ -92,7 +99,10 @@ def evaluate_expression(
         open_=open_.loc[factor.index] if open_ is not None else None,
         universe=universe,
         spec=spec,
+        tradeable=tradeable.loc[factor.index] if tradeable is not None else None,
     )
+    if tradeable is not None:
+        result["tradability_blocked_fraction"] = float(1.0 - tradeable.loc[factor.index].to_numpy(dtype=bool).mean())
     result["expression"] = str(expression)
     result["validation"] = report.to_dict()
     return result

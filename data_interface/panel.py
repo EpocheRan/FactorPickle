@@ -28,6 +28,8 @@ class Panel:
     amount: pd.DataFrame | None = None
     turnover: pd.DataFrame | None = None
     close_raw: pd.DataFrame | None = None
+    raw_high: pd.DataFrame | None = None
+    raw_low: pd.DataFrame | None = None
     extras: dict | None = None
     open_raw: pd.DataFrame | None = None
     benchmark: pd.Series | None = None
@@ -61,8 +63,12 @@ class Panel:
             "ts": index,
             "symbol": symbol,
             "close": flat(close),
+            "close_raw": flat(self.close_raw if self.close_raw is not None else close),
             "hfq_close": flat(close),
             "open": flat(self.open),
+            "open_raw": flat(self.open_raw if self.open_raw is not None else self.open),
+            "high_raw": flat(self.raw_high if self.raw_high is not None else self.high),
+            "low_raw": flat(self.raw_low if self.raw_low is not None else self.low),
             "high": flat(self.high),
             "low": flat(self.low),
             "hfq_high": flat(self.high),

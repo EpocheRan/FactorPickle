@@ -20,13 +20,13 @@ All-research dashboard: `python -m factor_lab alpha report` reads campaign round
 
 Pre-registration: `factor_lab.alpha.prereg` validates and freezes a PathFinder pre-registration with a hash before evaluation; FactorBuilder artifacts must match the frozen expressions exactly, and the campaign round records the hash.
 
-ML uses explicit pre-registered features, never auto-injection. `python -m factor_lab alpha axes` includes an `ml` feature catalog; ML Planner should include expanded P0/P1 fields when relevant. PathFinder now returns `ml_branch` and requests ML Planner after two campaigns without ML or after new axes; see `campaign_protocol.ml_planner_policy`.
+ML uses explicit pre-registered features, never auto-injection. `python -m factor_lab alpha axes` includes an `ml` feature catalog; ML Planner should include expanded P0/P1 fields when relevant. PathFinder returns `ml_branch` and requests ML Planner after two campaigns without ML or after new axes; see `campaign_protocol.ml_planner_policy`. ML targets match the Gate entry rule (`close[t+h]/open[t+1]-1`), OOS admission reports both daily and overlap-adjusted t, model cards keep raw/standardized coefficients and fold coefficients, and distill export rejects a fidelity failure. ML experiments are recorded in the unified trial sink and are never frozen as a branch.
 
 Default search includes the expanded P0/P1 axes: `alpha search` samples base OHLCV/valuation fields plus margin, moneyflow, financial quality and P1 event fields. ML plans remain explicit (features are pre-registered, not auto-expanded).
 
-Data axes: P0 fields (margin, moneyflow structure, financial quality, valuation) are loaded by PanelBuilder. P1 event fields (block_trade, top_list, repurchase, stk_holdernumber) are loaded through DataInterfaceGateway.event_bundle from data_interface.p1_events; event flows are zero-filled and all features are PIT-lagged one trading day. `alpha axes` prints the P0/P1 axis catalog; coverage evidence lives under `output/factor_lab/alpha/data_axes/`.
+Data axes: P0 fields (margin, moneyflow structure, financial quality, valuation) are loaded by PanelBuilder. P1 event fields (block_trade, top_list, repurchase, stk_holdernumber) are loaded through DataInterfaceGateway.event_bundle from data_interface.p1_events; flow amounts are zero-filled when no event exists, while event-vwap/ownership values remain null and are treated as missing (not fabricated zeros). Event features use the PIT event date and the full pre-roll state, including earlier holder announcements. `alpha axes` prints the P0/P1 axis catalog; coverage and nonzero-event evidence lives under `output/factor_lab/alpha/data_axes/`. The panel exposes both adjusted (`close/open/high/low`) and raw (`close_raw/open_raw/high_raw/low_raw`) prices; level factors must use the raw columns to avoid qfq future-adjustment leakage. Financial statements are indexed by `publish_date` only (no `period_end` fallback) and weekend announcements are carried into the next trading session.
 
-Family FDR / freeze: `alpha family bootstrap --recost` builds the family ledger (re-costing legacy attempts); `alpha family fdr` computes FDR; `alpha family reclassify` applies program FDR to historical Edge Cards; `alpha freeze` is the only path to a holdout confirmation. `alpha confirm` refuses candidates without a passed freeze decision.
+Family FDR / freeze: `alpha family bootstrap --recost` builds the family ledger (re-costing legacy attempts while preserving `original_metrics`); `alpha family fdr` computes FDR; `alpha family reclassify` applies program FDR to historical Edge Cards; `alpha freeze` is the only path to a holdout confirmation. Freeze requires a verified frozen pre-registration containing the expression and rejects Q overrides. `alpha confirm` refuses candidates without a passed freeze decision and refuses to reuse a holdout that has already been consumed; the append-only log is `output/factor_lab/alpha/holdout_uses.jsonl`.
 
 The binding coding contract is `factor_lab/alpha/ENGINEERING_CONTRACT.md`.
 
@@ -152,6 +152,8 @@ python -m factor_lab alpha memory
 python -m factor_lab alpha library
 python -m factor_lab alpha campaign --objective "研究应计" --max-rounds 5
 python -m factor_lab alpha campaign-audit --campaign-id CAMP-...
+python -m factor_lab alpha campaign-preflight --campaign-id CAMP-...
+python -m factor_lab alpha power --n-trials 276 --n-eff 145 --observations 148
 python -m factor_lab alpha report --report-out output/deliverables/research_portfolio.html
 python -m factor_lab alpha ml --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --features close,volume,amount
 python -m factor_lab alpha discovery
@@ -186,7 +188,8 @@ Do not add direct QuestDB/SQL access to Alpha. Data without PIT is not admitted.
 - Research evidence uses long-short spreads; deployment is long-only.
 - Verdicts are tri-state (`pass` / `fail` / `insufficient_evidence`); missing
   metrics never become pass or fail. Capacity is informational, not a gate.
-- Every label-touching candidate is trial-accounted.
+- Every label-touching candidate and ML experiment is trial-accounted. Search, dev, ML and holdout events also go to the append-only unified sink `output/factor_lab/alpha/trial_events.jsonl`; the legacy memory/ledger remain the FDR denominators until the sink is promoted.
+- A new or resumed campaign must pass `alpha campaign-preflight` (frozen policy, pre-registration, team provenance, artifact membership, holdout state) before touching labels.
 - Red Team failure cannot become a candidate.
 - No validated Edge Card means 100% broad-index baseline.
 - Research modes: `explore`, `validate`, `deploy`. Exploration is allowed to

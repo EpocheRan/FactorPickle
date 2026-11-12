@@ -12,7 +12,10 @@ from factor_lab.core.store import read_json, write_json_atomic
 
 
 def alpha_dir() -> Path:
-    path = config.LAB_ROOT / "alpha"
+    import os
+
+    override = os.environ.get("FACTOR_LAB_TRIALS_DIR")
+    path = Path(override) if override else config.LAB_ROOT / "alpha"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -26,6 +29,12 @@ def append_trial(payload: dict[str, Any]) -> dict[str, Any]:
     path = trials_path()
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
+    try:
+        from factor_lab.alpha.trial_sink import record_event
+
+        record_event("screen", record)
+    except Exception:  # noqa: BLE001
+        pass
     return record
 
 

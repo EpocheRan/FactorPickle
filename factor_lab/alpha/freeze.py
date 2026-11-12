@@ -21,6 +21,7 @@ from typing import Any
 from factor_lab.alpha.fdr import family_fdr, load_family_policy, load_ledger, program_fdr
 from factor_lab.alpha.gates import load_gate_policy
 from factor_lab.alpha.memory import canonical_expression
+from factor_lab.alpha.governance import find_frozen_candidate, policy_snapshot
 from factor_lab.alpha.research_runtime import evidence_status
 from factor_lab.core import config
 from factor_lab.core.store import write_json_atomic
@@ -57,6 +58,7 @@ def freeze_expression(
     campaign_id: str | None = None,
     q: float | None = None,
     write: bool = True,
+    require_prereg: bool = True,
 ) -> dict[str, Any]:
     canonical = canonical_expression(expression)
     ledger = load_ledger()
@@ -70,10 +72,12 @@ def freeze_expression(
     fdr = program_fdr(expression, q=q, ledger=ledger, include_legacy=False)
     family_fdr_result = family_fdr(effective_family, expression, q=q, ledger=ledger)
     metrics = trial.get("metrics") or {}
+    prereg = find_frozen_candidate(expression)
     status = evidence_status(metrics)
     min_dates = int(load_gate_policy().min_dates_insufficient)
     checks = {
         "evidence_status_pass": status == "pass",
+        "pre_registration_pass": bool(prereg and prereg.get("hash_ok")) if require_prereg else True,
         "program_fdr_pass": bool(fdr.get("passed")),
         "coverage_ge_0_90": bool((metrics.get("coverage") or 0.0) >= 0.90),
         "net_spread_positive": bool((metrics.get("net_spread") or 0.0) > 0.0),
@@ -87,6 +91,8 @@ def freeze_expression(
         "family_id": effective_family,
         "campaign_id": campaign_id or trial.get("campaign_id"),
         "trial_id": trial.get("trial_id"),
+        "pre_registration": prereg,
+        "policy": policy_snapshot(),
         "evidence_status": status,
         "metrics": {
             key: metrics.get(key)

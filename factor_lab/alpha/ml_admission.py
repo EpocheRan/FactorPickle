@@ -52,6 +52,10 @@ def admit_ml_result(
     monitor = result.get("monitor") or {}
     coefs = model_card.get("feature_importance") or {}
     coverage = _coverage(result)
+    bundle = result.get("data_bundle") or {}
+    n_dates = int(bundle.get("n_dates") or 0)
+    n_symbols = int(bundle.get("n_symbols") or 0)
+    coverage_all_cells = (float(bundle.get("n_finite_rows") or 0) / float(n_dates * n_symbols)) if n_dates and n_symbols else None
     folds = cv.get("splits") or []
     fold_ics = [float(fold.get("ic_mean")) for fold in folds if _finite(fold.get("ic_mean"))]
     positive_folds = sum(1 for value in fold_ics if value > 0)
@@ -60,7 +64,7 @@ def admit_ml_result(
     horizon = int(plan.get("target_horizon") or 0)
     checks = {
         "oos_ic_mean_ge_0_02": _finite(metrics.get("oos_rank_ic_mean")) and float(metrics["oos_rank_ic_mean"]) >= 0.02,
-        "oos_ic_t_ge_2": _finite(metrics.get("oos_rank_ic_t")) and abs(float(metrics["oos_rank_ic_t"])) >= 2.0,
+        "oos_ic_t_ge_2": _finite(metrics.get("oos_rank_ic_t_effective", metrics.get("oos_rank_ic_t"))) and abs(float(metrics.get("oos_rank_ic_t_effective", metrics.get("oos_rank_ic_t")))) >= 2.0,
         "folds_positive": bool(folds) and positive_folds >= required_positive,
         "coverage_ge_0_90": coverage is not None and coverage >= 0.90,
         "embargo_ge_horizon": embargo >= horizon,
@@ -90,14 +94,18 @@ def admit_ml_result(
         "metrics": {
             "oos_rank_ic_mean": metrics.get("oos_rank_ic_mean"),
             "oos_rank_ic_t": metrics.get("oos_rank_ic_t"),
+            "oos_rank_ic_t_effective": metrics.get("oos_rank_ic_t_effective"),
             "n_oos_dates": metrics.get("n_oos_dates"),
             "positive_folds": positive_folds,
             "n_folds": len(folds),
             "coverage": coverage,
+            "coverage_all_cells": coverage_all_cells,
+            "coverage_definition": "finite_rows / eligible_rows",
             "embargo_days": embargo,
             "target_horizon": horizon,
         },
         "feature_signs": signs_checked,
+        "standardized_feature_importance": model_card.get("standardized_feature_importance"),
         "evaluation_spec": result.get("evaluation_spec"),
         "created_at": config.now_iso(),
     }

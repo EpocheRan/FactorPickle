@@ -12,6 +12,8 @@ from factor_lab.alpha.data import AlphaDataset, HoldoutWindow
 from factor_lab.alpha.deployability import evaluate_long_only_expression
 from factor_lab.alpha.evaluation import evaluate_expression
 from factor_lab.alpha.freeze import latest_passed_freeze
+from factor_lab.alpha.gates import alpha_gate_spec
+from factor_lab.alpha.governance import assert_holdout_unused, record_holdout_use
 from factor_lab.alpha.memory import AlphaMemory, make_edge_card
 from factor_lab.alpha.red_team import red_team_review
 from factor_lab.alpha.research_runtime import evidence_status, policy_warnings
@@ -35,6 +37,7 @@ def confirm_search(
         raise ValueError("confirm requires the persisted locked holdout window")
     if not holdout.locked:
         raise ValueError("holdout is not locked")
+    assert_holdout_unused()
     start = pd.Timestamp(dataset.start)
     end = pd.Timestamp(dataset.end)
     if start < pd.Timestamp(holdout.holdout_start) or end > pd.Timestamp(holdout.holdout_end):
@@ -69,6 +72,8 @@ def confirm_search(
         start=dataset.start,
         end=dataset.end,
         universe=universe,
+        spec=alpha_gate_spec(),
+        use_tradability=True,
     )
     factor, _ = compile_expression(expression, dataset.context)
     factor = factor.loc[(factor.index >= dataset.start) & (factor.index <= dataset.end)]
@@ -129,6 +134,20 @@ def confirm_search(
         "universe": universe_summary(universe, universe_policy),
         "freeze_decision": {k: freeze_decision.get(k) for k in ("passed", "family_id", "created_at", "path")},
     }
+    try:
+        from factor_lab.alpha.trial_sink import record_event
+
+        record_event("holdout", {"expression": expression, "metrics": metrics, "search_path": str(search_path)})
+    except Exception:  # noqa: BLE001
+        pass
+    record_holdout_use(
+        expression=expression,
+        campaign_id=str(payload.get("campaign_id") or ""),
+        data_hash=str((dataset.data_manifest or {}).get("data_hash") or ""),
+        window_start=str(holdout.holdout_start),
+        window_end=str(holdout.holdout_end),
+        freeze_path=str(freeze_decision.get("path") or ""),
+    )
     out = config.LAB_ROOT / "alpha" / "confirm" / f"{Path(search_path).stem}.json"
     write_json_atomic(out, result)
     result["path"] = str(out)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +22,7 @@ from factor_lab.alpha.factor_library import write_factor_artifact
 from factor_lab.alpha.memory import AlphaMemory, canonical_expression, make_edge_card
 from factor_lab.alpha.red_team import red_team_review
 from factor_lab.alpha.trials import append_trial, benjamini_hochberg, p_value_from_t
+from factor_lab.alpha.gates import alpha_gate_spec
 from factor_lab.alpha.universe import UniversePolicy, universe_summary
 from factor_lab.alpha.validation import validate
 from factor_lab.core import config
@@ -56,7 +58,7 @@ class Candidate:
         }
 
 
-def _candidate(context: AlphaContext, expression: str, *, horizon: int, cost_bps: float, source: str, generation: int, start: str, end: str, universe: pd.DataFrame | None = None) -> Candidate | None:
+def _candidate(context: AlphaContext, expression: str, *, horizon: int, cost_bps: float, source: str, generation: int, start: str, end: str, universe: pd.DataFrame | None = None, tradeable: pd.DataFrame | None = None) -> Candidate | None:
     try:
         report = validate(expression, known_fields=context.field_names)
         if not report.ok:
@@ -73,6 +75,8 @@ def _candidate(context: AlphaContext, expression: str, *, horizon: int, cost_bps
             amount=amount.loc[factor.index] if amount is not None else None,
             open_=context.fields.get("open").loc[factor.index] if context.fields.get("open") is not None else None,
             universe=universe,
+            tradeable=tradeable.loc[factor.index] if tradeable is not None else None,
+            spec=alpha_gate_spec(),
         )
         policy = load_gate_policy()
         if int(metrics.get("n_dates", 0)) < int(policy.min_dates_insufficient):
@@ -88,6 +92,20 @@ def _candidate(context: AlphaContext, expression: str, *, horizon: int, cost_bps
         source=source,
         generation=generation,
     )
+
+
+def _expression_tokens(expression: str) -> set[str]:
+    return set(re.findall(r"[A-Za-z_][A-Za-z_0-9]*|\d+(?:\.\d+)?", str(expression)))
+
+
+def _near_duplicate(tokens: set[str], seen: list[set[str]], threshold: float = 0.98) -> bool:
+    if not tokens:
+        return False
+    for previous in seen:
+        union = tokens | previous
+        if union and len(tokens & previous) / len(union) >= threshold:
+            return True
+    return False
 
 
 BASE_SEARCH_FIELDS = [
@@ -198,15 +216,29 @@ def run_search(
     rng = random.Random(seed)
     context = dataset.context
     fields = _fields(context)
+    from factor_lab.alpha.tradability import build_tradability_mask
+
+    tradeable = build_tradability_mask(context)
     candidates: list[Candidate] = []
     attempted = 0
+    near_duplicates = 0
+    seen_token_sets: list[set[str]] = []
     memory = memory or AlphaMemory()
     known = memory.known_expressions()
     seen: set[str] = {canonical_expression(item) for item in known}
     search_id = f"ALPHA-{uuid.uuid4().hex[:8]}"
 
+    max_attempts = max(1, int(budget))
+
     def evaluate_candidate(expression: str, *, source: str, generation: int) -> Candidate | None:
         nonlocal attempted
+        if attempted >= max_attempts:
+            return None
+        tokens = _expression_tokens(expression)
+        if _near_duplicate(tokens, seen_token_sets):
+            nonlocal near_duplicates
+            near_duplicates += 1
+            return None
         attempted += 1
         candidate = _candidate(
             context,
@@ -218,6 +250,7 @@ def run_search(
             start=dataset.start,
             end=dataset.end,
             universe=universe,
+            tradeable=tradeable,
         )
         if candidate is None:
             memory.record_attempt(
@@ -250,6 +283,8 @@ def run_search(
 
     # Optional LLM/PathFinder seeds are evaluated under the same trial accounting.
     for expression in list(seed_expressions or []):
+        if attempted >= max_attempts:
+            break
         text = str(expression).strip()
         key = canonical_expression(text)
         if not text or key in seen:
@@ -261,6 +296,8 @@ def run_search(
 
     # Human baselines are seeds, not the search space.
     for baseline in HUMAN_BASELINES:
+        if attempted >= max_attempts:
+            break
         baseline_key = canonical_expression(baseline.expression)
         if baseline_key in seen:
             continue
@@ -271,6 +308,8 @@ def run_search(
 
     # Random / grammar candidates.
     for index in range(max(0, int(budget))):
+        if attempted >= max_attempts:
+            break
         expression = _random_atom(rng, fields, depth=rng.choice([1, 2, 2, 3]))
         expression_key = canonical_expression(expression)
         if expression_key in seen:
@@ -284,6 +323,8 @@ def run_search(
     for generation in range(2, 5):
         parents = _dedupe(candidates)[: max(8, budget // 8)]
         for parent in parents:
+            if attempted >= max_attempts:
+                break
             expression = _mutate(rng, parent.expression, fields)
             expression_key = canonical_expression(expression)
             if expression_key in seen:
@@ -333,7 +374,7 @@ def run_search(
         candidate_payload["red_team"] = review
         confirmed.append(candidate_payload)
 
-    pvalues = [p_value_from_t(float(item.metrics.get("ic_t", 0.0)), int(item.metrics.get("n_dates", 0))) for item in ranked]
+    pvalues = [p_value_from_t(float(item.metrics.get("ic_t", 0.0)), int(item.metrics.get("n_dates", 0))) for item in _dedupe(candidates)]
     bh = benjamini_hochberg(pvalues, q=0.1)
     passed_count = sum(1 for item in bh if item["passed"])
 
@@ -341,11 +382,9 @@ def run_search(
         best = dict(confirmed[0] if confirmed else ranked[0].to_dict())
         best_metrics = dict(best.get("metrics") or {})
         review = best.get("red_team") or {}
-        card_status = (
-            "signal_validated"
-            if review.get("passed") and float(best_metrics.get("net_spread", -1.0)) > 0.0
-            else "research"
-        )
+        # Search evidence is research evidence only; holdout confirmation is
+        # the only path to signal_validated.
+        card_status = "research" if review.get("passed") and float(best_metrics.get("net_spread", -1.0)) > 0.0 else "parked"
         factor_ref = {"factor_id": "", "version": "", "code_hash": ""}
         try:
             artifact = write_factor_artifact(
@@ -402,7 +441,8 @@ def run_search(
         "n_attempted": attempted,
         "n_evaluated": len(candidates),
         "n_ranked": len(ranked),
-        "fdr": {"q": 0.1, "n_trials": len(pvalues), "n_attempted": attempted, "passed": passed_count},
+        "n_near_duplicates": near_duplicates,
+        "fdr": {"q": 0.1, "n_trials": len(pvalues), "n_attempted": attempted, "n_unique": len({canonical_expression(item.expression) for item in candidates}), "passed": passed_count},
         "universe": universe_summary(universe, universe_policy),
         "top": [item.to_dict() for item in ranked[:10]],
         "confirmed": confirmed,

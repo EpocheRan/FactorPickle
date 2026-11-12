@@ -179,3 +179,32 @@ def verify_frozen(path: str | Path) -> dict[str, Any]:
         }
     )
     return {"ok": bool(report["ok"]) and stored == recomputed, "report": report, "hash": stored, "recomputed_hash": recomputed}
+
+
+def find_frozen_candidate(expression: str, root: str | Path | None = None) -> dict[str, Any] | None:
+    """Return frozen pre-registration evidence for a canonical expression."""
+    import json as _json
+    from factor_lab.alpha.memory import canonical_expression as _canonical
+    from factor_lab.core import config as _config
+
+    target = _canonical(expression)
+    lab_root = Path(root) if root is not None else Path(_config.LAB_ROOT)
+    for path in sorted((lab_root / "alpha" / "campaigns").glob("*/team/pre_registration.frozen.json")):
+        try:
+            payload = _json.loads(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+        for family in payload.get("families") or []:
+            for candidate in family.get("candidates") or []:
+                candidate_expression = str(candidate.get("expression") or "")
+                if candidate_expression and _canonical(candidate_expression) == target:
+                    return {
+                        "campaign_id": payload.get("campaign_id") or path.parent.parent.name,
+                        "family_id": family.get("family_id"),
+                        "candidate_id": candidate.get("candidate_id"),
+                        "expression": candidate_expression,
+                        "path": str(path),
+                        "pre_registration_hash": payload.get("pre_registration_hash"),
+                        "hash_ok": verify_frozen(path).get("ok"),
+                    }
+    return None

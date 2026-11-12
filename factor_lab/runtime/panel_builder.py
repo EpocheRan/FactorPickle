@@ -137,6 +137,25 @@ def build_factor_panel(
     volume = _wide(market, "volume")
     amount = _wide(market, "amount")
     turnover = _wide(market, "turnover")
+    # Raw (unadjusted) prices are needed for level factors; qfq close/lows are
+    # reserved for return/technical fields and can leak future corporate actions.
+    raw_close = None
+    raw_open = None
+    raw_high = None
+    raw_low = None
+    try:
+        raw_frames, raw_manifest = gateway.ohlc(codes, fetch_start, end, adjust="none")
+        raw_bundle = DataBundle(kind="market_raw", frames=raw_frames, fields=list(raw_manifest.fields), manifest=raw_manifest)
+        raw_close = _wide(raw_bundle, "close")
+        raw_open = _wide(raw_bundle, "open")
+        raw_high = _wide(raw_bundle, "high")
+        raw_low = _wide(raw_bundle, "low")
+        manifests.append(raw_manifest)
+    except Exception:  # noqa: BLE001
+        raw_close = None
+        raw_open = None
+        raw_high = None
+        raw_low = None
     columns = list(close.columns)
 
     def align(frame: pd.DataFrame | None) -> pd.DataFrame | None:
@@ -166,7 +185,14 @@ def build_factor_panel(
         if aligned is None:
             continue
         if str(name).lower().startswith("fin_"):
-            aligned = aligned.ffill()
+            # Keep weekend/holiday announcements: carry them forward on the
+            # union calendar, then align to the trading calendar.
+            try:
+                union = frame.index.union(close.index).sort_values()
+                widened = frame.reindex(union).ffill()
+                aligned = (widened.reindex(index=close.index, columns=close.columns)).ffill()
+            except Exception:  # noqa: BLE001
+                aligned = aligned.ffill()
         aligned_extras[name] = aligned
     extras = aligned_extras
 
@@ -197,17 +223,31 @@ def build_factor_panel(
 
     manifest = DataManifest(
         services=sorted({service for item in manifests for service in item.services}),
-        fields=sorted({field for item in manifests for field in item.fields}),
+        fields=sorted({field for item in manifests for field in item.fields} | {"close_raw"} if raw_close is not None else {field for item in manifests for field in item.fields}),
         codes=columns,
         start=str(start),
         end=str(end),
         rows=int(len(close)),
         data_hash="-".join(item.data_hash for item in manifests),
+        fetch_start=fetch_start,
+        warmup_days=int(warmup_days),
+        n_eval_dates=int(len(close.loc[(close.index >= pd.Timestamp(start)) & (close.index <= pd.Timestamp(end))])),
+        n_cells=int(close.loc[(close.index >= pd.Timestamp(start)) & (close.index <= pd.Timestamp(end))].shape[0] * close.shape[1]),
+        adjust=str(adjust),
     )
     manifest.source = "DataInterfaceGateway"
+    manifest.per_field_coverage = {
+        name: round(float(frame.loc[(frame.index >= pd.Timestamp(start)) & (frame.index <= pd.Timestamp(end))].notna().to_numpy().mean()), 6)
+        for name, frame in (extras or {}).items()
+        if isinstance(frame, pd.DataFrame) and not frame.empty
+    }
     panel = Panel(
         close=close,
         open=align(open_),
+        close_raw=align(raw_close) if raw_close is not None else None,
+        open_raw=align(raw_open) if raw_open is not None else None,
+        raw_high=align(raw_high) if raw_high is not None else None,
+        raw_low=align(raw_low) if raw_low is not None else None,
         market_cap=market_cap.reindex(index=close.index, columns=columns) if market_cap is not None else None,
         industry=industry,
         regime=regime,

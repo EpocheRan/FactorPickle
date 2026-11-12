@@ -322,8 +322,11 @@ def _recost_attempts(
                     end=end,
                     universe=mask,
                 )
+                row["original_metrics"] = dict(row.get("metrics") or {})
+                row["original_dataset_manifest"] = ((row.get("metrics") or {}).get("data_manifest") if isinstance((row.get("metrics") or {}).get("data_manifest"), dict) else None)
                 row["metrics"] = metrics
                 row["recosted"] = True
+                row["recast_of"] = {"window": [start, end], "cost_bps": 20.0, "bps_meaning": "per_side"}
                 recosted += 1
             except Exception as exc:  # noqa: BLE001
                 row["recosted"] = False
@@ -411,8 +414,11 @@ def build_ledger(
     if trials_file.exists():
         legacy_trials_lines = sum(1 for line in trials_file.read_text(encoding="utf-8").splitlines() if line.strip())
 
+    from factor_lab.alpha.governance import policy_snapshot
+
     summary = {
         "schema": LEDGER_SCHEMA,
+        "policy": policy_snapshot(),
         "q": policy.get("q", 0.10),
         "n_trials": len(rows),
         "by_family": dict(sorted(by_family.items())),

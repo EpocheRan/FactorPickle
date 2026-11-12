@@ -42,10 +42,14 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
             "library",
             "campaign",
             "campaign-audit",
+            "campaign-preflight",
+            "power",
             "family",
             "report",
             "freeze",
             "ml",
+            "ml-admit",
+            "ml-export",
             "discovery",
             "axes",
             "roles",
@@ -87,6 +91,8 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
     parser.add_argument("--ml-embargo", type=int, default=5)
     parser.add_argument("--ml-out", default="")
     parser.add_argument("--ml-plan", default="")
+    parser.add_argument("--ml-result", default="")
+    parser.add_argument("--factor-id", default="")
     parser.add_argument("--discovery-file", default="")
     parser.add_argument("--report-out", default="")
     parser.add_argument("--round-file", default="")
@@ -98,6 +104,9 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
     parser.add_argument("--behavior-action", choices=["list", "show", "verify"], default="show")
     parser.add_argument("--no-pit-universe", action="store_true", help="disable the point-in-time universe gate")
     parser.add_argument("--agent", default="")
+    parser.add_argument("--n-trials", type=int, default=276)
+    parser.add_argument("--n-eff", type=int, default=145)
+    parser.add_argument("--observations", type=int, default=148)
 
 
 def _run_alpha(args: argparse.Namespace) -> int:
@@ -276,6 +285,26 @@ def _run_alpha(args: argparse.Namespace) -> int:
 
         _print(write_portfolio_report(args.report_out or None))
         return 0
+    if args.action == "power":
+        from factor_lab.alpha.power import analyze_power
+
+        _print(
+            analyze_power(
+                n_periods=int(args.observations),
+                n_trials=int(args.n_trials),
+                n_eff=int(args.n_eff),
+                q=float(args.q if args.q is not None else 0.10),
+                horizon=int(args.horizon),
+            )
+        )
+        return 0
+    if args.action == "campaign-preflight":
+        if not args.campaign_id:
+            raise SystemExit("alpha campaign-preflight requires --campaign-id")
+        from factor_lab.alpha.preflight import preflight
+
+        _print(preflight(args.campaign_id))
+        return 0
     if args.action == "campaign-audit":
         if not args.campaign_id:
             raise SystemExit("alpha campaign-audit requires --campaign-id")
@@ -319,6 +348,8 @@ def _run_alpha(args: argparse.Namespace) -> int:
         if args.team_command == "list":
             _print(freeze_list())
             return 0
+        if args.q is not None:
+            raise SystemExit("freeze does not accept --q overrides; use the pre-registered policy q")
         expression = args.expression
         if args.factor_artifact and not expression:
             artifact = Path(args.factor_artifact)
@@ -371,6 +402,38 @@ def _run_alpha(args: argparse.Namespace) -> int:
         universe, policy = pit_universe(dataset)
         payload = evaluate_long_only_expression(args.expression, dataset.context, horizon=args.horizon, cost_bps=args.cost_bps, start=args.start, end=args.end, universe=universe)
         _print(attach_universe(payload, universe, policy))
+        return 0
+    if args.action == "ml-export":
+        from factor_lab.alpha.ml_export import export_ml_factor
+
+        if not args.ml_result:
+            raise SystemExit("alpha ml-export requires --ml-result")
+        result = read_json(Path(args.ml_result))
+        if not isinstance(result, dict):
+            raise SystemExit("ML result must be a JSON object")
+        codes = sorted({part.strip() for part in args.codes.replace("\n", ",").split(",") if part.strip()}) if args.codes else []
+        if not codes:
+            raise SystemExit("alpha ml-export requires --codes for fidelity replay")
+        dataset = load_alpha_dataset(codes, args.start, args.end, warmup_days=args.warmup)
+        payload = export_ml_factor(
+            result,
+            factor_id=args.factor_id or "ml_signal",
+            family=args.family_id or "ml_signal",
+            out_path=args.out or None,
+            dataset=dataset,
+            require_fidelity=True,
+        )
+        _print(payload)
+        return 0
+    if args.action == "ml-admit":
+        from factor_lab.alpha.ml_admission import admit_ml_result
+
+        if not args.ml_result:
+            raise SystemExit("alpha ml-admit requires --ml-result")
+        result = read_json(Path(args.ml_result))
+        if not isinstance(result, dict):
+            raise SystemExit("ML result must be a JSON object")
+        _print(admit_ml_result(result, out_path=args.ml_out or None))
         return 0
     if args.action == "ml":
         from factor_lab.alpha.ml_branch import plan_from_dict

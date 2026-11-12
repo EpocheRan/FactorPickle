@@ -39,6 +39,12 @@ class DataManifest:
     rows: int = 0
     data_hash: str = ""
     error: str = ""
+    fetch_start: str = ""
+    warmup_days: int = 0
+    n_eval_dates: int = 0
+    n_cells: int = 0
+    adjust: str = ""
+    per_field_coverage: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -52,6 +58,12 @@ class DataManifest:
             "rows": self.rows,
             "data_hash": self.data_hash,
             "error": self.error,
+            "fetch_start": self.fetch_start,
+            "warmup_days": int(self.warmup_days),
+            "n_eval_dates": int(self.n_eval_dates),
+            "n_cells": int(self.n_cells),
+            "adjust": self.adjust,
+            "per_field_coverage": dict(self.per_field_coverage),
         }
 
 
@@ -523,7 +535,11 @@ class DataInterfaceGateway:
                 for row in data:
                     if not isinstance(row, dict):
                         continue
-                    ts = row.get("publish_date") or row.get("period_end")
+                    ts = row.get("publish_date")
+                    if not ts:
+                        # A missing publication date is not PIT-safe; do not
+                        # silently fall back to period_end.
+                        continue
                     timestamp = pd.to_datetime(ts, errors="coerce")
                     if pd.isna(timestamp):
                         continue

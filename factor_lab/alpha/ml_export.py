@@ -12,6 +12,8 @@ from typing import Any
 
 from factor_lab.alpha.factor_library import write_factor_artifact
 from factor_lab.alpha.validation import validate
+from factor_lab.alpha.compiler import compile_expression
+from factor_lab.alpha.governance import policy_snapshot
 from factor_lab.core.store import write_json_atomic
 
 
@@ -26,11 +28,11 @@ def _term(feature: str, weight: float) -> tuple[str, float]:
 
 def distill_expression(model_card: dict[str, Any]) -> dict[str, Any]:
     features = [str(item) for item in (model_card.get("features") or [])]
-    importance = model_card.get("feature_importance") or {}
+    importance = model_card.get("standardized_feature_importance") or model_card.get("feature_importance") or {}
     terms = []
     for feature in features:
         weight = importance.get(feature)
-        if weight is None:
+        if weight is None or abs(float(weight)) < 1e-12:
             continue
         term, signed = _term(feature, float(weight))
         if term:
@@ -56,6 +58,42 @@ def distill_expression(model_card: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def distill_fidelity(result: dict[str, Any], dataset: Any) -> dict[str, Any]:
+    """Compare the distilled DSL factor with the OOS model score by date."""
+    import numpy as np
+    import pandas as pd
+
+    data = result.get("_fidelity_data") or {}
+    predictions = data.get("predictions")
+    dates = data.get("dates")
+    symbols = data.get("symbols")
+    if predictions is None or dates is None or symbols is None:
+        return {"schema": "factor_lab.alpha.distill_fidelity.v1", "available": False, "reason": "no in-memory OOS predictions"}
+    model_card = result.get("model_card") or {}
+    distilled = distill_expression(model_card)
+    factor, _ = compile_expression(distilled["expression"], dataset.context)
+    pred = pd.DataFrame({"date": np.asarray(dates), "symbol": np.asarray(symbols), "pred": np.asarray(predictions, dtype=float)})
+    pred_wide = pred.pivot(index="date", columns="symbol", values="pred")
+    common_dates = pred_wide.index.intersection(factor.index)
+    corr = []
+    for date in common_dates:
+        pair = pd.concat([pred_wide.loc[date].rename("p"), factor.loc[date].rename("f")], axis=1).dropna()
+        if len(pair) >= 10:
+            value = pair["p"].rank().corr(pair["f"].rank())
+            if np.isfinite(value):
+                corr.append(float(value))
+    value = float(np.mean(corr)) if corr else None
+    return {
+        "schema": "factor_lab.alpha.distill_fidelity.v1",
+        "available": True,
+        "n_dates": len(corr),
+        "mean_rank_corr": value,
+        "passed": bool(value is not None and abs(value) >= 0.95),
+        "threshold": 0.95,
+        "expression": distilled["expression"],
+    }
+
+
 def export_ml_factor(
     result: dict[str, Any],
     *,
@@ -63,18 +101,27 @@ def export_ml_factor(
     family: str = "ml_signal",
     library_root: str | Path | None = None,
     out_path: str | Path | None = None,
+    dataset: Any | None = None,
+    require_fidelity: bool = False,
+    campaign_id: str = "",
 ) -> dict[str, Any]:
     model_card = result.get("model_card") or {}
     distilled = distill_expression(model_card)
+    fidelity = distill_fidelity(result, dataset) if dataset is not None else None
+    if require_fidelity and fidelity is not None and not fidelity.get("passed"):
+        raise ValueError(f"distill fidelity gate failed: {fidelity}")
     plan = result.get("plan") or {}
     spec = {
         "kind": "ml_distilled",
         "mechanism": "linear ML signal distilled to DSL rank combination",
-        "source_campaign": plan.get("plan_id"),
+        "source_campaign": campaign_id or plan.get("plan_id"),
+        "campaign_id": campaign_id or None,
+        "policy_hash": policy_snapshot().get("policy_hash"),
         "model_family": model_card.get("model_family"),
         "features": model_card.get("features"),
         "evaluation_spec": result.get("evaluation_spec"),
         "distilled_weights": distilled["weights"],
+        "standardized_weights": (model_card.get("standardized_feature_importance") or {}),
         "holdout_confirmed": False,
         "venue": "P2 ML execution",
     }
@@ -93,7 +140,9 @@ def export_ml_factor(
         "version": artifact.version,
         "expression": distilled["expression"],
         "weights": distilled["weights"],
+        "standardized_weights": model_card.get("standardized_feature_importance") or {},
         "validation": distilled["validation"],
+        "fidelity": fidelity,
         "manifest_path": str(artifact.path),
     }
     if out_path is not None:

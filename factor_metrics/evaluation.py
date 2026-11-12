@@ -121,22 +121,26 @@ def _ic_series(
 
 
 def _spread_series(
-    quantile_result, groups: int, cost_model: CostModel
-) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
-    """Return (gross, leg_cost, net, leg_turnover) period series."""
+    quantile_result, groups: int, cost_model: CostModel, horizon: int = 5
+) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series, pd.Series]:
+    """Return (gross, leg_cost, borrow, net, leg_turnover) period series."""
     _, turnover_df, _, periods_gross, _, _, _ = quantile_result
     q_hi, q_lo = f"Q{groups}", "Q1"
     if periods_gross.empty or q_hi not in periods_gross or q_lo not in periods_gross:
         empty = pd.Series(dtype="float64")
-        return empty, empty, empty, empty
+        return empty, empty, empty, empty, empty
     gross = (periods_gross[q_hi] - periods_gross[q_lo]).dropna()
     legs = (
         turnover_df.get(q_hi, pd.Series(dtype="float64")).reindex(gross.index).fillna(0.0)
         + turnover_df.get(q_lo, pd.Series(dtype="float64")).reindex(gross.index).fillna(0.0)
     )
     cost = legs * float(cost_model.bps) * cost_model.one_way_cost_multiplier() / 10000.0
-    net = gross - cost
-    return gross, cost, net, legs
+    borrow = pd.Series(
+        float(cost_model.borrow_bps_per_year) / 10000.0 * float(horizon) / 252.0,
+        index=gross.index,
+    )
+    net = gross - cost - borrow
+    return gross, cost, borrow, net, legs
 
 
 def evaluate_factor(
@@ -151,6 +155,7 @@ def evaluate_factor(
     universe: pd.DataFrame | None = None,
     spec: MetricsSpec | None = None,
     min_ic_names: int | None = None,
+    tradeable: pd.DataFrame | None = None,
 ) -> FactorMetrics:
     """Evaluate one factor with the calibrated research primitives.
 
@@ -183,13 +188,15 @@ def evaluate_factor(
     forward = _forward_matrix(close, open_, horizon, entry)
     entry_frame = _entry_frame(close, open_, entry)
     quantile = _quantile_nav(
-        factor, close, entry_frame, groups=groups, horizon=horizon, cost_bps=float(cost_bps)
+        factor, close, entry_frame, groups=groups, horizon=horizon, cost_bps=float(cost_bps), tradeable=tradeable
     )
-    gross_series, cost_series, net_series, leg_turnover = _spread_series(
-        quantile, groups, spec.cost
+    gross_series, cost_series, borrow_series, net_series, leg_turnover = _spread_series(
+        quantile, groups, spec.cost, horizon
     )
     if gross_series.empty:
         metrics = _empty_metrics(spec, factor, raw_factor, universe_mask, close)
+        if tradeable is not None:
+            metrics["tradability_blocked_fraction"] = float(1.0 - tradeable.reindex_like(factor).fillna(False).to_numpy(dtype=bool).mean())
         return FactorMetrics(spec=spec, metrics=metrics)
 
     ic_series = _ic_series(factor, forward, spec)
@@ -214,6 +221,7 @@ def evaluate_factor(
     gross_stats = spread_stats(gross_series)
     net_stats = spread_stats(net_series)
     cost_per_period = float(cost_series.mean())
+    borrow_cost_per_period = float(borrow_series.mean()) if len(borrow_series) else 0.0
     turnover = float(leg_turnover.mean() / 2.0) if len(leg_turnover) else float("nan")
     sharpe = float(_period_performance(net_series, horizon).get("sharpe", np.nan))
 
@@ -278,6 +286,9 @@ def evaluate_factor(
         "groups": groups,
         "cost_bps": float(cost_bps),
     }
+    if float(spec.cost.borrow_bps_per_year) != 0.0:
+        metrics["borrow_bps_per_year"] = float(spec.cost.borrow_bps_per_year)
+        metrics["borrow_cost_per_period"] = _round(borrow_cost_per_period, 6)
     return FactorMetrics(spec=spec, metrics=metrics)
 
 
@@ -302,7 +313,7 @@ def _winsorized_net_spread(
             horizon=horizon,
             cost_bps=float(cost_bps),
         )
-        _, _, net_series, _ = _spread_series(quantile, groups, spec.cost)
+        _, _, _, net_series, _ = _spread_series(quantile, groups, spec.cost, horizon)
         return float(net_series.mean()) if len(net_series) else float("nan")
     except Exception:  # noqa: BLE001 - diagnostic must never break the evaluation
         return float("nan")
@@ -419,7 +430,9 @@ def evaluate_long_only(
         current = set(str(item) for item in top)
         turnover = float(len(current - previous) / max(1, len(current)))
         previous = current
-        cost = turnover * float(cost_bps) / 10000.0
+        # Long-only trades both sides of the turnover: per-side 20bps means
+        # 2 * turnover * bps, matching the LS leg convention.
+        cost = turnover * float(cost_bps) * 2.0 / 10000.0
         net = gross - cost
         top_returns.append(float(valid.loc[top, "r"].mean()) - cost)
         benchmark_returns.append(float(valid["r"].mean()))

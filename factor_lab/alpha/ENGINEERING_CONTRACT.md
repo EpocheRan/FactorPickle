@@ -226,7 +226,8 @@ recorded under `output/factor_lab/alpha/data_axes/coverage.json`.
   or non-finite metrics never become pass or fail. Capacity is informational
   only and never vetoes a candidate.
 - Locked holdout is never used for candidate generation.
-- Every label-touching candidate is trial-accounted.
+- Every label-touching candidate and ML experiment is trial-accounted; search/dev/ML/holdout events are mirrored to the append-only `output/factor_lab/alpha/trial_events.jsonl` sink.
+- Freeze requires a verified frozen pre-registration containing the candidate expression and rejects Q overrides. Confirmation is refused once any holdout use is recorded (`holdout_uses.jsonl`).
 - Pre-registration is frozen with a hash before evaluation; artifacts must match the frozen expressions exactly. Attempts record `family_id` and `pre_registered`.
 - ML features are explicit and pre-registered; the runtime validates that expanded P0/P1 fields exist, but never auto-injects them. PathFinder must expose `ml_branch` and route to ML Planner after two ML-free campaigns or when expanded axes changed.
 - Event features carry the disclosure/trade date already present as `ts`; the p1_events adapter applies exactly one trading-day lag. Do not apply a second arbitrary lag in factor expressions.
@@ -235,6 +236,7 @@ recorded under `output/factor_lab/alpha/data_axes/coverage.json`.
 - Only validated/active Edge Cards may be allocated.
 - No validated edge means 100% broad-index baseline.
 - Research modes: `explore`, `validate`, `deploy`.
+- ML targets use the same entry rule as the Gate; OOS admission uses an overlap-adjusted t in addition to the naive daily t. Model cards record raw and standardized coefficients; export runs a distill-fidelity check.
 - ML is non-deep-learning; purged walk-forward with embargo at least as long as
   the target horizon.
 - Web discovery requires cited sources and retrieval times.

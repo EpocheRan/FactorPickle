@@ -60,6 +60,10 @@ class AlphaContext:
         for name in ("open", "high", "low", "volume", "amount", "turnover", "market_cap"):
             add(name, getattr(panel, name, None))
         add("close", close)
+        add("close_raw", getattr(panel, "close_raw", None))
+        add("open_raw", getattr(panel, "open_raw", None))
+        add("high_raw", getattr(panel, "raw_high", None))
+        add("low_raw", getattr(panel, "raw_low", None))
         add("returns", close.pct_change(fill_method=None))
         add("ret_1d", close.pct_change(fill_method=None))
         add("log_close", np.log(close.where(close > 0.0)))

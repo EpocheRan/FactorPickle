@@ -153,8 +153,11 @@ def _holder_frame(
     # Change is computed between consecutive *announced* values, not between
     # adjacent calendar rows (rows between announcements are missing).
     change = event.ffill().pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan).where(event.notna())
-    state = event.reindex(index=dates).ffill()
-    change_daily = change.reindex(index=dates).ffill()
+    # Preserve announcements before the requested window for forward-fill;
+    # dropping them would lose the holder state at the first eval date.
+    state_dates = event.index.union(dates).sort_values()
+    state = event.reindex(index=state_dates).ffill().reindex(index=dates)
+    change_daily = change.reindex(index=state_dates).ffill().reindex(index=dates)
     event_mask = event.notna().to_numpy()
     event_date_matrix = np.where(
         event_mask,
@@ -227,7 +230,7 @@ def load_p1_events(
         trim_end=trim_end,
     )
     flow["block_vwap"] = flow["block_amount"] / flow["block_vol"].replace(0.0, np.nan)
-    flow["block_vwap"] = flow["block_vwap"].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    flow["block_vwap"] = flow["block_vwap"].replace([np.inf, -np.inf], np.nan)
     bundle.frames.update({name: flow[name] for name in P1_EVENT_FIELDS["block_trade"]})
 
     top_frame = _flow_frame(

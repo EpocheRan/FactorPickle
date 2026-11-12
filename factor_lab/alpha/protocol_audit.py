@@ -86,6 +86,26 @@ def audit_campaign(campaign_id: str, *, write: bool = False) -> dict[str, Any]:
 
     artifact_rows = _factor_manifests(campaign_id)
     evidence["artifacts"] = [{"factor_id": row["factor_id"], "family": row["family"], "version": row["version"], "manifest_path": row["manifest_path"]} for row in artifact_rows]
+    # Verify each artifact expression is actually in the frozen pre-registration.
+    frozen_path_for_check = _team_dir(campaign_id) / "pre_registration.frozen.json"
+    expressed = set()
+    if frozen_path_for_check.exists():
+        try:
+            frozen_payload = json.loads(frozen_path_for_check.read_text(encoding="utf-8"))
+            from factor_lab.alpha.memory import canonical_expression
+            for family in frozen_payload.get("families") or []:
+                for candidate in family.get("candidates") or []:
+                    expressed.add(canonical_expression(str(candidate.get("expression") or "")))
+        except Exception:  # noqa: BLE001
+            expressed = set()
+    if expressed:
+        from factor_lab.alpha.memory import canonical_expression
+        for row in artifact_rows:
+            dsl_path = Path(row["manifest_path"]).parent / "factor.dsl"
+            if dsl_path.exists():
+                expression = canonical_expression(dsl_path.read_text(encoding="utf-8").strip())
+                if expression not in expressed:
+                    issues.append(f"artifact not in frozen pre-registration: {row['factor_id']}")
     evidence["n_artifacts"] = len(artifact_rows)
     if not artifact_rows:
         issues.append("no FactorBuilder artifacts carry source_campaign")

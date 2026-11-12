@@ -130,6 +130,12 @@ def write_factor_artifact(
         test_text += "\n" + extra_tests.strip() + "\n"
     (target / "test_factor.py").write_text(test_text, encoding="utf-8")
 
+    try:
+        from factor_lab.alpha.governance import git_commit, policy_snapshot
+
+        provenance = {"policy": policy_snapshot(), "git_commit": git_commit()}
+    except Exception:  # noqa: BLE001
+        provenance = {}
     manifest = {
         "schema": FACTOR_SCHEMA,
         "factor_id": factor_id,
@@ -142,6 +148,9 @@ def write_factor_artifact(
         "spec": spec_payload,
         "data_contract": spec_payload.get("data_contract") or {},
         "created_at": config.now_iso(),
+        "provenance": provenance,
+        "campaign_id": spec_payload.get("campaign_id") or spec_payload.get("source_campaign"),
+        "pre_registration_hash": spec_payload.get("pre_registration_hash"),
         "assets": {
             "main": str(asset.relative_to(target)),
             "spec": "spec.json",

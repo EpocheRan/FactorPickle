@@ -283,6 +283,12 @@ class AlphaMemory:
             "created_at": config.now_iso(),
         }
         append_jsonl(self.attempts_path, record)
+        try:
+            from factor_lab.alpha.trial_sink import record_event
+
+            record_event("dev", record)
+        except Exception:  # noqa: BLE001
+            pass
         if status in FAILURE_STATUSES:
             self.record_failure(
                 canonical,
