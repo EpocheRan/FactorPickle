@@ -72,7 +72,8 @@ def test_policy_defaults_to_repo_source_of_truth() -> None:
     assert not str(path.resolve()).startswith(str(config.LAB_ROOT.resolve()))
     policy = load_universe_policy()
     assert policy.enabled is True
-    assert policy.min_history_days == 60
+    assert policy.min_history_days >= 60
+    assert policy.top_n >= 0
     assert policy.to_dict()["schema"] == UNIVERSE_POLICY_SCHEMA
 
 

@@ -26,9 +26,47 @@ def _term(feature: str, weight: float) -> tuple[str, float]:
     return term, float(weight)
 
 
-def distill_expression(model_card: dict[str, Any]) -> dict[str, Any]:
+def _projection_weights(fidelity_data: dict[str, Any]) -> dict[str, float] | None:
+    """Fit rank-space weights to the OOS model score (distillation projection)."""
+    import numpy as np
+    import pandas as pd
+
+    x = fidelity_data.get("x")
+    predictions = fidelity_data.get("predictions")
+    dates = fidelity_data.get("dates")
+    symbols = fidelity_data.get("symbols")
+    features = [str(item) for item in (fidelity_data.get("features") or [])]
+    if x is None or predictions is None or not features:
+        return None
+    try:
+        frame = pd.DataFrame(np.asarray(x, dtype=float), columns=features)
+        frame["_pred"] = np.asarray(predictions, dtype=float)
+        frame["_date"] = pd.to_datetime(pd.Series(dates))
+        frame["_symbol"] = [str(item) for item in symbols]
+        frame = frame.dropna()
+        if len(frame) < max(100, len(features) * 20):
+            return None
+        y = frame.groupby("_date")["_pred"].rank(pct=True).to_numpy(dtype=float)
+        columns = []
+        for feature in features:
+            values = frame.groupby("_date")[feature].rank(pct=True).to_numpy(dtype=float)
+            columns.append(values)
+        design = np.column_stack(columns)
+        coef, *_ = np.linalg.lstsq(design, y, rcond=None)
+        return {feature: float(value) for feature, value in zip(features, coef)}
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def distill_expression(model_card: dict[str, Any], fidelity_data: dict[str, Any] | None = None) -> dict[str, Any]:
     features = [str(item) for item in (model_card.get("features") or [])]
     importance = model_card.get("standardized_feature_importance") or model_card.get("feature_importance") or {}
+    projected = _projection_weights(fidelity_data or {})
+    if projected:
+        importance = projected
+        method = "oos_rank_projection"
+    else:
+        method = "model_card_coefficients"
     terms = []
     for feature in features:
         weight = importance.get(feature)
@@ -54,11 +92,12 @@ def distill_expression(model_card: dict[str, Any]) -> dict[str, Any]:
     return {
         "expression": expression,
         "weights": {feature: weight for _term, _signed, feature, weight in terms},
+        "method": method,
         "validation": report.to_dict(),
     }
 
 
-def distill_fidelity(result: dict[str, Any], dataset: Any) -> dict[str, Any]:
+def distill_fidelity(result: dict[str, Any], dataset: Any, *, expression: str | None = None) -> dict[str, Any]:
     """Compare the distilled DSL factor with the OOS model score by date."""
     import numpy as np
     import pandas as pd
@@ -70,9 +109,9 @@ def distill_fidelity(result: dict[str, Any], dataset: Any) -> dict[str, Any]:
     if predictions is None or dates is None or symbols is None:
         return {"schema": "factor_lab.alpha.distill_fidelity.v1", "available": False, "reason": "no in-memory OOS predictions"}
     model_card = result.get("model_card") or {}
-    distilled = distill_expression(model_card)
-    factor, _ = compile_expression(distilled["expression"], dataset.context)
-    pred = pd.DataFrame({"date": np.asarray(dates), "symbol": np.asarray(symbols), "pred": np.asarray(predictions, dtype=float)})
+    distilled = {"expression": expression} if expression else distill_expression(model_card, result.get("_fidelity_data"))
+    factor, _ = compile_expression(str(distilled["expression"]), dataset.context)
+    pred = pd.DataFrame({"date": pd.to_datetime(np.asarray(dates)), "symbol": [str(item) for item in symbols], "pred": np.asarray(predictions, dtype=float)})
     pred_wide = pred.pivot(index="date", columns="symbol", values="pred")
     common_dates = pred_wide.index.intersection(factor.index)
     corr = []
@@ -90,7 +129,7 @@ def distill_fidelity(result: dict[str, Any], dataset: Any) -> dict[str, Any]:
         "mean_rank_corr": value,
         "passed": bool(value is not None and abs(value) >= 0.95),
         "threshold": 0.95,
-        "expression": distilled["expression"],
+        "expression": str(distilled["expression"]),
     }
 
 
@@ -106,8 +145,8 @@ def export_ml_factor(
     campaign_id: str = "",
 ) -> dict[str, Any]:
     model_card = result.get("model_card") or {}
-    distilled = distill_expression(model_card)
-    fidelity = distill_fidelity(result, dataset) if dataset is not None else None
+    distilled = distill_expression(model_card, result.get("_fidelity_data"))
+    fidelity = distill_fidelity(result, dataset, expression=distilled["expression"]) if dataset is not None else None
     if require_fidelity and fidelity is not None and not fidelity.get("passed"):
         raise ValueError(f"distill fidelity gate failed: {fidelity}")
     plan = result.get("plan") or {}

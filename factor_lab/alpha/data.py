@@ -146,7 +146,7 @@ def default_holdout(end: str | None = None) -> HoldoutWindow:
     end_ts = pd.Timestamp(end or "2026-11-01")
     holdout_start = (end_ts - pd.DateOffset(months=12)).normalize()
     return HoldoutWindow(
-        dev_start="2022-10-01",
+        dev_start="2016-01-04",
         dev_end=(holdout_start - pd.Timedelta(days=1)).date().isoformat(),
         holdout_start=holdout_start.date().isoformat(),
         holdout_end=end_ts.date().isoformat(),

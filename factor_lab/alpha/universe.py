@@ -37,10 +37,16 @@ class UniversePolicy:
     min_history_days: int = 60
     min_close: float = 0.0
     require_positive_volume: bool = True
+    top_n: int = 0
+    lookback_days: int = 60
 
     def __post_init__(self) -> None:
         if int(self.min_history_days) < 1:
             raise ValueError("min_history_days must be >= 1")
+        if int(self.top_n) < 0:
+            raise ValueError("top_n must be >= 0")
+        if int(self.lookback_days) < 1:
+            raise ValueError("lookback_days must be >= 1")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -50,6 +56,8 @@ class UniversePolicy:
             "min_history_days": int(self.min_history_days),
             "min_close": float(self.min_close),
             "require_positive_volume": bool(self.require_positive_volume),
+            "top_n": int(self.top_n),
+            "lookback_days": int(self.lookback_days),
         }
 
 
@@ -72,6 +80,8 @@ def load_universe_policy(path: str | Path | None = None) -> UniversePolicy:
         min_history_days=int(raw.get("min_history_days", 60)),
         min_close=float(raw.get("min_close", 0.0)),
         require_positive_volume=bool(raw.get("require_positive_volume", True)),
+        top_n=int(raw.get("top_n", 0)),
+        lookback_days=int(raw.get("lookback_days", 60)),
     )
 
 
@@ -100,6 +110,18 @@ def build_pit_universe(
         volume = volume.reindex(index=index, columns=columns).astype(float)
         mask = mask & (volume.fillna(0.0) > 0.0)
 
+    if int(policy.top_n) > 0:
+        amount = context.fields.get("amount")
+        if amount is not None:
+            liquidity = amount.reindex(index=index, columns=columns).astype(float)
+            # Trailing average amount is observed by close t; no future data.
+            liquidity = liquidity.where(liquidity > 0).rolling(
+                int(policy.lookback_days), min_periods=max(10, int(policy.lookback_days) // 3)
+            ).mean()
+            ranks = liquidity.where(mask).rank(axis=1, ascending=False, method="first")
+            mask = mask & ranks.le(int(policy.top_n))
+        else:
+            raise ValueError("top_n universe policy requires an amount field")
     mask = mask.fillna(False).astype(bool)
     if dates is not None:
         wanted = [date for date in dates if date in mask.index]

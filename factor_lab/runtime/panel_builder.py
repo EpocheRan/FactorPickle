@@ -143,6 +143,7 @@ def build_factor_panel(
     raw_open = None
     raw_high = None
     raw_low = None
+    manifests = [market.manifest]
     try:
         raw_frames, raw_manifest = gateway.ohlc(codes, fetch_start, end, adjust="none")
         raw_bundle = DataBundle(kind="market_raw", frames=raw_frames, fields=list(raw_manifest.fields), manifest=raw_manifest)
@@ -164,7 +165,6 @@ def build_factor_panel(
         return frame.reindex(index=close.index, columns=columns)
 
     extras: dict[str, pd.DataFrame] = {}
-    manifests = [market.manifest]
     reference = bool(contract.get("reference", True))
     # Data availability is not a factor-category decision.  Fetch every
     # optional matrix the gateway exposes; a missing service only removes its

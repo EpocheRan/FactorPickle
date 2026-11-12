@@ -171,7 +171,7 @@ def _kind_for(campaign_id: str, objective: str) -> str:
         return "calibration"
     if "l0" in text or "smoke" in text:
         return "calibration"
-    if campaign_id == "CAMP-2b995bc651" or "p2" in text or "ml execution" in text or text.startswith("ml ") or "machine learning" in text or "ml expanded" in text:
+    if campaign_id == "CAMP-2b995bc651" or "p2" in text or "ml execution" in text or text.startswith("ml ") or "machine learning" in text or "ml expanded" in text or "ml branch" in text or "ml experiment" in text:
         return "ml"
     if campaign_id == "CAMP-4319413b27" or "p3" in text or "discovery" in text:
         return "discovery"
@@ -534,7 +534,7 @@ def _campaign_record(
             evidence["ml-planner"]["files"].append(str(team_dir / "p2_run.json"))
             conclusion = str(p2_payload.get("conclusion") or conclusion)
     if ml_summary is None:
-        for name in ("ml_expanded_run_v2.json", "ml_expanded_run.json", "p2_run.json"):
+        for name in ("ml_10y_summary.json", "ml_10y_run_v3.json", "ml_10y_run.json", "ml_expanded_run_v2.json", "ml_expanded_run.json", "p2_run.json"):
             path = team_dir / name
             if not path.exists():
                 continue

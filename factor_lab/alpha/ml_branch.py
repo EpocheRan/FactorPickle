@@ -313,6 +313,7 @@ def run_ml_experiment(
         embargo_days=purge_days,
     )
     oos_predictions: list[np.ndarray] = []
+    oos_features: list[np.ndarray] = []
     oos_targets: list[np.ndarray] = []
     oos_dates: list[np.ndarray] = []
     oos_symbols: list[np.ndarray] = []
@@ -355,6 +356,7 @@ def run_ml_experiment(
             }
         )
         oos_predictions.append(pred)
+        oos_features.append(flat_x[test_mask])
         oos_targets.append(truth)
         oos_dates.append(fold_dates)
         oos_symbols.append(fold_symbols)
@@ -426,8 +428,10 @@ def run_ml_experiment(
         # before writing the JSON result to disk.
         "_fidelity_data": {
             "predictions": predictions,
-            "dates": groups,
-            "symbols": symbols_oos,
+            "features": list(plan.features),
+            "x": np.concatenate(oos_features) if oos_features else np.zeros((0, len(plan.features))),
+            "dates": [bundle["dates"][int(index)] for index in groups],
+            "symbols": [bundle["symbols"][int(index)] for index in symbols_oos],
         },
     }
     try:

@@ -250,6 +250,24 @@
         "pb_mrq",
         "turnover"
       ]
+    },
+    {
+      "family_id": "fam-holder-10y",
+      "research_question": "Does shareholder concentration survive 10y PIT top-800?",
+      "mechanism": "ownership breadth/concentration; holder_chg/holder_num",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-0f9b786f80"
+      ],
+      "fields": [
+        "holder_chg",
+        "holder_num",
+        "holder_days_since",
+        "close_raw",
+        "float_mv",
+        "turnover",
+        "pb_mrq"
+      ]
     }
   ],
   "legacy_family_id": "legacy-unassigned",

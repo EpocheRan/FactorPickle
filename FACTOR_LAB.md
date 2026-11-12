@@ -143,10 +143,10 @@ writes holdout cards.
 
 ```powershell
 python -m factor_lab alpha validate --expression "rank(ts_corr(rank(close), rank(volume), 20))"
-python -m factor_lab alpha eval --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --expression "rank(close)"
-python -m factor_lab alpha benchmark --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31
+python -m factor_lab alpha eval --codes output/factor_lab/hypotheses/pool1000_10y.txt --start 2016-01-04 --end 2025-10-31 --expression "rank(close)"
+python -m factor_lab alpha benchmark --codes output/factor_lab/hypotheses/pool1000_10y.txt --start 2016-01-04 --end 2025-10-31
 python -m factor_lab alpha holdout --end 2026-11-01 --save
-python -m factor_lab alpha search --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --budget 80
+python -m factor_lab alpha search --codes output/factor_lab/hypotheses/pool1000_10y.txt --start 2016-01-04 --end 2025-10-31 --budget 80
 python -m factor_lab alpha confirm --codes output/factor_lab/hypotheses/pool200.txt --search output/factor_lab/alpha/search/ALPHA-....json
 python -m factor_lab alpha memory
 python -m factor_lab alpha library
@@ -155,10 +155,10 @@ python -m factor_lab alpha campaign-audit --campaign-id CAMP-...
 python -m factor_lab alpha campaign-preflight --campaign-id CAMP-...
 python -m factor_lab alpha power --n-trials 276 --n-eff 145 --observations 148
 python -m factor_lab alpha report --report-out output/deliverables/research_portfolio.html
-python -m factor_lab alpha ml --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --features close,volume,amount
+python -m factor_lab alpha ml --codes output/factor_lab/hypotheses/pool1000_10y.txt --start 2016-01-04 --end 2025-10-31 --features close,volume,amount
 python -m factor_lab alpha discovery
 python -m factor_lab alpha axes
-python -m factor_lab alpha deploy --codes output/factor_lab/hypotheses/pool200.txt --start 2022-10-01 --end 2025-10-31 --expression "rank(close)"
+python -m factor_lab alpha deploy --codes output/factor_lab/hypotheses/pool1000_10y.txt --start 2016-01-04 --end 2025-10-31 --expression "rank(close)"
 python -m factor_lab alpha allocate
 python -m factor_lab alpha cycle --factor-artifact <factor-dir-or-id> --campaign-id CAMP-...
 python -m factor_lab alpha roles
@@ -180,6 +180,13 @@ Do not add direct QuestDB/SQL access to Alpha. Data without PIT is not admitted.
 
 - Search only on the development window; the holdout policy lives in
   `factor_lab/alpha/policy/holdout.json`, not in `output/`, and is locked.
+  Current dev is `2016-01-04..2025-10-31`; expanded P0/P1/valuation axes are
+  effective from 2017-01-03. Holdout remains `2025-11-01..2026-11-01` and is
+  already consumed four times, so no confirmation is independent.
+- Data audit: `output/deliverables/data_audit_10y.md` / `data_coverage_10y.json`.
+  Current universe policy is PIT top-800 liquidity with a 60-day trailing
+  amount and 120-day history; the 1,000-code ex-ante pool is
+  `output/factor_lab/hypotheses/pool1000_10y.txt`.
 - The universe is point-in-time: eligibility comes from trailing data only
   (delisted/suspended/newly listed names are excluded, never forward-filled);
   the policy lives in `factor_lab/alpha/policy/universe.json`. Every research
