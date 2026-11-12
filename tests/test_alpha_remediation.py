@@ -146,3 +146,28 @@ def test_liquidity_pool_uses_gateway_query() -> None:
 
     codes = build_pool(gateway=FakeGateway())
     assert codes == ["000001", "600000"]
+
+
+def test_singlefold_protocol_is_codified() -> None:
+    from factor_lab.alpha.ml_branch import (
+        load_singlefold_protocol,
+        make_ml_plan,
+        validate_singlefold_plan,
+    )
+
+    protocol = load_singlefold_protocol()
+    assert protocol["requirements"]["n_splits"] == 1
+    assert protocol["requirements"]["distill_mode"] == "model_card"
+    assert protocol["requirements"]["fidelity_policy"] == "report_only"
+    plan = make_ml_plan(
+        "singlefold test",
+        ["returns", "turnover"],
+        n_splits=1,
+        feature_transform="cs_rank",
+        target_transform="cs_rank",
+        distill_mode="model_card",
+        fidelity_policy="report_only",
+    )
+    assert validate_singlefold_plan(plan)["ok"] is True
+    wrong = make_ml_plan("wrong split", ["returns"], n_splits=4)
+    assert validate_singlefold_plan(wrong)["ok"] is False

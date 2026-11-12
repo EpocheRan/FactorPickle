@@ -240,7 +240,7 @@ recorded under `output/factor_lab/alpha/data_axes/coverage.json`.
 - No validated edge means 100% broad-index baseline.
 - Research modes: `explore`, `validate`, `deploy`.
 - Alpha cost model: actual A-share fees (buy 2.44bps, sell 7.44bps including 5bps sell stamp duty) plus 800bps/year short borrow; the generic research `CostModel` is not the Alpha deployment assumption.
-- ML targets use the same entry rule as the Gate; OOS admission uses an overlap-adjusted t in addition to the naive daily t. Model cards record raw and standardized coefficients. Distillation supports `projection` and `model_card` modes; a single-fold plan may export one `model_card` vector with descriptive fidelity (report-only), while a 0.95 gate is optional and must be pre-registered.
+- ML targets use the same entry rule as the Gate; OOS admission uses an overlap-adjusted t in addition to the naive daily t. Model cards record raw and standardized coefficients. Distillation supports `projection` and `model_card` modes. The single-fold/single-vector protocol is binding when pre-registered in `factor_lab/alpha/policy/singlefold.json`: n_splits=1, cs_rank features/target, model_card export, report-only fidelity, OOS-test-only evaluation. A 0.95 gate is optional and must be pre-registered.
 - ML is non-deep-learning; purged walk-forward with embargo at least as long as
   the target horizon.
 - Web discovery requires cited sources and retrieval times.

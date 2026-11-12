@@ -14,6 +14,7 @@ ML monitor remain owned by this deterministic runtime.
 
 from __future__ import annotations
 
+import json
 import math
 import uuid
 from dataclasses import dataclass, field
@@ -51,6 +52,7 @@ class MLPlan:
     feature_transform: str = "raw"
     target_transform: str = "raw"
     distill_mode: str = "projection"
+    fidelity_policy: str = "report_only"
     created_at: str = field(default_factory=config.now_iso)
 
     def to_dict(self) -> dict[str, Any]:
@@ -69,6 +71,7 @@ class MLPlan:
             "feature_transform": self.feature_transform,
             "target_transform": self.target_transform,
             "distill_mode": self.distill_mode,
+            "fidelity_policy": self.fidelity_policy,
             "created_at": self.created_at,
         }
 
@@ -85,6 +88,7 @@ def make_ml_plan(
     feature_transform: str = "raw",
     target_transform: str = "raw",
     distill_mode: str = "projection",
+    fidelity_policy: str = "report_only",
 ) -> MLPlan:
     fields = [str(item) for item in features if str(item).strip()]
     if not fields:
@@ -97,6 +101,8 @@ def make_ml_plan(
         raise ValueError("target_transform must be raw or cs_rank")
     if distill_mode not in {"projection", "model_card"}:
         raise ValueError("distill_mode must be projection or model_card")
+    if fidelity_policy not in {"report_only", "gate_0_95"}:
+        raise ValueError("fidelity_policy must be report_only or gate_0_95")
     if target_horizon < 1:
         raise ValueError("target_horizon must be positive")
     return MLPlan(
@@ -111,6 +117,7 @@ def make_ml_plan(
         feature_transform=feature_transform,
         target_transform=target_transform,
         distill_mode=distill_mode,
+        fidelity_policy=fidelity_policy,
     )
 
 
@@ -160,6 +167,7 @@ def plan_from_dict(payload: dict[str, Any]) -> MLPlan:
         feature_transform=str(payload.get("feature_transform") or "raw"),
         target_transform=str(payload.get("target_transform") or "raw"),
         distill_mode=str(payload.get("distill_mode") or "projection"),
+        fidelity_policy=str(payload.get("fidelity_policy") or "report_only"),
         created_at=str(payload.get("created_at") or config.now_iso()),
     )
 
@@ -324,6 +332,10 @@ def run_ml_experiment(
     universe_policy: UniversePolicy | None = None,
 ) -> dict[str, Any]:
     validate_ml_features(plan.features, dataset.context.fields.keys())
+    if int(plan.n_splits) == 1 and plan.distill_mode == "model_card":
+        singlefold = validate_singlefold_plan(plan)
+        if not singlefold.get("ok"):
+            raise ValueError(f"invalid single-fold/single-vector plan: {singlefold.get('blocked_reasons')}")
     bundle = build_ml_bundle(dataset, plan, universe=universe)
     x = bundle["arrays"]["x"]
     y = bundle["arrays"]["y"]
@@ -505,3 +517,32 @@ def monitor_ml_result(result: dict[str, Any]) -> dict[str, Any]:
         "warnings": warnings,
         "cv_splits": len(cv.get("splits") or []),
     }
+
+
+SINGLEFOLD_PROTOCOL = "factor_lab.alpha.singlefold.v1"
+
+
+def load_singlefold_protocol(path: str | Path | None = None) -> dict[str, Any]:
+    from factor_lab.alpha.policy_paths import policy_file
+
+    target = Path(path) if path is not None else policy_file("singlefold.json")
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or payload.get("schema") != SINGLEFOLD_PROTOCOL:
+        raise ValueError(f"invalid single-fold protocol: {target}")
+    return payload
+
+
+def validate_singlefold_plan(plan: MLPlan, protocol: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Validate the pre-registered single-fold/single-vector protocol."""
+    protocol = protocol or load_singlefold_protocol()
+    expected = protocol.get("requirements") or {}
+    checks = {
+        "n_splits_1": int(plan.n_splits) == int(expected.get("n_splits", 1)),
+        "distill_mode_model_card": plan.distill_mode == expected.get("distill_mode", "model_card"),
+        "fidelity_report_only": plan.fidelity_policy == expected.get("fidelity_policy", "report_only"),
+        "feature_transform_rank": plan.feature_transform == expected.get("feature_transform", "cs_rank"),
+        "target_transform_rank": plan.target_transform == expected.get("target_transform", "cs_rank"),
+        "embargo_ge_horizon": int(plan.embargo_days) >= int(plan.target_horizon),
+    }
+    blocked = [name for name, ok in checks.items() if not ok]
+    return {"schema": "factor_lab.alpha.singlefold_validation.v1", "ok": not blocked, "checks": checks, "blocked_reasons": blocked, "protocol": protocol.get("name")}

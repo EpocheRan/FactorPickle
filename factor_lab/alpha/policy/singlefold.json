@@ -1,0 +1,31 @@
+{
+  "schema": "factor_lab.alpha.singlefold.v1",
+  "name": "singlefold-v1",
+  "description": "Single purged walk-forward split; one fitted model; one model-card coefficient vector; OOS test segment only; fidelity reported descriptively.",
+  "requirements": {
+    "n_splits": 1,
+    "feature_transform": "cs_rank",
+    "target_transform": "cs_rank",
+    "distill_mode": "model_card",
+    "fidelity_policy": "report_only",
+    "embargo_days_ge_target_horizon": true,
+    "evaluation": "OOS test segment only",
+    "fidelity_target": null,
+    "one_label_touching_run": true
+  },
+  "export": {
+    "distill_mode": "model_card",
+    "require_fidelity": false,
+    "description": "one model-card coefficient vector; no post-hoc projection fallback"
+  },
+  "evaluation": {
+    "entry": "next_open",
+    "costs": "actual A-share fees buy2.44/sell7.44 + borrow800bps/yr",
+    "holdout": "locked; no confirmation"
+  },
+  "governance": {
+    "no_post_hoc_feature_or_hyperparameter_change": true,
+    "program_fdr_required": true,
+    "ml_is_research_evidence_only": true
+  }
+}
