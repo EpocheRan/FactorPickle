@@ -536,7 +536,7 @@ def _campaign_record(
             evidence["ml-planner"]["files"].append(str(team_dir / "p2_run.json"))
             conclusion = str(p2_payload.get("conclusion") or conclusion)
     if ml_summary is None:
-        for name in ("h20_run.json", "singlefold_run.json", "rank_native_run.json", "ml_10y_summary.json", "ml_10y_run_v3.json", "ml_10y_run.json", "ml_expanded_run_v2.json", "ml_expanded_run.json", "p2_run.json"):
+        for name in ("external_run.json", "h20_run.json", "singlefold_run.json", "rank_native_run.json", "ml_10y_summary.json", "ml_10y_run_v3.json", "ml_10y_run.json", "ml_expanded_run_v2.json", "ml_expanded_run.json", "p2_run.json"):
             path = team_dir / name
             if not path.exists():
                 continue

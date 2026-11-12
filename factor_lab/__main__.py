@@ -13,7 +13,7 @@ from factor_lab.core.store import jsonable, read_json
 
 
 def _print(payload: Any) -> None:
-    print(json.dumps(jsonable(payload), ensure_ascii=False, indent=2))
+    print(json.dumps(jsonable(payload), ensure_ascii=True, indent=2))
 
 
 def _codes(value: str) -> list[str]:

@@ -316,6 +316,22 @@
         "holder_chg",
         "fin_basic_eps"
       ]
+    },
+    {
+      "family_id": "fam-lottery-purge-10y",
+      "research_question": "External-evidence lottery/MAX purge of top quantile on 10y PIT top-800",
+      "mechanism": "MAX/lottery contamination purge; external A-share MAX anomaly + limits-to-arbitrage",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-d95264e8cd"
+      ],
+      "fields": [
+        "returns",
+        "turnover",
+        "mf_net_amount",
+        "holder_chg",
+        "fin_basic_eps"
+      ]
     }
   ],
   "legacy_family_id": "legacy-unassigned",
