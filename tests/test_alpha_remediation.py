@@ -119,3 +119,30 @@ def test_campaign_protocol_requires_gateway_and_ml_decision() -> None:
     assert "ml-planner" in protocol["required_ml_decision_per_campaign"]
     assert "every new alpha-campaign-v2 campaign" in protocol["external_evidence_policy"]["default"].lower()
     assert "every new alpha-campaign-v2 campaign" in protocol["ml_planner_policy"]["default"].lower()
+
+
+def test_ten_year_protocol_is_codified() -> None:
+    from factor_lab.alpha.ten_year import load_protocol
+
+    protocol = load_protocol()
+    assert protocol["dataset_start"] == "2016-01-04"
+    assert protocol["dataset_end"] == "2025-10-31"
+    assert protocol["candidate_pool"]["top_n"] == 1000
+    assert protocol["universe"]["top_n"] == 800
+    assert protocol["costs"]["buy_fee_bps"] == 2.44
+    assert protocol["holdout"]["confirmation_allowed"] is False
+
+
+def test_liquidity_pool_uses_gateway_query() -> None:
+    import pandas as pd
+    from factor_lab.alpha.ten_year import build_pool
+
+    class FakeGateway:
+        def liquidity_pool(self, *, start, end, top_n, min_amount=0.0):
+            assert start == "2015-01-01"
+            assert end == "2016-12-31"
+            assert top_n == 1000
+            return ["000001", "600000"]
+
+    codes = build_pool(gateway=FakeGateway())
+    assert codes == ["000001", "600000"]

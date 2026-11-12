@@ -43,6 +43,7 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
             "campaign",
             "campaign-audit",
             "campaign-preflight",
+            "ten-year",
             "power",
             "family",
             "report",
@@ -95,6 +96,8 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
     parser.add_argument("--factor-id", default="")
     parser.add_argument("--discovery-file", default="")
     parser.add_argument("--report-out", default="")
+    parser.add_argument("--pool-out", default="")
+    parser.add_argument("--audit-out", default="")
     parser.add_argument("--round-file", default="")
     parser.add_argument("--factor-artifact", default="")
     parser.add_argument("--family-id", default="")
@@ -284,6 +287,30 @@ def _run_alpha(args: argparse.Namespace) -> int:
         from factor_lab.alpha.research_atlas import write_portfolio_report
 
         _print(write_portfolio_report(args.report_out or None))
+        return 0
+    if args.action == "ten-year":
+        from factor_lab.alpha.ten_year import (
+            build_pool,
+            data_audit,
+            load_protocol,
+            load_pool,
+            run_artifact,
+            run_expression,
+        )
+
+        result = {"protocol": load_protocol()}
+        if args.codes or args.pool_out:
+            pool_path = args.pool_out or (config.LAB_ROOT / "hypotheses" / "pool1000_10y.txt")
+            result["pool"] = {"path": str(pool_path), "n": len(build_pool(out_path=pool_path))}
+        if args.audit_out:
+            audit = data_audit()
+            Path(args.audit_out).write_text(json.dumps(audit, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            result["audit_path"] = args.audit_out
+        if args.factor_artifact:
+            result["backtest"] = run_artifact(args.factor_artifact, out_path=args.out or None)
+        elif args.expression:
+            result["backtest"] = run_expression(args.expression, out_path=args.out or None)
+        _print(result)
         return 0
     if args.action == "power":
         from factor_lab.alpha.power import analyze_power

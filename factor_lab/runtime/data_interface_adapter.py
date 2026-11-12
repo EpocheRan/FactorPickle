@@ -214,6 +214,58 @@ class DataInterfaceGateway:
             result["error"] = f"{type(exc).__name__}: {exc}"
         return result
 
+    # ---------------------------------------------------------- research pool
+    def liquidity_pool(
+        self,
+        *,
+        start: str,
+        end: str,
+        top_n: int = 1000,
+        min_amount: float = 0.0,
+    ) -> list[str]:
+        """Ex-ante liquidity candidate pool selected only from a pre-period.
+
+        The selection query lives in the runtime gateway, not in an Alpha
+        module. Callers must pass a period before the evaluation window.
+        """
+        if int(top_n) < 2:
+            raise ValueError("top_n must be >= 2")
+        sql = (
+            'SELECT code, avg(amount) AS avg_amount, count() AS n '
+            'FROM "ohlcv_1d" '
+            "WHERE ts >= %s AND ts <= %s AND type <> 'idx' AND amount > %s "
+            "GROUP BY code ORDER BY avg_amount DESC LIMIT %s"
+        )
+        frame = self.query_frame(sql, (str(start), str(end), float(min_amount), int(top_n)))
+        if frame is None or frame.empty or "code" not in frame.columns:
+            raise DataGap("liquidity pool query returned no codes")
+        return sorted({str(value).strip().zfill(6) for value in frame["code"].tolist() if str(value).strip()})
+
+    def research_coverage(self, *, start: str = "2015-01-01", end: str = "2026-11-06") -> dict[str, Any]:
+        """Read-only table coverage summary for the data audit."""
+        specs = {
+            "ohlcv_1d": ('"ohlcv_1d"', "AND type <> 'idx'"),
+            "fin_valuation_daily": ('"fin_valuation_daily"', ""),
+            "moneyflow_daily": ('"moneyflow_daily"', ""),
+            "margin_detail": ('"margin_detail"', ""),
+            "block_trade": ('"block_trade"', ""),
+            "top_list": ('"top_list"', ""),
+            "stk_holdernumber": ('"stk_holdernumber"', ""),
+            "repurchase": ('"repurchase"', ""),
+        }
+        result: dict[str, Any] = {"schema": "factor_lab.alpha.data_coverage.v1", "start": start, "end": end, "tables": {}}
+        for name, (table, extra_where) in specs.items():
+            try:
+                frame = self.query_frame(
+                    f'SELECT min(ts) AS mn, max(ts) AS mx, count() AS n, count_distinct(code) AS codes FROM {table} '
+                    f"WHERE ts >= %s AND ts <= %s {extra_where}",
+                    (str(start), str(end)),
+                )
+                result["tables"][name] = frame.to_dict("records")[0] if len(frame) else {"error": "no rows"}
+            except Exception as exc:  # noqa: BLE001
+                result["tables"][name] = {"error": f"{type(exc).__name__}: {exc}"}
+        return result
+
     # ---------------------------------------------------------------- market
     def ohlc(
         self,

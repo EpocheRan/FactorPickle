@@ -167,6 +167,9 @@ python -m factor_lab alpha campaign --objective "研究应计" --max-rounds 5
 python -m factor_lab alpha campaign-audit --campaign-id CAMP-...
 python -m factor_lab alpha campaign-preflight --campaign-id CAMP-...
 python -m factor_lab alpha power --n-trials 276 --n-eff 145 --observations 148
+python -m factor_lab alpha ten-year
+python -m factor_lab alpha ten-year --pool-out output/factor_lab/hypotheses/pool1000_10y.txt --audit-out output/deliverables/data_coverage_10y.json
+python -m factor_lab alpha ten-year --expression "rank(close)" --out output/factor_lab/alpha/ten_year_eval.json
 python -m factor_lab alpha report --report-out output/deliverables/research_portfolio.html
 python -m factor_lab alpha ml --codes output/factor_lab/hypotheses/pool1000_10y.txt --start 2016-01-04 --end 2025-10-31 --features close,volume,amount
 python -m factor_lab alpha discovery
@@ -196,7 +199,8 @@ Do not add direct QuestDB/SQL access to Alpha. Data without PIT is not admitted.
   Current dev is `2016-01-04..2025-10-31`; expanded P0/P1/valuation axes are
   effective from 2017-01-03. Holdout remains `2025-11-01..2026-11-01` and is
   already consumed four times, so no confirmation is independent.
-- Data audit: `output/deliverables/data_audit_10y.md` / `data_coverage_10y.json`.
+- Data audit: `output/deliverables/data_audit_10y.md` / `data_coverage_10y.json`, reproducible with `python -m factor_lab alpha ten-year --audit-out ...`.
+- The 10-year procedure is source-tracked in `factor_lab/alpha/policy/ten_year.json`; `factor_lab/alpha/ten_year.py` exposes `build_pool`, `data_audit`, `load_pool`, `run_expression`, `run_artifact` and the `alpha ten-year` CLI. Campaign results remain disposable runtime artifacts under `output/factor_lab`; they are reproducible from the protocol + data, not committed to Git.
   Current universe policy is PIT top-800 liquidity with a 60-day trailing
   amount and 120-day history; the 1,000-code ex-ante pool is
   `output/factor_lab/hypotheses/pool1000_10y.txt`.
