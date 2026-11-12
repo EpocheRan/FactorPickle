@@ -52,3 +52,8 @@ Return one JSON object:
 ## Quality bar
 
 Prefer few, economically motivated features over a large feature dump.
+
+## Single-fold / one-vector protocol
+
+- A campaign may pre-register `n_splits=1` with `feature_transform=cs_rank`, `target_transform=cs_rank`, `distill_mode=model_card` and `fidelity_policy=report_only` when the hypothesis is a single walk-forward coefficient vector.
+- In that protocol, OOS evaluation is restricted to the test segment; distillation fidelity is descriptive, not a 0.95 gate. Do not switch distillation modes after seeing results.

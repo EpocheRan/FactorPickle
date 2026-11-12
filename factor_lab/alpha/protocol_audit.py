@@ -86,6 +86,7 @@ def audit_campaign(campaign_id: str, *, write: bool = False) -> dict[str, Any]:
 
     artifact_rows = _factor_manifests(campaign_id)
     evidence["artifacts"] = [{"factor_id": row["factor_id"], "family": row["family"], "version": row["version"], "manifest_path": row["manifest_path"]} for row in artifact_rows]
+    ml_artifact_ids = {str(item.get("factor_id")) for item in ((team or {}).get("ml_artifacts") or []) if isinstance(item, dict)}
     # Verify each artifact expression is actually in the frozen pre-registration.
     frozen_path_for_check = _team_dir(campaign_id) / "pre_registration.frozen.json"
     expressed = set()
@@ -102,7 +103,7 @@ def audit_campaign(campaign_id: str, *, write: bool = False) -> dict[str, Any]:
         from factor_lab.alpha.memory import canonical_expression
         diagnostic_ids = {str(item) for item in ((team or {}).get("diagnostic_artifacts") or [])}
         for row in artifact_rows:
-            if str(row.get("factor_id")) in diagnostic_ids:
+            if str(row.get("factor_id")) in diagnostic_ids or str(row.get("factor_id")) in ml_artifact_ids:
                 continue
             dsl_path = Path(row["manifest_path"]).parent / "factor.dsl"
             if dsl_path.exists():
@@ -110,10 +111,12 @@ def audit_campaign(campaign_id: str, *, write: bool = False) -> dict[str, Any]:
                 if expression not in expressed:
                     issues.append(f"artifact not in frozen pre-registration: {row['factor_id']}")
     evidence["n_artifacts"] = len(artifact_rows)
+    evidence["ml_artifacts"] = sorted(ml_artifact_ids)
     if not artifact_rows:
         issues.append("no FactorBuilder artifacts carry source_campaign")
     factor_role = role_by_name.get("factor-builder") or {}
-    if factor_role and int(factor_role.get("n_artifacts") or 0) != len(artifact_rows):
+    deterministic_artifacts = [row for row in artifact_rows if str(row.get("factor_id")) not in ml_artifact_ids]
+    if factor_role and int(factor_role.get("n_artifacts") or 0) != len(deterministic_artifacts):
         warnings.append(f"team manifest n_artifacts={factor_role.get('n_artifacts')} but library has {len(artifact_rows)}")
 
     # Pre-registration: frozen file must exist and be valid before evaluation.

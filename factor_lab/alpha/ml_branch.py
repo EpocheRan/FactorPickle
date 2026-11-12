@@ -50,6 +50,7 @@ class MLPlan:
     baseline: str = "zero"
     feature_transform: str = "raw"
     target_transform: str = "raw"
+    distill_mode: str = "projection"
     created_at: str = field(default_factory=config.now_iso)
 
     def to_dict(self) -> dict[str, Any]:
@@ -67,6 +68,7 @@ class MLPlan:
             "baseline": self.baseline,
             "feature_transform": self.feature_transform,
             "target_transform": self.target_transform,
+            "distill_mode": self.distill_mode,
             "created_at": self.created_at,
         }
 
@@ -82,6 +84,7 @@ def make_ml_plan(
     ridge_alpha: float = 1.0,
     feature_transform: str = "raw",
     target_transform: str = "raw",
+    distill_mode: str = "projection",
 ) -> MLPlan:
     fields = [str(item) for item in features if str(item).strip()]
     if not fields:
@@ -92,6 +95,8 @@ def make_ml_plan(
         raise ValueError("feature_transform must be raw or cs_rank")
     if target_transform not in {"raw", "cs_rank"}:
         raise ValueError("target_transform must be raw or cs_rank")
+    if distill_mode not in {"projection", "model_card"}:
+        raise ValueError("distill_mode must be projection or model_card")
     if target_horizon < 1:
         raise ValueError("target_horizon must be positive")
     return MLPlan(
@@ -105,6 +110,7 @@ def make_ml_plan(
         ridge_alpha=float(ridge_alpha),
         feature_transform=feature_transform,
         target_transform=target_transform,
+        distill_mode=distill_mode,
     )
 
 
@@ -153,6 +159,7 @@ def plan_from_dict(payload: dict[str, Any]) -> MLPlan:
         baseline=str(payload.get("baseline") or "zero"),
         feature_transform=str(payload.get("feature_transform") or "raw"),
         target_transform=str(payload.get("target_transform") or "raw"),
+        distill_mode=str(payload.get("distill_mode") or "projection"),
         created_at=str(payload.get("created_at") or config.now_iso()),
     )
 

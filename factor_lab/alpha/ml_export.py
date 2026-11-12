@@ -143,9 +143,17 @@ def export_ml_factor(
     dataset: Any | None = None,
     require_fidelity: bool = False,
     campaign_id: str = "",
+    distill_mode: str | None = None,
 ) -> dict[str, Any]:
     model_card = result.get("model_card") or {}
-    distilled = distill_expression(model_card, result.get("_fidelity_data"))
+    mode = str(distill_mode or (result.get("plan") or {}).get("distill_mode") or "projection")
+    if mode not in {"projection", "model_card"}:
+        raise ValueError("distill_mode must be projection or model_card")
+    distilled = (
+        distill_expression(model_card, None)
+        if mode == "model_card"
+        else distill_expression(model_card, result.get("_fidelity_data"))
+    )
     fidelity = distill_fidelity(result, dataset, expression=distilled["expression"]) if dataset is not None else None
     if require_fidelity and fidelity is not None and not fidelity.get("passed"):
         raise ValueError(f"distill fidelity gate failed: {fidelity}")
@@ -160,6 +168,8 @@ def export_ml_factor(
         "features": model_card.get("features"),
         "evaluation_spec": result.get("evaluation_spec"),
         "distilled_weights": distilled["weights"],
+        "distill_mode": mode,
+        "fidelity_policy": "report_only" if not require_fidelity else "gate_0_95",
         "standardized_weights": (model_card.get("standardized_feature_importance") or {}),
         "holdout_confirmed": False,
         "venue": "P2 ML execution",

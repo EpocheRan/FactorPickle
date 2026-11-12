@@ -236,7 +236,7 @@ recorded under `output/factor_lab/alpha/data_axes/coverage.json`.
 - Only validated/active Edge Cards may be allocated.
 - No validated edge means 100% broad-index baseline.
 - Research modes: `explore`, `validate`, `deploy`.
-- ML targets use the same entry rule as the Gate; OOS admission uses an overlap-adjusted t in addition to the naive daily t. Model cards record raw and standardized coefficients; export runs a distill-fidelity check.
+- ML targets use the same entry rule as the Gate; OOS admission uses an overlap-adjusted t in addition to the naive daily t. Model cards record raw and standardized coefficients. Distillation supports `projection` and `model_card` modes; a single-fold plan may export one `model_card` vector with descriptive fidelity (report-only), while a 0.95 gate is optional and must be pre-registered.
 - ML is non-deep-learning; purged walk-forward with embargo at least as long as
   the target horizon.
 - Web discovery requires cited sources and retrieval times.

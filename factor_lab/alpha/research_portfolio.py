@@ -536,7 +536,7 @@ def _campaign_record(
             evidence["ml-planner"]["files"].append(str(team_dir / "p2_run.json"))
             conclusion = str(p2_payload.get("conclusion") or conclusion)
     if ml_summary is None:
-        for name in ("rank_native_run.json", "ml_10y_summary.json", "ml_10y_run_v3.json", "ml_10y_run.json", "ml_expanded_run_v2.json", "ml_expanded_run.json", "p2_run.json"):
+        for name in ("singlefold_run.json", "rank_native_run.json", "ml_10y_summary.json", "ml_10y_run_v3.json", "ml_10y_run.json", "ml_expanded_run_v2.json", "ml_expanded_run.json", "p2_run.json"):
             path = team_dir / name
             if not path.exists():
                 continue
@@ -546,15 +546,23 @@ def _campaign_record(
             plan = payload.get("plan") or {}
             admission = payload.get("admission") or payload.get("ml_admission") or {}
             metrics = payload.get("metrics") or payload.get("ml_metrics") or {}
+            export_payload = payload.get("ml_export") or {}
+            fidelity = export_payload.get("fidelity") or payload.get("ml_fidelity")
+            export_error = export_payload.get("error") if isinstance(export_payload, dict) else None
             conclusion = payload.get("conclusion")
-            if not conclusion and payload.get("ml_fidelity"):
-                conclusion = f"ML admission passed={admission.get('passed')}; distill fidelity={((payload.get('ml_fidelity') or {}).get('mean_rank_corr'))}; export={(payload.get('ml_export') or {}).get('error') or 'none'}"
+            if not conclusion:
+                conclusion = (
+                    f"ML admission passed={admission.get('passed')}; exported fidelity="
+                    f"{((fidelity or {}).get('mean_rank_corr'))}; "
+                    f"export_error={export_error or 'none'}"
+                )
             ml_summary = {
                 "metrics": metrics,
                 "admission": admission,
                 "conclusion": conclusion or f"ML admission passed={admission.get('passed')}; cycle={((payload.get('cycle') or {}).get('metrics') or {})}",
                 "plan_source": payload.get("plan_source"),
-                "fidelity": payload.get("ml_fidelity"),
+                "fidelity": fidelity,
+                "export": export_payload if isinstance(export_payload, dict) else None,
                 "weights": ((payload.get("export") or {}).get("weights")) if isinstance(payload.get("export"), dict) else None,
         "standardized_weights": ((payload.get("export") or {}).get("standardized_weights")) if isinstance(payload.get("export"), dict) else None,
                 "standardized_weights": ((payload.get("export") or {}).get("standardized_weights")) if isinstance(payload.get("export"), dict) else None,

@@ -284,6 +284,22 @@
         "holder_chg",
         "fin_basic_eps"
       ]
+    },
+    {
+      "family_id": "fam-singlefold-10y",
+      "research_question": "Single-fit rank-native ML plus signed rank composite on 10y PIT top-800",
+      "mechanism": "single walk-forward coefficient vector / rank composite",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-9ded21c30e"
+      ],
+      "fields": [
+        "returns",
+        "turnover",
+        "mf_net_amount",
+        "holder_chg",
+        "fin_basic_eps"
+      ]
     }
   ],
   "legacy_family_id": "legacy-unassigned",
