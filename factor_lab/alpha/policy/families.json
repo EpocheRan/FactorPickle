@@ -300,6 +300,22 @@
         "holder_chg",
         "fin_basic_eps"
       ]
+    },
+    {
+      "family_id": "fam-horizon20-10y",
+      "research_question": "Horizon-20 cost-aware rank-native ML/control on 10y PIT top-800",
+      "mechanism": "20-day horizon / lower borrow-adjusted turnover",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-356f31ae6b"
+      ],
+      "fields": [
+        "returns",
+        "turnover",
+        "mf_net_amount",
+        "holder_chg",
+        "fin_basic_eps"
+      ]
     }
   ],
   "legacy_family_id": "legacy-unassigned",
