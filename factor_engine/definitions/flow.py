@@ -3,7 +3,7 @@
 分层与价量因子一致：
 
 - 计算在 ``factors/ops/flow.py``（纯 pandas，列缺失返回 NaN）；
-- 分类/方向/公式/数据来源在本文件，登记进 ``factor_registry``；
+- 分类/方向/公式/数据来源在本文件，登记进 ``custom_factor_registry``；
 - ``materialization=INLINE``：回测时随面板现算，不落长表。
 
 方向全部是**族先验**（写死，不按样本内 IC 翻转）：

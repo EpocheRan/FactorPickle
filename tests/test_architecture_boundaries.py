@@ -70,8 +70,9 @@ def test_panel_data_container_is_neutral() -> None:
 
 def test_ml_branch_depends_on_core_rank_ic_one_way() -> None:
     source = (ROOT / "factor_lab" / "alpha" / "ml_branch.py").read_text(encoding="utf-8")
-    assert "from factor_metrics import rank_ic_frame" in source
-    assert "rank_ic_frame(" in source
+    assert "from factor_metrics import" in source
+    assert "rank_ic_frame" in source
+    assert "evaluate_long_only" in source
     assert "from research" not in source
 
 

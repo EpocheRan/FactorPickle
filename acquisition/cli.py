@@ -82,11 +82,28 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("status", help="查看各数据集游标")
 
+    probe = sub.add_parser("probe-p0", help="用最小请求探测 P0 Tushare 接口权限")
+    probe.add_argument("--date", default=None, help="采样交易日，默认最近交易日")
+
     args = parser.parse_args(argv)
     if args.command == "status":
         from data_interface.api.runtime import get_sync_service
 
         print(json.dumps(get_sync_service().status(), ensure_ascii=False, default=str))
+        return 0
+    if args.command == "probe-p0":
+        from data_interface.api.runtime import get_sync_service
+
+        result = get_sync_service().probe_basic_permissions(args.date)
+        print(json.dumps(result, ensure_ascii=False, default=str))
+        blocked = [
+            name
+            for name, item in result["datasets"].items()
+            if not item.get("ok")
+        ]
+        if blocked:
+            print("[acquisition] P0 接口不可用: " + ", ".join(blocked))
+            return 1
         return 0
 
     end = date.fromisoformat(args.end) if args.end else date.today()

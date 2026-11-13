@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from data_interface.panel import Panel
@@ -100,6 +101,7 @@ def _pivot_extras(frames: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
             normalized = frame.copy()
             if not isinstance(normalized.index, pd.DatetimeIndex):
                 normalized = _plain_index(normalized)
+            normalized = normalized[~normalized.index.duplicated(keep="last")].sort_index()
             result[name] = normalized
     return result
 
@@ -120,7 +122,7 @@ def build_factor_panel(
     end: str,
     *,
     warmup_days: int = 800,
-    adjust: str = "qfq",
+    adjust: str = "hfq",
 ) -> BuiltPanel:
     if not codes:
         raise PanelBuildError("codes must not be empty")
@@ -137,8 +139,8 @@ def build_factor_panel(
     volume = _wide(market, "volume")
     amount = _wide(market, "amount")
     turnover = _wide(market, "turnover")
-    # Raw (unadjusted) prices are needed for level factors; qfq close/lows are
-    # reserved for return/technical fields and can leak future corporate actions.
+    # Raw (unadjusted) prices are needed for execution/limits; the research
+    # close/open/high/low use PIT cumulative adjustment (hfq), never forward qfq.
     raw_close = None
     raw_open = None
     raw_high = None
@@ -169,7 +171,7 @@ def build_factor_panel(
     # Data availability is not a factor-category decision.  Fetch every
     # optional matrix the gateway exposes; a missing service only removes its
     # columns and is recorded in the manifest, never blocks an unrelated factor.
-    for method in ("flow_bundle", "margin_bundle", "valuation_bundle", "financial_bundle", "event_bundle"):
+    for method in ("flow_bundle", "margin_bundle", "valuation_bundle", "financial_bundle", "event_bundle", "index_weight_bundle"):
         bundle = _safe_bundle(gateway, method, codes, fetch_start, end)
         if bundle is not None:
             extras.update(_pivot_extras(bundle.frames))
@@ -181,7 +183,10 @@ def build_factor_panel(
     # announcement date itself is already PIT-aligned by data_interface).
     aligned_extras: dict[str, pd.DataFrame] = {}
     for name, frame in extras.items():
-        aligned = align(frame)
+        if str(name).startswith("index_weight_"):
+            aligned = frame.reindex(index=close.index, columns=columns, method="ffill")
+        else:
+            aligned = align(frame)
         if aligned is None:
             continue
         if str(name).lower().startswith("fin_"):
@@ -194,6 +199,23 @@ def build_factor_panel(
             except Exception:  # noqa: BLE001
                 aligned = aligned.ffill()
         aligned_extras[name] = aligned
+    # Static listing date -> as-of listing age.  PIT-safe: the date is static.
+    try:
+        profile = gateway.security_master(columns)
+        if profile is not None and not profile.empty and "list_date" in profile.columns:
+            listing = pd.to_datetime(profile["list_date"], errors="coerce").reindex(columns)
+            raw_days = (close.index.to_numpy()[:, None] - listing.to_numpy()[None, :]) / np.timedelta64(1, "D")
+            list_days = pd.DataFrame(raw_days, index=close.index, columns=columns)
+            aligned_extras["list_days"] = list_days.where(list_days >= 0)
+    except Exception:  # noqa: BLE001 - optional reference data
+        pass
+    # float_mv / raw close gives daily float shares when the vendor does not
+    # publish float_share directly.
+    if "float_share" not in aligned_extras and "float_mv" in aligned_extras and raw_close is not None:
+        raw = align(raw_close)
+        mv = aligned_extras.get("float_mv")
+        if raw is not None and mv is not None:
+            aligned_extras["float_share"] = mv / raw.replace(0.0, np.nan)
     extras = aligned_extras
 
     benchmark = None
@@ -223,7 +245,13 @@ def build_factor_panel(
 
     manifest = DataManifest(
         services=sorted({service for item in manifests for service in item.services}),
-        fields=sorted({field for item in manifests for field in item.fields} | {"close_raw"} if raw_close is not None else {field for item in manifests for field in item.fields}),
+        fields=sorted(
+            {field for item in manifests for field in item.fields}
+            | ({"close_raw"} if raw_close is not None else set())
+            # Derived extras (list_days, float_share) are added after the bundles
+            # were collected; without this they are missing from the manifest.
+            | set(extras)
+        ),
         codes=columns,
         start=str(start),
         end=str(end),

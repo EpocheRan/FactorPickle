@@ -38,6 +38,7 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
             "confirm",
             "holdout",
             "trials",
+            "trial-accounting",
             "memory",
             "library",
             "campaign",
@@ -67,7 +68,8 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
     parser.add_argument("--expression", default="")
     parser.add_argument("--codes", default=str(config.LAB_ROOT / "hypotheses" / "pool200.txt"))
     parser.add_argument("--start", default="2022-10-01")
-    parser.add_argument("--end", default="2026-11-01")
+    parser.add_argument("--end", default="2025-10-31")
+    parser.add_argument("--allow-holdout", action="store_true", help="explicitly allow evaluation inside the frozen forward holdout")
     parser.add_argument("--dev-end", default="")
     parser.add_argument("--holdout-start", default="")
     parser.add_argument("--holdout-end", default="")
@@ -98,11 +100,21 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
     parser.add_argument("--report-out", default="")
     parser.add_argument("--pool-out", default="")
     parser.add_argument("--audit-out", default="")
+    parser.add_argument("--build-cache", action="store_true", help="build the reproducible ten-year dataset cache + sidecar")
+    parser.add_argument("--cache-out", default="")
+    parser.add_argument("--cache-start", default="")
+    parser.add_argument("--cache-end", default="")
+    parser.add_argument("--cache-coverage-start", default="")
     parser.add_argument("--round-file", default="")
     parser.add_argument("--factor-artifact", default="")
     parser.add_argument("--family-id", default="")
     parser.add_argument("--q", type=float, default=None)
     parser.add_argument("--recost", action="store_true", help="re-evaluate legacy attempts with the current CostModel")
+    parser.add_argument("--memory-action", choices=["summary", "record-validation", "build-context"], default="summary")
+    parser.add_argument("--validation-file", default="")
+    parser.add_argument("--parent-campaign-id", action="append", default=None)
+    parser.add_argument("--context-budget", type=int, default=12000)
+    parser.add_argument("--llm-compress", action="store_true", help="use DeepSeek Flash to compress a long context")
     parser.add_argument("--team-action", choices=["plan", "verify", "brief"], default="plan")
     parser.add_argument("--behavior-action", choices=["list", "show", "verify"], default="show")
     parser.add_argument("--no-pit-universe", action="store_true", help="disable the point-in-time universe gate")
@@ -113,6 +125,18 @@ def _alpha_parser(sub: argparse._SubParsersAction) -> None:
 
 
 def _run_alpha(args: argparse.Namespace) -> int:
+    from factor_lab.alpha.data import load_holdout
+    from factor_lab.alpha.evaluation_contract import load_holdout_v2
+
+    holdout_v2_start = str(load_holdout_v2().get("holdout_start"))
+    historical = load_holdout()
+    historical_end = historical.dev_end if historical is not None else "2025-10-31"
+    if str(args.end) > historical_end and not bool(getattr(args, "allow_holdout", False)):
+        raise SystemExit(
+            f"refusing to evaluate through {args.end}: it overlaps the locked holdout "
+            f"(historical dev_end {historical_end}, forward holdout {holdout_v2_start}); "
+            "pass --allow-holdout only after a new policy decision"
+        )
     from factor_lab.alpha import parse_expression
     from factor_lab.alpha.allocator import CapitalAllocator
     from factor_lab.alpha.benchmarks import run_benchmark
@@ -178,9 +202,59 @@ def _run_alpha(args: argparse.Namespace) -> int:
     if args.action == "trials":
         _print(summarize_trials())
         return 0
-    if args.action == "memory":
-        _print(AlphaMemory().summary())
+    if args.action == "trial-accounting":
+        from factor_lab.alpha.trial_accounting import write_trial_accounting_audit
+
+        _print(write_trial_accounting_audit())
         return 0
+    if args.action == "memory":
+        from factor_lab.alpha.research_memory import ResearchMemory
+
+        memory = ResearchMemory()
+        if args.memory_action == "summary":
+            _print({"edge_memory": AlphaMemory().summary(), "research_memory": memory.summary()})
+            return 0
+        if args.memory_action == "record-validation":
+            if not args.validation_file:
+                raise SystemExit("alpha memory --memory-action record-validation requires --validation-file")
+            payload = read_json(Path(args.validation_file))
+            if not isinstance(payload, dict):
+                raise SystemExit("validation file must be a JSON object")
+            campaign_id = str(payload.get("campaign_id") or args.campaign_id or "")
+            factor_id = str(payload.get("factor_id") or "")
+            tests = payload.get("tests")
+            if not campaign_id or not factor_id or not isinstance(tests, dict):
+                raise SystemExit("validation file requires campaign_id, factor_id and tests")
+            _print(memory.record_validation(
+                campaign_id,
+                factor_id,
+                tests,
+                source_paths=payload.get("source_paths") or [],
+                data_hashes=payload.get("data_hashes") or {},
+                result_hash=str(payload.get("result_hash") or ""),
+                notes=str(payload.get("notes") or ""),
+            ))
+            return 0
+        if args.memory_action == "build-context":
+            parents = list(args.parent_campaign_id or [])
+            if not args.campaign_id:
+                raise SystemExit("alpha memory --memory-action build-context requires --campaign-id")
+            if not parents:
+                campaign = CampaignController().load(args.campaign_id)
+                parents = list(campaign.get("parent_campaign_ids") or [])
+            compressor = None
+            if args.llm_compress:
+                from factor_lab.alpha.llm_compressor import DeepSeekCompressor
+
+                compressor = DeepSeekCompressor()
+            _print(memory.write_context(
+                args.campaign_id,
+                parents,
+                budget_chars=int(args.context_budget),
+                compressor=compressor,
+            ))
+            return 0
+        raise SystemExit(f"unknown memory action: {args.memory_action}")
     if args.action == "library":
         _print(library_summary())
         return 0
@@ -290,6 +364,7 @@ def _run_alpha(args: argparse.Namespace) -> int:
         return 0
     if args.action == "ten-year":
         from factor_lab.alpha.ten_year import (
+            build_dataset_cache,
             build_pool,
             data_audit,
             load_protocol,
@@ -302,6 +377,14 @@ def _run_alpha(args: argparse.Namespace) -> int:
         if args.codes or args.pool_out:
             pool_path = args.pool_out or (config.LAB_ROOT / "hypotheses" / "pool1000_10y.txt")
             result["pool"] = {"path": str(pool_path), "n": len(build_pool(out_path=pool_path))}
+        if args.build_cache:
+            cache = build_dataset_cache(
+                start=args.cache_start or None,
+                end=args.cache_end or None,
+                out_path=args.cache_out or None,
+                coverage_start=args.cache_coverage_start or None,
+            )
+            result["cache"] = cache
         if args.audit_out:
             audit = data_audit()
             Path(args.audit_out).write_text(json.dumps(audit, ensure_ascii=False, indent=2, default=str), encoding="utf-8")

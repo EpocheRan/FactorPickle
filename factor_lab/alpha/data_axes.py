@@ -39,24 +39,75 @@ P0_AXES: dict[str, dict[str, Any]] = {
         "label": "财务质量 / 应计",
         "fields": [
             "fin_net_income",
+            "fin_net_income_attributable_to_parent",
             "fin_operating_cash_flow",
             "fin_total_assets",
             "fin_total_equity",
             "fin_total_liabilities",
             "fin_revenue",
             "fin_gross_profit",
+            "fin_operating_profit",
+            "fin_ebit",
+            "fin_ebitda",
+            "fin_free_cash_flow",
             "fin_research_and_development_expense",
+            "fin_selling_expense",
+            "fin_general_and_admin_expense",
+            "fin_finance_expense",
             "fin_basic_eps",
+            "fin_diluted_eps",
         ],
         "pit": "financial statements aligned to publish_date by data_interface",
         "source": "financial statements via DataInterfaceGateway.financial_bundle",
     },
     "valuation": {
         "label": "估值剖面",
-        "fields": ["pb_mrq", "pe_ttm", "ps_ttm", "total_mv", "float_mv"],
-        "conditional_fields": ["p_nwc"],
+        "fields": [
+            "pb_mrq",
+            "pe_ttm",
+            "ps_ttm",
+            "pcf_ttm",
+            "pfcf",
+            "ev_ebit",
+            "ev_ebitda",
+            "ev_sales",
+            "ev_gross_profit",
+            "ev_fcf",
+            "p_nwc",
+            "earnings_yield",
+            "dividend_yield",
+            "enterprise_value",
+            "market_cap_change_pct",
+            "total_mv",
+            "float_mv",
+        ],
         "pit": "daily valuation, PIT published",
         "source": "fin_valuation_daily via DataInterfaceGateway.valuation_bundle",
+    },
+    "share_structure": {
+        "label": "股本结构",
+        "fields": ["total_share", "float_share"],
+        "pit": "daily share-count field exposed by the valuation panel; PIT same-date",
+        "source": "fin_valuation_daily via DataInterfaceGateway.valuation_bundle",
+    },
+    "security_master": {
+        "label": "证券主数据",
+        "fields": ["list_days"],
+        "pit": "list_date is static; list_days is an as-of scalar derived from it",
+        "source": "stock_basic_info via DataInterfaceGateway.security_master",
+    },
+    "index_membership": {
+        "label": "指数成分/权重",
+        "fields": [
+            "index_weight_000300",
+            "index_weight_000905",
+            "index_weight_000852",
+            "index_weight_000001",
+            "index_weight_000016",
+            "index_weight_399006",
+        ],
+        "pit": "index weight snapshot, forward-filled to the panel",
+        "source": "index_weight via DataInterfaceGateway.index_weight_bundle",
     },
 }
 
@@ -88,14 +139,15 @@ P1_AXES: dict[str, dict[str, Any]] = {
 }
 
 
-ML_FEATURE_GROUPS: dict[str, list[str]] = {
-    "base_market": ["close", "open", "high", "low", "volume", "amount", "turnover", "returns", "float_mv", "total_mv"],
-    "valuation": ["pb_mrq", "pe_ttm", "ps_ttm"],
-    "margin": ["margin_rzye", "margin_rqye", "margin_rzmre", "margin_rqyl"],
-    "moneyflow": ["mf_buy_sm", "mf_buy_lg", "mf_buy_elg", "mf_sell_sm", "mf_sell_lg", "mf_sell_elg", "mf_net_amount"],
-    "financial_quality": ["fin_net_income", "fin_operating_cash_flow", "fin_total_assets", "fin_total_equity", "fin_total_liabilities", "fin_revenue", "fin_gross_profit", "fin_research_and_development_expense", "fin_basic_eps"],
-    "p1_events": ["block_amount", "block_vol", "block_vwap", "block_count", "top_amount", "top_l_buy", "top_l_sell", "top_net_amount", "top_count", "rep_amount", "rep_vol", "rep_count", "holder_num", "holder_chg", "holder_days_since"],
-}
+BASE_MARKET_FIELDS = ["close", "open", "high", "low", "volume", "amount", "turnover", "returns", "float_mv", "total_mv"]
+
+# One source of truth: ML feature groups are generated from the same axes that
+# PathFinder/FactorBuilder see.  Do not maintain a second field list.
+ML_FEATURE_GROUPS: dict[str, list[str]] = {"base_market": list(BASE_MARKET_FIELDS)}
+ML_FEATURE_GROUPS.update({name: list(axis["fields"]) for name, axis in P0_AXES.items()})
+ML_FEATURE_GROUPS["p1_events"] = sorted(
+    {field for axis in P1_AXES.values() for field in axis["fields"]}
+)
 
 
 def ml_feature_catalog() -> dict[str, Any]:

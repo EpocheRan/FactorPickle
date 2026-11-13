@@ -1,0 +1,14 @@
+{
+  "schema": "factor_lab.alpha.portfolio_policy.v1",
+  "top_fraction": 0.20,
+  "min_names": 20,
+  "max_weight": 0.05,
+  "max_industry_weight": 0.30,
+  "size_neutral": true,
+  "size_tilt": 0.0,
+  "risk_lookback": 60,
+  "risk_shrinkage": 0.5,
+  "turnover_limit": 0.5,
+  "min_coverage": 0.9,
+  "note": "Long-only top-quintile construction; inverse-vol risk weights shrunk to equal; industry cap; optional size tilt; turnover blend. No expected-return estimation."
+}

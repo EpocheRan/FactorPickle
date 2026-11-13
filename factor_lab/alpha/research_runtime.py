@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from factor_lab.alpha.compiler import AlphaContext
 from factor_lab.alpha.gates import GatePolicy, alpha_gate_spec, load_gate_policy
 from factor_lab.alpha.data import AlphaDataset
 from factor_metrics import ALPHA_GATE_SPEC, CostModel
@@ -27,10 +28,18 @@ def run_research(
     horizon: int = 5,
     cost_bps: float = 20.0,
     universe: Any | None = None,
+    context: AlphaContext | None = None,
 ) -> dict[str, Any]:
+    """Run the deterministic evaluator.
+
+    ``context`` may include pre-evaluation warmup history; the evaluation window
+    is still ``dataset.start``/``dataset.end``.  When omitted, the dataset's
+    evaluation context (history if available) is used.
+    """
+    evaluation_context = context or dataset.evaluation_context()
     metrics = evaluate_expression(
         expression,
-        dataset.context,
+        evaluation_context,
         horizon=horizon,
         cost_bps=cost_bps,
         start=dataset.start,
@@ -125,15 +134,52 @@ def policy_warnings(
 
 
 def explain_result(
-    result: dict[str, Any], policy: GatePolicy | None = None
+    result: dict[str, Any],
+    policy: GatePolicy | None = None,
+    *,
+    research_evidence: dict[str, Any] | None = None,
+    long_only_status: str | None = None,
+    long_only_reasons: list[str] | None = None,
 ) -> dict[str, Any]:
     """Deterministic Evaluator output; never changes gate verdicts.
 
-    Capacity is informational only: it is reported as a warning, not a veto.
+    Capacity is informational only. When ``research_evidence.primary`` is
+    ``long_only``, the long-only evidence status is the primary verdict and the
+    long-short evaluation is retained as a diagnostic.
     """
     policy = policy or load_gate_policy()
     metrics = result.get("metrics") or {}
-    status = evidence_status(metrics, policy)
+    legacy_status = evidence_status(metrics, policy)
+    legacy_reasons = _failure_reasons(metrics, policy)
+    primary = str((research_evidence or {}).get("primary") or "long_short")
+    if primary == "long_only" and long_only_status is not None:
+        status = str(long_only_status)
+        reasons = list(long_only_reasons or [])
+        if status == "pass":
+            reasons = []
+        elif status == "insufficient_evidence":
+            reasons = reasons or ["insufficient long-only evidence"]
+        elif not reasons:
+            reasons = ["long-only promotion Gate failed"]
+        warnings = []
+        next_action = "validate_deployability" if status == "pass" else ("collect_more_evidence" if status == "insufficient_evidence" else "record_failure")
+        return {
+            "schema": "factor_lab.alpha.evaluation.v1",
+            "factor_ref": result.get("factor_ref") or {},
+            "verdict": status,
+            "primary_evidence": "long_only",
+            "reasons": reasons,
+            "warnings": warnings,
+            "long_short_verdict": legacy_status,
+            "long_short_reasons": legacy_reasons,
+            "caveats": [
+                "long-only is the primary research/deployment evidence; long-short is a diagnostic",
+                "long-only returns require benchmark/style attribution before promotion",
+                "capacity is reported for information and does not veto a candidate",
+            ],
+            "next_action": next_action,
+        }
+    status = legacy_status
     warnings = policy_warnings(metrics, policy)
     if status == "insufficient_evidence":
         missing = [name for name in REQUIRED_METRICS if not _finite(metrics.get(name))]

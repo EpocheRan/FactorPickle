@@ -18,9 +18,10 @@ def _payload() -> dict:
         "campaign_id": "CAMP-TEST",
         "research_question": "does margin predict returns?",
         "constraints": ["dev only"],
+        "evaluation": {"start": "2017-01-03", "end": "2025-10-31", "universe": "pit_liquidity_1000_size_screen", "horizon": 20, "cost": {"buy": 2.44, "sell": 7.44, "borrow": 0}},
         "families": [
             {
-                "family_id": "fam-test-margin",
+                "family_id": "fam-max-lottery",
                 "research_question": "margin crowding",
                 "pre_registered": True,
                 "candidates": [
@@ -58,3 +59,10 @@ def test_freeze_writes_hash_and_verifies(tmp_path) -> None:
     tampered = target.read_text(encoding="utf-8").replace("ts_delta(margin_rzye, 5)", "ts_delta(margin_rzye, 10)")
     target.write_text(tampered, encoding="utf-8")
     assert verify_frozen(target)["ok"] is False
+
+
+def test_total_share_is_admitted_pre_registration_field() -> None:
+    payload = _payload()
+    payload["families"][0]["candidates"][0]["expression"] = "rank(div(holder_chg, total_share))"
+    report = validate_pre_registration(payload, campaign_id="CAMP-TEST")
+    assert report["ok"] is True, report["issues"]

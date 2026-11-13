@@ -278,7 +278,7 @@ def describe(factor_id: str) -> Definition:
         return Definition(
             factor_id=key, name=short or key, category=category,
             formula=f"{short}（registry 公式：{reg_formula or key}）",
-            source="factor_value_daily（fin_* 报表 + fin_valuation_daily，按公告日物化）",
+            source="custom_factor_value_daily（fin_* 报表 + fin_valuation_daily，按公告日物化）",
             unit=_UNIT_TEXT.get(unit, unit), transform=transform,
             window=window, direction=direction,
             direction_text=_direction_text(direction, category),
@@ -289,7 +289,7 @@ def describe(factor_id: str) -> Definition:
     return Definition(
         factor_id=key, name=short or key, category=category or "unknown",
         formula=f"见 registry：{key}（窗口 {window or '—'} 日）",
-        source="ohlcv_1d / factor_value_daily",
+        source="ohlcv_1d / custom_factor_value_daily",
         unit=_UNIT_TEXT.get(unit, unit), transform=transform,
         window=window, direction=direction,
         direction_text=_direction_text(direction, category),

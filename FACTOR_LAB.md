@@ -3,6 +3,27 @@
 Portable Alpha research workspace. A new DSH session should not need prior
 chat history.
 
+## Research memory
+
+Campaign facts and validation evidence feed
+`factor_lab.alpha.research_memory.ResearchMemory`. Every new campaign writes
+`team/research_context.json` (`factor_lab.alpha.research_context.v2`), carrying
+parent result hashes, data provenance, prior metrics and every failed/unverified
+validation as a hard negative. New campaigns are memory-audited by default.
+Validation records live at
+`output/factor_lab/alpha/memory/validation_results.jsonl`; the context builder
+writes under `output/factor_lab/alpha/memory/contexts/`.
+
+```powershell
+python -m factor_lab alpha memory
+python -m factor_lab alpha memory --memory-action build-context --campaign-id CAMP-... --parent-campaign-id CAMP-... --llm-compress
+```
+
+DeepSeek Flash is the optional compression adapter. Its API key lives only in
+the gitignored `config.json` (`llm.deepseek`); deterministic compression is the
+offline fallback. The structured facts and source hashes remain authoritative.
+See `docs/design/research_memory.md`.
+
 ## Start
 
 ```powershell
@@ -17,6 +38,11 @@ Research commands are under `python -m factor_lab alpha ...`.
 Instrument calibration: `python -m factor_lab alpha probe --codes <pool> --start <s> --end <e>` runs the cheat / random / known probes before large search campaigns; probe reports live under `output/factor_lab/alpha/probes/`.
 
 All-research dashboard: `python -m factor_lab alpha report` reads campaign rounds, team outputs, memory, family ledger, probes, data axes and holdout policy and writes `output/deliverables/research_portfolio.html` plus a JSON sidecar.
+
+
+PathFinder research policy: default toward a fixed **5–8 component equal-weight rank composite** when the single-factor search is saturated or the available signals are weakly positive but economically complementary. Components must be named with direction and mechanism, fixed before evaluation, no fitted weights, no post-hoc component selection, no combination scan, and at most two candidates. A single-factor question remains allowed when it has a genuinely new mechanism/data axis, a clean event study, or a composite would only dilute it; PathFinder must state that reason. See `factor_lab/alpha/team/roles.json` `campaign_protocol.pathfinder_policy` and the PathFinder behavior files.
+
+Research evidence policy: **long-only primary, long-short diagnostic**. The mandate and promotion Gate use long-only net excess vs the eligible equal-weight benchmark after actual fees, PIT liquidity-1000 + smallest-30% size screen, 20d horizon. Coverage is part of the promotion Gate. Promotion requires long-only Gate + coverage + long-only program FDR + independent validation; long-short evidence is reported as a diagnostic (style/beta/short-leg realizability), not a promotion veto. See `campaign_protocol.research_evidence_policy` and `factor_lab/alpha/policy/mandate.json`.
 
 Pre-registration: `factor_lab.alpha.prereg` validates and freezes a PathFinder pre-registration with a hash before evaluation; FactorBuilder artifacts must match the frozen expressions exactly, and the campaign round records the hash.
 
@@ -37,7 +63,7 @@ Alpha research and deployment use the actual China A-share fee schedule rather t
 - Buy: commission 1.8bps + handling 0.34bps + regulatory 0.20bps + transfer 0.10bps = **2.44bps**.
 - Sell: the same components + stamp duty 5.0bps = **7.44bps**.
 - Effective round-trip fee per one-way turnover: **9.88bps** (representative screenshot trade: 2.41bps buy / 7.45bps sell / 9.82bps round trip).
-- Short borrow: **800bps/year**; the 5-day hold cost is about 1.59bps per rebalance.
+- Short borrow: **800bps/year**; the 5-day hold cost is about 15.87bps per rebalance.
 - `factor_metrics` keeps the generic 20bps `CostModel` for calibrated research/parity; `alpha_gate_spec()` is the Alpha cost profile and uses the buy/sell fee schedule plus borrow.
 
 ## DSH team
@@ -80,8 +106,18 @@ five DSH teammates:
   + Web Gateway cited discovery + ML Planner decision (plan or explicit
   falsifiable skip reason);
 - Reader is used when external sources need structured event extraction;
+- **one fresh team per campaign**: every campaign, including every adaptive
+  iteration, needs its own completed PathFinder/FactorBuilder/Web Gateway/ML
+  Planner tasks and its own campaign-scoped outputs; task ids and outputs may
+  not be reused across campaigns, and one PathFinder decision cannot be
+  relabeled as several campaigns;
+- a pre-registration contains at most two candidates; one campaign is one
+  research decision, not a batch of independent campaigns;
 - one shared task per delegated role (claim → work → complete), plus
   `send_message` with a self-contained task and output contract;
+- the task board is ephemeral coordination, not evidence: after the campaign
+  outputs are recorded and `campaign-audit` passes, delete that campaign's
+  completed task ids; keep only pending/in-progress tasks under the hard limit;
 - record task ids and teammate outputs under
   `output/factor_lab/alpha/campaigns/<campaign_id>/team/`;
 - write `team/team_manifest.json` and record `agents`, `team_tasks`, `protocol`
@@ -153,6 +189,8 @@ output/factor_lab/alpha/memory/
   edge_cards.jsonl
   failures.jsonl
   discoveries.jsonl
+  validation_results.jsonl
+  contexts/
   summary.json
 ```
 
@@ -170,6 +208,8 @@ python -m factor_lab alpha holdout --end 2026-11-01 --save
 python -m factor_lab alpha search --codes output/factor_lab/hypotheses/pool1000_10y.txt --start 2016-01-04 --end 2025-10-31 --budget 80
 python -m factor_lab alpha confirm --codes output/factor_lab/hypotheses/pool200.txt --search output/factor_lab/alpha/search/ALPHA-....json
 python -m factor_lab alpha memory
+python -m factor_lab alpha memory --memory-action record-validation --validation-file validation.json
+python -m factor_lab alpha memory --memory-action build-context --campaign-id CAMP-... --parent-campaign-id CAMP-... --llm-compress
 python -m factor_lab alpha library
 python -m factor_lab alpha campaign --objective "研究应计" --max-rounds 5
 python -m factor_lab alpha campaign-audit --campaign-id CAMP-...
@@ -217,10 +257,10 @@ Do not add direct QuestDB/SQL access to Alpha. Data without PIT is not admitted.
   the policy lives in `factor_lab/alpha/policy/universe.json`. Every research
   command applies it by default; `--no-pit-universe` is for fixed-pool
   comparison only.
-- Research evidence uses long-short spreads; deployment is long-only.
+- Research evidence is long-only primary; long-short is a diagnostic, not a promotion veto. Deployment remains long-only.
 - Verdicts are tri-state (`pass` / `fail` / `insufficient_evidence`); missing
   metrics never become pass or fail. Capacity is informational, not a gate.
-- Every label-touching candidate and ML experiment is trial-accounted. Search, dev, ML and holdout events also go to the append-only unified sink `output/factor_lab/alpha/trial_events.jsonl`; the legacy memory/ledger remain the FDR denominators until the sink is promoted.
+- Every label-touching candidate and ML experiment is trial-accounted. Search, dev, ML and holdout events also go to the append-only unified sink `output/factor_lab/alpha/trial_events.jsonl`; the existing memory/ledger remain the FDR denominators until the sink is promoted.
 - A new or resumed campaign must pass `alpha campaign-preflight` (frozen policy, pre-registration, team provenance, artifact membership, holdout state) before touching labels.
 - Red Team failure cannot become a candidate.
 - No validated Edge Card means 100% broad-index baseline.
@@ -243,3 +283,11 @@ output/factor_lab/
 
 All mutable state is under `output/factor_lab`. Generated factor artifacts are
 runtime research data, not portable design assets.
+
+## Evaluation and holdout policy
+
+- Every round records `evaluation_contract` with evaluation_start/end, universe, size screen, horizon, actual cost, n_eff, n_trials, hypothesis count, pre-registration and ledger snapshot hashes.
+- Research prices use point-in-time cumulative adjustment (`hfq`); raw OHLC is retained for execution and limit checks. Do not use forward adjustment (`qfq`) for price-level factors.
+- The historical holdout is locked; a forward holdout starting 2026-11-02 is frozen and not evaluable until a new explicit policy decision. Evaluation through either locked window requires `--allow-holdout` and is refused by default.
+- Family registration is required; the family ledger is frozen into `ledger_snapshot.json` and evaluations use that snapshot.
+- Pre-registration caps a campaign at 10 candidates and must declare evaluation conditions.

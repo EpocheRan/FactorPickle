@@ -109,3 +109,18 @@ cross-sectional factor metrics. Artifacts live under `output/factor_lab/alpha/ml
 Alpha reads panels through `DataInterfaceGateway` and `build_factor_panel`.
 Research modules never access QuestDB directly. All mutable state is under
 `output/factor_lab`.
+
+PathFinder defaults to a fixed 5–8 component equal-weight rank composite when single-factor evidence is saturated or components are economically complementary; single-factor questions need a concrete new-mechanism/event reason. Components are fixed before evaluation; no fitted weights, post-hoc selection or combination scans.
+
+
+## Per-campaign full team protocol
+
+Every campaign, including every adaptive iteration, must have its own completed PathFinder, FactorBuilder, Web Gateway and ML Planner tasks with campaign-scoped outputs. Task ids and outputs cannot be reused across campaigns; one PathFinder decision cannot be relabeled as several campaigns. A pre-registration may contain at most two candidates. `protocol_audit` is binding.
+
+## Long-only primary evidence (current)
+
+The mandate is long-only and the primary research statistic is **long-only net excess** after actual fees versus the eligible equal-weight benchmark. Coverage is enforced in the promotion Gate; the long-only Gate also checks net excess, t, IR, cost/gross and capacity. Long-short evidence is a diagnostic (style/beta/short-leg realizability), not a promotion veto. Promotion requires long-only Gate + coverage + long-only program FDR + independent validation. The FDR primary statistic is the long-only t-statistic; trials are admitted to the promotion denominator only with long-only evidence.
+
+## Research context
+
+Every new campaign writes `team/research_context.json` (`factor_lab.alpha.research_context.v2`). It carries parent campaign source hashes, structured prior results, validation hard negatives and data provenance. Campaign audit enforces context presence, source-hash integrity, hard-negative coverage and lineage. LLM compression is narrative only; the structured facts remain authoritative. See `research_memory.md`.

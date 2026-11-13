@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from .base import *  # noqa: F401,F403
+from .basic import BasicSyncMixin
 from .benchmark import BenchmarkSyncMixin
 from .concept import ConceptSyncMixin
 from .daily import DailySyncMixin
@@ -15,6 +16,8 @@ from .moneyflow import MoneyflowSyncMixin
 from .screener import ScreenerSyncMixin
 from .sentiment import SentimentSyncMixin
 from .valuation import ValuationSyncMixin
+
+from data_interface.basic.repository import BasicRepository
 
 
 class AShareSyncService(
@@ -26,6 +29,7 @@ class AShareSyncService(
     SentimentSyncMixin,
     ConceptSyncMixin,
     ValuationSyncMixin,
+    BasicSyncMixin,
 ):
     def __init__(
         self,
@@ -62,6 +66,8 @@ class AShareSyncService(
         self._moneyflow_service: MoneyflowService | None = None
         self._sentiment_service: Any | None = None
         self._concept_service: ConceptService | None = None
+        self._basic_repository = BasicRepository(db=self.db, config=self.config)
+        self._basic_service: Any | None = None
 
     def status(self) -> dict[str, Any]:
         latest = self.state.list_latest(TASK_NAME)
@@ -81,4 +87,12 @@ class AShareSyncService(
             "concept_daily": latest.get(CONCEPT_DAILY_STATE),
             "concept_member": latest.get(CONCEPT_MEMBER_STATE),
             "concept_class": latest.get(CONCEPT_CLASS_STATE),
+            "stock_basic_history": latest.get("stock_basic_history"),
+            "namechange": latest.get("namechange"),
+            "new_share": latest.get("new_share"),
+            "suspend_d": latest.get("suspend_d"),
+            "stk_limit": latest.get("stk_limit"),
+            "disclosure_date": latest.get("disclosure_date"),
+            "forecast": latest.get("forecast"),
+            "express": latest.get("express"),
         }

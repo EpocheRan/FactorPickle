@@ -119,8 +119,16 @@ five DSH teammates:
 - **Use when needed**: Reader (structured evidence extraction from cited
   sources). The Gateway step must record "no new external evidence" rather than
   silently skip.
+- **Reader mandatory trigger**: Reader is required when the Web Gateway map has
+  at least four cited sources, when the map sets `reader_required: true`, or
+  when the map records unread/paywalled full-text sources. The Reader task must
+  write `team/reader_evidence.json` with schema
+  `factor_lab.alpha.reader_evidence.v1`; the policy lives in
+  `roles.json` under `campaign_protocol.reader_policy`. Campaigns created before
+  the policy `effective_from` are warning-only and are not retro-edited.
 - **Enforcement**: new `alpha-campaign-v2` campaigns fail the strict campaign
-  audit if the team manifest lacks completed web-gateway or ml-planner evidence.
+  audit if the team manifest lacks completed web-gateway or ml-planner evidence,
+  or if a Reader-required campaign lacks completed Reader evidence.
 - **Delegation mechanics**: one shared task per delegated role on the task
   board, claimed and completed; `send_message` with a self-contained task
   (role boundaries, inputs, output contract); wait for outputs.
@@ -220,6 +228,16 @@ recorded under `output/factor_lab/alpha/data_axes/coverage.json`.
 ## 7. Research invariants
 
 - Search only on the development window.
+- Evaluation preserves pre-window history: `AlphaDataset.segment` keeps the requested evaluation window in `context`, but `evaluation_context()` carries the pre-segment history so `ts_mean`/`ts_std`/`ref` do not lose warmup at the OOS edge. The evaluator still slices results to `start`/`end`.
+- Each campaign round records a first-class `evaluation_contract` with schema `factor_lab.alpha.evaluation_contract.v1`: `evaluation_start`, `evaluation_end`, `universe`, `size_screen`, `pool_mode`, `horizon`, actual `cost`, `n_eff`, `n_trials`, `hypothesis_count`, `pre_registration_hash`, frozen `ledger_snapshot_hash`, `price_basis`, `tradability`, and the forward-holdout state. `evaluation_universe` remains the mask provenance.
+- The forward holdout is frozen in `policy/holdout_v2.json` starting `2026-11-02`; it is not evaluable until `confirmation_allowed` is explicitly changed. A round whose evaluation window reaches it is refused.
+- Research prices use the point-in-time cumulative adjusted convention (`hfq`), not forward-adjusted `qfq`; raw OHLC is retained for execution/limit checks. The data manifest records both price bases.
+- The family ledger is frozen once into `output/factor_lab/alpha/families/ledger_snapshot.json`; evaluations use the snapshot hash. Re-freezing is an explicit `refresh=True` action and changes the denominator identity.
+- Every pre-registration declares its evaluation conditions, has at most 10 candidates, and every used family must be registered in `policy/families.json`. Freeze rejects `require_prereg=False` and Q overrides, and selects the latest recorded trial rather than the largest sample.
+- Each campaign round records `evaluation_universe` with schema `factor_lab.alpha.evaluation_universe.v1`; `kind` is `full_panel` or `custom_mask` and the nested universe summary is the auditable PIT mask. The field is first-class, not a team-manifest workaround.
+- P0 data axes are the single field registry used by PathFinder (pre-registration) and ML Planner: expanded `valuation` fields (`dividend_yield`, `earnings_yield`, `pcf_ttm`, `pfcf`, `ev_*`, `p_nwc`, ...), `share_structure` (`total_share`, `float_share`), `security_master.list_days`, and `index_membership.index_weight_*` are admitted once the panel provides them. Do not maintain a separate ML-only field list.
+- ML features may be raw PIT fields or validated deterministic DSL feature expressions (for example `rank(div(fin_net_income, fin_total_assets))`, `ts_std(returns, 20)`, `div(ts_mean(abs(returns),20), ts_mean(amount,20))`). The runtime compiles expressions on the evaluation context, so long-lookback features keep their warmup; raw fields are never auto-injected.
+- The ML result includes a deterministic long-only construction block built from OOS scores: top-quintile equal weight, next-open entry, actual A-share buy/sell fees. It is deployability evidence, not a promotion gate.
 - Universe is point-in-time: eligibility uses trailing data only. Delisted,
   suspended and not-yet-seasoned names leave or stay out of the universe and
   are never forward-filled. The policy lives in
@@ -231,6 +249,7 @@ recorded under `output/factor_lab/alpha/data_axes/coverage.json`.
   DSH teammates and records their outputs; a Lead-only campaign is invalid.
 - Instrument calibration (cheat / random / known probes) runs before a large
   search campaign; probes are calibration reports, not candidate trials.
+- The forward holdout is frozen and unused; historical holdout uses remain recorded and never reopen.
 - Holdout confirmation requires a passed freeze decision; freeze uses the
   program-wide FDR denominator (all pre-registered families on the same
   standardized pool/window), not a small family-only denominator.
@@ -244,8 +263,8 @@ recorded under `output/factor_lab/alpha/data_axes/coverage.json`.
 - ML features are explicit and pre-registered; the runtime validates that expanded P0/P1 fields exist, but never auto-injects them. PathFinder must expose `ml_branch` and route to ML Planner after two ML-free campaigns or when expanded axes changed.
 - Event features carry the disclosure/trade date already present as `ts`; the p1_events adapter applies exactly one trading-day lag. Do not apply a second arbitrary lag in factor expressions.
 - Red Team failure cannot become a candidate.
-- Research uses long-short signal evidence; deployment is long-only.
-- Only validated/active Edge Cards may be allocated.
+- Research uses long-short signal evidence; deployment is long-only. Portfolio construction uses `policy/portfolio.json`; execution uses `policy/execution.json`. Neither layer may silently fabricate ST/new/delisting/suspension flags.
+- Only validated/active Edge Cards may be allocated. Portfolio construction and paper execution are separate deterministic layers; a portfolio backtest is not a promotion, and missing ST/new/delisting/security-master data is an explicit execution gap.
 - No validated edge means 100% broad-index baseline.
 - Research modes: `explore`, `validate`, `deploy`.
 - Alpha cost model: actual A-share fees (buy 2.44bps, sell 7.44bps including 5bps sell stamp duty) plus 800bps/year short borrow; the generic research `CostModel` is not the Alpha deployment assumption.

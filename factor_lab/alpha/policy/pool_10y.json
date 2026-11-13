@@ -8,7 +8,7 @@
     "end": "2016-12-31"
   },
   "min_bars": 1,
-  "universe_policy": "pit_liquidity_800",
+  "universe_policy": "pit_liquidity_1000",
   "generated_file": "output/factor_lab/hypotheses/pool1000_10y.txt",
   "note": "Selection uses only 2015-2016 data, before the 2017-2025 expanded-axis evaluation. Do not use full-window liquidity to select candidates."
 }

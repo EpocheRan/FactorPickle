@@ -33,10 +33,11 @@ def register_acquisition_tools(mcp) -> None:
 
         Args:
             datasets: 逗号分隔的数据集；不传则按依赖顺序全跑：
-                trading_calendar, stock_basic, ohlcv_1d, benchmark, financial,
-                valuation, moneyflow, margin_detail, top_list, block_trade,
-                concept_meta, concept_daily, concept_member, concept_class,
-                factors, screener。
+                trading_calendar, stock_basic, stock_basic_history, namechange,
+                new_share, suspend_d, stk_limit, disclosure_date, forecast,
+                express, ohlcv_1d, benchmark, financial, valuation, moneyflow,
+                margin_detail, top_list, block_trade, concept_meta,
+                concept_daily, concept_member, concept_class, factors, screener。
             start_date / end_date: 日期范围，默认 2020-01-01 至今。
             codes: 指定股票/ETF 代码；不传表示全市场。
             boards: 指定板块代码（概念日线/成分用）。

@@ -128,7 +128,8 @@ def test_ten_year_protocol_is_codified() -> None:
     assert protocol["dataset_start"] == "2016-01-04"
     assert protocol["dataset_end"] == "2025-10-31"
     assert protocol["candidate_pool"]["top_n"] == 1000
-    assert protocol["universe"]["top_n"] == 800
+    assert protocol["universe"]["top_n"] == 1000
+    assert protocol["horizon"] == 20
     assert protocol["costs"]["buy_fee_bps"] == 2.44
     assert protocol["holdout"]["confirmation_allowed"] is False
 

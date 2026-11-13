@@ -29,7 +29,18 @@ def _dataset() -> AlphaDataset:
 def test_ml_feature_catalog_contains_expanded_axes() -> None:
     catalog = ml_feature_catalog()
     expanded = set(catalog["expanded_fields"])
-    assert {"margin_rzye", "mf_net_amount", "block_amount", "top_net_amount", "holder_chg", "rep_amount"} <= expanded
+    assert {
+        "margin_rzye",
+        "mf_net_amount",
+        "block_amount",
+        "top_net_amount",
+        "holder_chg",
+        "rep_amount",
+        "dividend_yield",
+        "ev_ebit",
+        "list_days",
+        "index_weight_000300",
+    } <= expanded
 
 
 def test_validate_ml_features_accepts_expanded_and_rejects_unknown() -> None:
@@ -81,3 +92,39 @@ def test_run_ml_experiment_accepts_expanded_fields() -> None:
     assert result["schema"] == "factor_lab.alpha.ml_result.v1"
     assert result["model_card"]["features"] == ["margin_rzye", "mf_net_amount", "block_amount"]
     assert result["metrics"]["n_oos_rows"] > 0
+
+
+def test_axes_and_ml_groups_share_one_list() -> None:
+    from factor_lab.alpha.data_axes import ML_FEATURE_GROUPS, P0_AXES
+    from factor_lab.alpha.prereg import allowed_fields
+
+    for name, axis in P0_AXES.items():
+        assert ML_FEATURE_GROUPS[name] == list(axis["fields"])
+    admitted = allowed_fields()
+    assert {"dividend_yield", "earnings_yield", "p_nwc", "list_days", "float_share", "index_weight_000300"} <= admitted
+
+
+def test_ml_accepts_expanded_valuation_and_reference_fields() -> None:
+    report = validate_ml_features(
+        ["dividend_yield", "ev_ebit", "list_days", "index_weight_000300"],
+        available_fields=["dividend_yield", "ev_ebit", "list_days", "index_weight_000300"],
+    )
+    assert report["features"] == ["dividend_yield", "ev_ebit", "list_days", "index_weight_000300"]
+
+
+def test_pathfinder_prefers_multi_factor_when_evidence_is_saturated() -> None:
+    import json
+    from pathlib import Path
+
+    from factor_lab.alpha.team.behavior import load_behavior
+
+    pathfinder = load_behavior("pathfinder")
+    assert "Multi-factor bias" in pathfinder["system_prompt"]
+    assert "equal-weight rank composite" in pathfinder["system_prompt"]
+    for field in ("candidate_mode", "components", "combination_rule", "multi_factor_rationale"):
+        assert field in pathfinder["contract"]["outputs"]
+    assert any(item["id"] == "PF-005" for item in pathfinder["evals"])
+    roles = json.loads(Path("factor_lab/alpha/team/roles.json").read_text(encoding="utf-8"))
+    policy = roles["campaign_protocol"]["pathfinder_policy"]
+    assert policy["component_range"] == [5, 8]
+    assert policy["combination_rule"] == "equal_weight_rank_composite"

@@ -4,6 +4,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+# polars 是可选性能后端（pyproject 的 ``perf`` extra）；默认 uv sync 不安装它，
+# 缺失时整组用例跳过，避免默认离线测试套件因可选依赖变红。
+pytest.importorskip("polars", reason="optional perf extra: uv sync --extra perf")
+
 from research.report import metrics
 from research.report.benchmark_polars import _pandas_quantile_forward_spread
 from research.report.metrics_polars import quantile_forward_spread, quantile_nav, rank_ic_frame

@@ -1,0 +1,11 @@
+{
+  "schema": "factor_lab.alpha.holdout_v2.v1",
+  "state": "frozen",
+  "holdout_start": "2026-11-02",
+  "holdout_end": null,
+  "confirmation_allowed": false,
+  "reason": "Only 5 trading days are available (data ends 2026-11-06); a 20d long-only holdout is not identifiable yet.",
+  "minimum_independent_periods": 120,
+  "created_at": "2026-11-13T12:55:00+08:00",
+  "note": "Do not evaluate or report metrics on this window until confirmation_allowed is set by a new explicit policy decision."
+}

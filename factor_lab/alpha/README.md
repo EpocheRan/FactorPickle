@@ -186,8 +186,10 @@ output/factor_lab/alpha/ml/<plan_id>.model_card.json
 ```text
 OHLCV / amount / turnover
 moneyflow / margin
-valuation
+valuation（PE/PB/PS/PCF/EV/股息率/盈利收益率等全字段）
 financial statements（按 publish_date PIT，fin_*）
+security master（list_days）
+index membership（index_weight_*）
 ```
 
 ## 规则

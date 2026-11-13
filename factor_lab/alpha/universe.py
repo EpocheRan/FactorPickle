@@ -28,6 +28,7 @@ from factor_lab.core.store import read_json
 
 UNIVERSE_SCHEMA = "factor_lab.alpha.universe.v1"
 UNIVERSE_POLICY_SCHEMA = "factor_lab.alpha.universe_policy.v1"
+EVALUATION_UNIVERSE_SCHEMA = "factor_lab.alpha.evaluation_universe.v1"
 
 
 @dataclass(frozen=True)
@@ -152,3 +153,54 @@ def universe_summary(
         "first_date": str(mask.index.min().date()) if len(mask.index) else None,
         "last_date": str(mask.index.max().date()) if len(mask.index) else None,
     }
+
+
+def evaluation_universe_summary(
+    mask: pd.DataFrame | None,
+    policy: UniversePolicy | None = None,
+    *,
+    kind: str = "custom_mask",
+    source: str = "campaign_round",
+) -> dict[str, Any]:
+    """First-class evaluation-universe record for a campaign round.
+
+    ``kind`` is ``full_panel`` when no custom mask was supplied, or
+    ``custom_mask`` (or a caller-supplied mask kind) otherwise.  The nested
+    ``universe`` payload is the existing auditable mask summary.
+    """
+    summary = universe_summary(mask, policy)
+    if summary is None:
+        return {
+            "schema": EVALUATION_UNIVERSE_SCHEMA,
+            "kind": "full_panel",
+            "source": str(source),
+            "universe": None,
+        }
+    return {
+        "schema": EVALUATION_UNIVERSE_SCHEMA,
+        "kind": str(kind),
+        "source": str(source),
+        "universe": summary,
+    }
+
+
+def apply_size_screen(
+    context: AlphaContext,
+    mask: pd.DataFrame,
+    *,
+    exclude_smallest_fraction: float = 0.30,
+) -> pd.DataFrame:
+    """Apply the pre-registered smallest-float-market-cap screen.
+
+    ``mask`` must already be the PIT eligibility mask.  The float-cap rank is
+    cross-sectional and same-date (PIT); the smallest fraction is excluded.
+    """
+    fraction = float(exclude_smallest_fraction)
+    if not (0.0 <= fraction < 1.0):
+        raise ValueError("exclude_smallest_fraction must be in [0, 1)")
+    float_mv = context.fields.get("float_mv")
+    if float_mv is None:
+        raise ValueError("size screen requires float_mv in the panel")
+    frame = mask.reindex(index=float_mv.index, columns=float_mv.columns).fillna(False).astype(bool)
+    ranks = float_mv.where(frame).rank(axis=1, pct=True)
+    return frame & ranks.gt(fraction)

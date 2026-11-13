@@ -27,6 +27,21 @@ from factor_metrics.stats import group_monotonicity, spearman, spearman_p, sprea
 #: 不能直接乘在 G5−G1 上。这里用 2.80，并允许在报告里覆盖。
 QUINTILE_SPREAD_MULTIPLIER = 2.80
 
+#: 因子族规则：报告用可读族名/标签；未匹配时回退到 factor_id 前缀。
+_FAMILY_RULES = (
+    (r"^liquidity\.", "liquidity", "流动性"),
+    (r"^momentum\.", "momentum", "动量"),
+    (r"^reversal\.", "reversal", "反转"),
+    (r"^risk\.", "risk", "风险"),
+    (r"^quality\.", "quality", "质量"),
+    (r"^value\.", "value", "价值"),
+    (r"^growth\.", "growth", "成长"),
+    (r"^sentiment\.", "sentiment", "情绪/资金"),
+    (r"^size\.", "size", "规模"),
+    (r"^technical\.", "technical", "技术"),
+    (r"^valuation\.", "valuation", "估值"),
+)
+
 GRADE_ORDER = ("A", "B", "C", "D")
 
 

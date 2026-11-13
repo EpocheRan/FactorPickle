@@ -3,7 +3,7 @@
 分层
 ----
 - 计算在 ``factors/ops/price_factors.py``（纯 pandas）；
-- 分类/命名/窗口/方向/公式在本文件，登记进 ``factor_registry``；
+- 分类/命名/窗口/方向/公式在本文件，登记进 ``custom_factor_registry``；
 - ``factor_id`` 形如 ``momentum.return_21d``，原始  名（含大写，如 ``MACD``）
   保留在 ``aliases`` 里，便于对账。
 

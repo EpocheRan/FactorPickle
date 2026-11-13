@@ -388,7 +388,7 @@ class QuestDBDataSource:
         code_placeholders = ",".join(["%s"] * len(codes))
         id_placeholders = ",".join(["%s"] * len(ids))
         sql = (
-            "SELECT ts, code, factor_id, value FROM \"factor_value_daily\" "
+            "SELECT ts, code, factor_id, value FROM \"custom_factor_value_daily\" "
             f"WHERE code IN ({code_placeholders}) "
             f"AND factor_id IN ({id_placeholders}) "
             "AND ts BETWEEN %s AND %s ORDER BY ts, code, factor_id"

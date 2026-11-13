@@ -1,0 +1,82 @@
+{
+  "schema": "factor_lab.alpha.mandate.v1",
+  "deployment_mode": "long_only",
+  "primary_horizon": 20,
+  "robustness_horizons": [
+    5,
+    60
+  ],
+  "universe": {
+    "name": "pit_liquidity_1000",
+    "top_n": 1000,
+    "min_history_days": 120,
+    "lookback_days": 60,
+    "pool": "pool1000_10y",
+    "note": "Widest pool available in the current ten-year data contract; PIT eligibility is recomputed daily."
+  },
+  "size_screen": {
+    "name": "exclude_smallest_float_mv_30pct",
+    "exclude_smallest_fraction": 0.3,
+    "applied_to": "deployment_and_promotion",
+    "pre_registered": true
+  },
+  "aum_cny": 1000000,
+  "benchmark": {
+    "primary": "ew_eligible_pool",
+    "secondary": [
+      "csi_1000"
+    ],
+    "secondary_data_available": false,
+    "note": "Secondary index data is not in the current data contract; do not fabricate index returns."
+  },
+  "long_only_gate": {
+    "min_net_excess_annualized": 0.0,
+    "min_t": 2.0,
+    "min_ir": 0.8,
+    "max_turnover": 0.3,
+    "min_coverage": 0.9,
+    "min_dates_insufficient": 30,
+    "gate_version": "cost_impact_v1",
+    "effective_from": "2026-11-13T13:30:00+08:00",
+    "max_cost_to_gross_ratio": 0.25,
+    "min_capacity_multiple": 2.0,
+    "turnover_warning": 0.5,
+    "turnover_is_veto": false,
+    "impact_model": "capacity_multiple_proxy"
+  },
+  "data_requirements": {
+    "delisting_adjusted_universe": false,
+    "capacity_impact_model": false,
+    "pit_earnings_announcement_dates": false,
+    "oos_2017_2025": false,
+    "notes": "These are capability gaps in the frozen data contract; they block promotion-grade replication, not exploratory research."
+  },
+  "research_mode": "replication",
+  "primary_benchmark": "ew_eligible_pool",
+  "pool_mode": "ex_ante_top1000",
+  "price_basis": "pit_cumulative_adjusted_hfq",
+  "tradability": "partial_ohlcv_mask",
+  "holdout_v2_start": "2026-11-02",
+  "research_evidence": {
+    "primary": "long_only",
+    "long_short_role": "diagnostic",
+    "promotion": {
+      "requires": [
+        "long_only_gate",
+        "coverage",
+        "program_fdr",
+        "independent_validation"
+      ],
+      "ls_is_veto": false,
+      "primary_benchmark": "ew_eligible_pool"
+    },
+    "long_only_gate": {
+      "min_coverage": 0.9,
+      "min_t": 2.0,
+      "min_ir": 0.8,
+      "max_cost_to_gross_ratio": 0.25,
+      "min_capacity_multiple": 2.0
+    },
+    "note": "Primary evidence is long-only net excess vs the eligible equal-weight benchmark; long-short is a diagnostic, not a promotion veto."
+  }
+}

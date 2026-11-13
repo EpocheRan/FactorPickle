@@ -25,7 +25,7 @@ logger = logging.getLogger("Scripts.ScreenerSchema")
 def _ddl() -> list[str]:
     return [
         """
-        CREATE TABLE IF NOT EXISTS "factor_daily_wide" (
+        CREATE TABLE IF NOT EXISTS "screener_feature_daily" (
             ts TIMESTAMP,
             code SYMBOL,
             market SYMBOL,
@@ -96,6 +96,10 @@ def _ddl() -> list[str]:
             computed_at TIMESTAMP
         ) TIMESTAMP(ts) PARTITION BY MONTH WAL
         DEDUP UPSERT KEYS(ts, code, market)
+        """,
+        """
+        CREATE VIEW IF NOT EXISTS "screener_daily_wide_view" AS
+        SELECT * FROM "screener_feature_daily"
         """,
         """
         CREATE TABLE IF NOT EXISTS "intraday_baseline" (

@@ -23,6 +23,19 @@ class AlphaDataset:
     end: str
     warmup_days: int
     data_manifest: dict[str, Any]
+    # The pre-segment context used for warmup.  ``segment`` keeps the
+    # evaluation window in ``context`` for ML/split logic, while the evaluator
+    # compiles expressions against this full-history context so long lookback
+    # operators (ts_mean/ts_std/ref) do not lose their warmup at the OOS edge.
+    history_context: AlphaContext | None = None
+
+    def evaluation_context(self) -> AlphaContext:
+        """Context the evaluator may use for factor compilation.
+
+        It contains pre-evaluation history; callers must still use
+        ``start``/``end`` (or ``context``) for the actual evaluation window.
+        """
+        return self.history_context or self.context
 
     def segment(self, start: str | None = None, end: str | None = None) -> "AlphaDataset":
         context = self.context
@@ -45,6 +58,7 @@ class AlphaDataset:
             end=end or self.end,
             warmup_days=self.warmup_days,
             data_manifest=self.data_manifest,
+            history_context=self.history_context or self.context,
         )
 
 
@@ -84,6 +98,9 @@ def load_alpha_dataset(
         "rows": built.manifest.rows,
         "data_hash": built.manifest.data_hash,
         "category": built.category,
+        "price_basis": "pit_cumulative_adjusted_hfq",
+        "execution_price_basis": "raw",
+        "per_field_coverage": built.manifest.per_field_coverage,
     }
     return AlphaDataset(
         context=context,

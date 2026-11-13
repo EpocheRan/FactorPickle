@@ -15,6 +15,7 @@
 - **A 股规则内置**：T+1、整手、涨跌停、停牌、佣金与印花税；单标的与横截面共用一套账本。
 - **MCP 原生**：行情、财务、因子、选股、持仓、同步统一暴露为工具，AI Agent 可直接调用。
 - **可复现**：`run_id` 固化策略、参数、数据快照与执行规则，同输入可重跑、可对照。
+- **研究记忆**：campaign 结果、validation ledger、hard negatives、数据 provenance 进入结构化 context；新 campaign 不能绕过 memory audit。
 
 ## 架构
 
@@ -51,7 +52,7 @@ MCPserver ── 统一工具出口（http / sse / stdio）
 | `factors/` | 因子定义、时序与横截面算子 | `from factors import F` |
 | `factor_engine/` | 因子物化、宽表、审计与对账 | `python -m factor_engine` |
 | `research/` | 统一报告：profile 章节 + 单因子 HTML；默认全市场 | `python -m research.report` / `python -m scripts.cli profile` |
-| `factor_lab/` | Alpha Research Engine：DSL、Edge Card、Memory、Factor Library、Campaign、ML Branch | `python -m factor_lab alpha` |
+| `factor_lab/` | Alpha Research Engine：DSL、Edge Card、Research Memory、Factor Library、Campaign、ML Branch | `python -m factor_lab alpha` |
 | `screener/` | 因子筛股、基线、停牌与覆盖检查 | `python -m screener` |
 | `backtest/` | 单股 / 横截面回测、执行规则、账本 | `python -m backtest` |
 | `strategies/` | 策略基类、universe、weighting、模型 | `python -m backtest list` |
@@ -95,6 +96,8 @@ python MCPserver.py
 python -m acquisition run
 # 或只更新部分数据集
 python -m acquisition run --datasets ohlcv_1d,factors,screener
+# P0 基础资料（名单/停复牌/涨跌停/披露/预告/快报）
+python -m acquisition run --datasets stock_basic_history,namechange,new_share,suspend_d,stk_limit,disclosure_date,forecast,express --start 2017-01-01 --end 2026-11-07 --loop
 ```
 
 数据集、增量策略与回补命令见 [docs/modules/01-acquisition.md](docs/modules/01-acquisition.md)。
@@ -109,6 +112,9 @@ python -m acquisition run --datasets ohlcv_1d,factors,screener
 - **市场与品种**：`market` 是交易所（`SSE` / `SZSE` / `BSE`），`type` 是品种（`stock` / `etf` / `lof` / `fund` / `idx`）。
 - **时点正确**：财务按 `publish_date` 过滤，板块成分按 `as_of` 取最近整组快照。
 - **写入边界**：raw 表只由 `data_interface` 写，因子表只由 `factor_engine` 写。
+- **Alpha 研究证据**：long-only primary，long-short diagnostic；promotion 需要 long-only Gate + coverage + long-only program FDR + independent validation。
+- **研究记忆**：每个新 campaign 写 `team/research_context.json`；validation 记录在 `output/factor_lab/alpha/memory/validation_results.jsonl`；入口 `python -m factor_lab alpha memory`。
+- **LLM 压缩**：DeepSeek Flash 是可选 compressor；API key 只放在 gitignored `config.json`，不写入源码。
 - **报告单一入口**：因子报告只认 `research.report`；报告章节由 `eval_profile` 里的 profile 决定。取数入口在 `research.data`（`loader.py` / `db.py` / `spec.py`）。
 - **因子报告唯一入口**：只用 `python -m research.report`。默认 `all_a` 全市场、`2017-01-01` 至 `2026-11-01`、`default` profile、5 日持有；股票池只用 `--universe`（`all_a` / `index:...` / `pool:date:size`）；只输出 HTML。禁止另写自定义报告脚本或临时 Panel。
 - **profile 即报告章节**：`default` 包含定义、时间、空间、评级、附录五章；`quick` 只含定义、时间、评级。数据/面板参数在 `research.data`。

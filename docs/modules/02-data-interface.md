@@ -46,6 +46,7 @@
 | | `normalizer.py` / `metrics.py` | 字段归一、季度化、TTM |
 | `moneyflow/` | `service.py` | 资金流同步/排名 |
 | `sentiment/` | `service.py` / `repository.py` | `SentimentService`：两融/龙虎榜/大宗按交易日批量同步 |
+| `basic/` | `service.py` / `repository.py` / `normalizer.py` / `models.py` | P0 基础资料：名单快照、名称变更、新股、停复牌、涨跌停、披露计划、业绩预告/快报 |
 | `concept/` | `service.py` | 板块目录、成分、板块日线、个股↔板块映射 |
 | `disclosure/` | `service.py` | 财报披露日历、公告 |
 | `api/` | `*_tools.py` / `runtime.py` / `utils.py` | MCP 工具注册、单例管理、JSON 序列化 |
@@ -60,6 +61,16 @@
 价格是不复权价；`adj_factor` 按 `(code, date)` 取日线当日因子，`turnover` 按日线隐含流通股本折算。
 批量导出/落库：`scripts/export_index_minutes.py` / `scripts/import_minutes_csv.py`，
 细节见 [../design/minute_data.md](../design/minute_data.md)。
+
+**P0 基础资料（`data_interface.basic`）**：八张表按各自业务日期做 designated timestamp，
+`WAL + DEDUP` 幂等写入。`stock_basic_history` 存全市场名单快照（L/P/D、名称、行业、
+`is_st`）；`namechange` 存历史名称与 ST 区间；`suspend_d` 存逐日停牌（S）/复牌（R）；
+`stk_limit` 存逐日涨跌停价；`disclosure_date` 以报告期为 `ts`，保留 `ann_date`/`pre_date`/
+`actual_date` 供 PIT；`forecast`/`express` 以公告日为 `ts`。取数入口是
+`TushareSource.fetch_*`（`namechange`/`new_share`/`suspend_d`/`stk_limit`/
+`disclosure_date`/`forecast`/`express`），服务层 `BasicDataService` 按快照/交易日/
+自然日/报告期/区间五种粒度分批。`market_suspension`（screener 负缓存）与
+`fin_disclosure_calendar`（预约披露快照）保持原语义，不由本域写入。
 
 ### 1.4 数据流（以日线为例）
 
@@ -81,8 +92,9 @@ MarketDataLoader.ohlc(codes, start, end, freq, adjust)
 | `QuestDBClient` | `query_dataframe(sql)` / `execute(sql)` / `execute_values(prefix, rows)` / `execute_ddl(sql)` | 所有 SQL 的入口 |
 | `MarketDataLoader` | `ohlc(codes, start, end, freq, adjust, source_priority)` / `ticker_basic_info` | 行情主入口，含增量与复权（板块走 `ConceptService`） |
 | `MarketDataFetcher` | `get_ohlc(...)` / `get_realtime_quotes` / `update_ohlc(data, freq)` | 多源调度 + 写库 |
-| `FinancialDataService` | `get_statements` / `get_valuation` / `get_indicators` / `sync_*` / `ensure_stock_universe` | 财务 PIT |
+| `FinancialDataService` | `get_statements` / `get_valuation` / `get_indicators` / `sync_*` / `ensure_stock_universe` / `load_valuation_statement_index` / `rebuild_valuation_derived` | 财务 PIT；`rebuild_valuation_derived` 原地重算 `fin_valuation_daily` 的派生列（零请求、按月切片、可 dry-run） |
 | `MoneyflowService` | `get_by_code` / `get_by_date` / `rank` / `sync` | 资金流 |
+| `BasicDataService` | `sync(...)` / `sync_days` / `sync_periods` / `sync_range` / `probe` / `latest_ts` | P0 基础资料取数与归一 |
 | `ConceptService` | `sync_boards` / `stock_boards(code)` / `compute_board_daily` / `sync_stock_boards` | 板块 |
 | `DisclosureService` | `calendar(code)` / `upcoming(days)` / `announcements(code)` | 披露 |
 | `TradingCalendar` | `is_trading_day` / `trading_days(start, end)` | 交易日历：库内覆盖不足时才补齐（Tushare `trade_cal` → AkShare） |
@@ -104,6 +116,13 @@ stmts = fin.get_statements("600519", "IS", as_of="2026-10-28")
 # 直接 SQL
 db = QuestDBClient()
 frame = db.query_dataframe("select * from ohlcv_1d where code='600519' limit 10")
+
+# P0 基础资料（按数据集天然粒度取数；游标/pending 由 acquisition 落库）
+from data_interface.basic import BasicDataService
+
+basic = BasicDataService()
+basic.sync("stk_limit", "2017-01-01", "2026-11-07", max_units=20)
+basic.probe()  # 最小请求探测 8 个接口权限
 ```
 
 MCP 工具：`data_interface/api/market_tools.py` 等注册 `get_ohlc`、`get_financial_statements`、

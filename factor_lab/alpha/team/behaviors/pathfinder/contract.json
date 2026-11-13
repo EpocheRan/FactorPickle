@@ -3,9 +3,81 @@
   "agent": "pathfinder",
   "type": "llm",
   "tier": "L0",
-  "inputs": ["campaign", "memory_summary", "factor_library", "discovery_map"],
-  "outputs": ["research_question", "mechanism_priority", "data_axes", "decision", "rationale", "stop_conditions", "ml_branch"],
+  "inputs": [
+    "campaign",
+    "research_context",
+    "memory_summary",
+    "factor_library",
+    "discovery_map"
+  ],
+  "outputs": [
+    "research_question",
+    "mechanism_priority",
+    "data_axes",
+    "decision",
+    "rationale",
+    "stop_conditions",
+    "ml_branch",
+    "candidate_mode",
+    "components",
+    "combination_rule",
+    "multi_factor_rationale",
+    "context_refs"
+  ],
   "allowed_tools": [],
-  "forbidden": ["data_access", "code_execution", "gate_override", "capital_allocation", "historical_behavior"],
-  "stop_conditions": ["duplicate_question", "no_data_axis", "budget_exhausted"]
+  "forbidden": [
+    "data_access",
+    "code_execution",
+    "gate_override",
+    "capital_allocation",
+    "historical_behavior",
+    "unmotivated_component_dump",
+    "post_hoc_component_selection",
+    "batch_preregistration",
+    "reuse_prior_campaign_decision",
+    "shared_campaign_task_id",
+    "ignore_hard_negatives",
+    "repeat_failed_hypothesis_without_new_mechanism",
+    "use_stale_validation"
+  ],
+  "stop_conditions": [
+    "duplicate_question",
+    "no_data_axis",
+    "budget_exhausted"
+  ],
+  "multi_factor_policy": {
+    "default": "prefer_fixed_equal_weight_rank_composite_when_single_factor_search_saturated_or_components_complementary",
+    "component_range": [
+      5,
+      8
+    ],
+    "single_factor_allowed_when": [
+      "new_mechanism_or_data_axis",
+      "clean_event_study",
+      "composite_would_only_dilute"
+    ],
+    "combination_rule": "equal_weight_rank_composite",
+    "guardrails": [
+      "no_fitted_weights",
+      "no_post_hoc_component_selection",
+      "no_combination_scan",
+      "one_hypothesis_max_two_candidates",
+      "no_more_than_eight_components"
+    ]
+  },
+  "per_campaign_freshness": {
+    "required": true,
+    "one_decision_per_campaign": true,
+    "fresh_task_and_output_required": true,
+    "max_candidates_per_campaign": 2,
+    "instruction": "Re-judge every campaign from the prior result; never relabel a shared decision as a new campaign."
+  },
+  "research_memory": {
+    "required": true,
+    "context_path": "team/research_context.json",
+    "schema": "factor_lab.alpha.research_context.v2",
+    "hard_negatives_binding": true,
+    "source_hashes_required": true,
+    "compressor": "optional_llm_narrative_only"
+  }
 }

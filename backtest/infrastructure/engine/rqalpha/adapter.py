@@ -308,10 +308,16 @@ class StrategyAdapter:
             base = float(getattr(position, "avg_price", 0.0) or 0.0) or price
             stop = base * (1.0 - float(intent.stop_loss_pct))
         if stop is not None or intent.trailing_pct is not None or intent.hold_bars is not None:
+            previous = runtime.stops.get(code)
+            high_water = (
+                max(float(previous.high_water), float(price))
+                if previous is not None
+                else float(price)
+            )
             runtime.stops[code] = StopState(
                 stop=None if stop is None else float(stop),
                 trailing_pct=None if intent.trailing_pct is None else float(intent.trailing_pct),
-                high_water=float(price),
+                high_water=high_water,
                 hold_bars=None if intent.hold_bars is None else int(intent.hold_bars),
             )
         intent.clear()

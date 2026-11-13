@@ -63,6 +63,21 @@ def test_build_and_render_research_atlas(tmp_path) -> None:
     assert "Research Atlas" in html
     assert "CAMP-TEST" in html
     assert "does test work?" in html
+    # app-shell structure: every view is a hash-routed section, one per question
+    for view in ("overview", "evolution", "ideas", "agents", "results", "datasets", "conclusions", "method"):
+        assert f'data-view="{view}"' in html
+    # campaign explorer: dense rail row + detail pane, deep-linkable
+    assert 'class="camp-row"' in html
+    assert 'href="#/evolution/CAMP-TEST"' in html
+    assert '<article class="camp-detail" data-id="CAMP-TEST"' in html
+    # flat, filterable data tables exist instead of nested scroll walls
+    assert 'id="ev-list"' in html
+    assert 'id="idea-list"' in html
+    assert 'id="cand-body"' in html
+    # self-contained: no external assets or network resources
+    assert "http://" not in html
+    assert "https://" not in html
+    assert "<script>" in html and "<style>" in html
     out = write_portfolio_report(tmp_path / "deliverables" / "research_portfolio.html", root=tmp_path)
     assert out["ok"] is True
     assert Path(out["path"]).exists()

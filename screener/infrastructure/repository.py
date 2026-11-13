@@ -53,7 +53,7 @@ class QuestDBFactorRepository:
         if not codes:
             return pd.DataFrame()
         sql = (
-            'SELECT * FROM "factor_daily_wide" '
+            'SELECT * FROM "screener_daily_wide_view" '
             "WHERE ts BETWEEN %s AND %s "
             f"AND code IN ({_placeholders(len(codes))}) "
             "ORDER BY ts, code"
@@ -74,7 +74,7 @@ class QuestDBFactorRepository:
             return pd.DataFrame()
         sql = (
             'SELECT ts, code, formula_version, is_partial, full_ready '
-            'FROM "factor_daily_wide" '
+            'FROM "screener_daily_wide_view" '
             "WHERE ts BETWEEN %s AND %s "
             f"AND code IN ({_placeholders(len(codes))}) "
             "ORDER BY code, ts"
@@ -92,7 +92,7 @@ class QuestDBFactorRepository:
         if not codes:
             return False
         sql = (
-            "SELECT count_distinct(code) FROM \"factor_daily_wide\" "
+            "SELECT count_distinct(code) FROM \"screener_daily_wide_view\" "
             "WHERE ts = %s "
             f"AND code IN ({_placeholders(len(codes))})"
         )
@@ -106,7 +106,7 @@ class QuestDBFactorRepository:
         if not codes:
             return 0
         sql = (
-            "SELECT count_distinct(code) FROM \"factor_daily_wide\" "
+            "SELECT count_distinct(code) FROM \"screener_daily_wide_view\" "
             "WHERE ts = %s "
             f"AND code IN ({_placeholders(len(codes))})"
         )

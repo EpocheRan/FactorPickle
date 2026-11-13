@@ -24,6 +24,28 @@ PRE_REG_SCHEMA = "factor_lab.alpha.pre_registration.v1"
 FROZEN_SCHEMA = "factor_lab.alpha.pre_registration_frozen.v1"
 BASE_FIELDS = {"open", "high", "low", "close", "close_raw", "open_raw", "high_raw", "low_raw", "volume", "amount", "turnover", "returns", "ret_1d", "log_close", "float_mv", "total_mv"}
 FORBIDDEN_TOKENS = {"forward", "future", "label", "target", "ret_fwd"}
+MAX_CANDIDATES_PER_CAMPAIGN = 10
+
+
+def registered_families() -> set[str]:
+    path = Path(config.ALPHA_POLICY_DIR) / "families.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return set()
+    families = payload.get("families") or {}
+    if isinstance(families, dict):
+        return {str(key) for key in families}
+    return {str(item.get("family_id")) for item in families if isinstance(item, dict) and item.get("family_id")}
+
+
+def family_registration_required() -> bool:
+    path = Path(config.ALPHA_POLICY_DIR) / "families.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return False
+    return bool(payload.get("require_registered_family", False))
 
 
 def allowed_fields() -> set[str]:
@@ -31,7 +53,7 @@ def allowed_fields() -> set[str]:
     return set(payload["fields"].get("p0", [])) | set(payload["fields"].get("p1", [])) | BASE_FIELDS
 
 
-def validate_pre_registration(payload: dict[str, Any], *, campaign_id: str | None = None) -> dict[str, Any]:
+def validate_pre_registration(payload: dict[str, Any], *, campaign_id: str | None = None, enforce_policy: bool = True) -> dict[str, Any]:
     issues: list[str] = []
     warnings: list[str] = []
     if not isinstance(payload, dict):
@@ -56,6 +78,8 @@ def validate_pre_registration(payload: dict[str, Any], *, campaign_id: str | Non
             issues.append("family_id is required")
         elif family_id in family_ids:
             issues.append(f"duplicate family_id: {family_id}")
+        if enforce_policy and family_id and family_registration_required() and family_id not in registered_families():
+            issues.append(f"{family_id}: family is not registered in policy/families.json; register it before pre-registration")
         family_ids.add(family_id)
         if not family.get("pre_registered"):
             # PathFinder files may omit the flag; the freeze sets it.
@@ -93,6 +117,22 @@ def validate_pre_registration(payload: dict[str, Any], *, campaign_id: str | Non
                 issues.append(f"{family_id}/{candidate_id}: kill_criteria is required")
     if n_candidates < 1:
         issues.append("pre-registration has no candidates")
+    if enforce_policy and n_candidates > MAX_CANDIDATES_PER_CAMPAIGN:
+        issues.append(f"pre-registration has {n_candidates} candidates; maximum is {MAX_CANDIDATES_PER_CAMPAIGN}")
+    if enforce_policy:
+        evaluation = payload.get("evaluation")
+        if not isinstance(evaluation, dict):
+            issues.append("evaluation conditions are required (start/end/universe/horizon/cost)")
+        else:
+            for key in ("start", "end", "universe", "horizon", "cost"):
+                if evaluation.get(key) in (None, "", {}):
+                    issues.append(f"evaluation.{key} is required")
+            if evaluation.get("horizon") is not None:
+                try:
+                    if int(evaluation["horizon"]) < 1:
+                        issues.append("evaluation.horizon must be positive")
+                except (TypeError, ValueError):
+                    issues.append("evaluation.horizon must be an integer")
     return {
         "ok": not issues,
         "issues": issues,
@@ -156,7 +196,10 @@ def verify_frozen(path: str | Path) -> dict[str, Any]:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if payload.get("schema") != FROZEN_SCHEMA:
         raise ValueError("not a frozen pre-registration")
-    report = validate_pre_registration({**payload, "schema": PRE_REG_SCHEMA}, campaign_id=payload.get("campaign_id"))
+    # Frozen-artifact verification must not retro-apply new pre-registration
+    # policy (evaluation fields, candidate caps, family registry).  It verifies
+    # the frozen structure and hash only.
+    report = validate_pre_registration({**payload, "schema": PRE_REG_SCHEMA}, campaign_id=payload.get("campaign_id"), enforce_policy=False)
     stored = payload.get("pre_registration_hash")
     recomputed = sha256_json(
         {

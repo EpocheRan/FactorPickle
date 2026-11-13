@@ -1,3 +1,4 @@
+from .basic_schema import create_basic_tables
 from .concept_schema import create_concept_tables
 from .disclosure_schema import create_disclosure_tables
 from .factor_schema import create_factor_tables
@@ -15,6 +16,7 @@ __all__ = [
     "create_moneyflow_tables",
     "create_concept_tables",
     "create_disclosure_tables",
+    "create_basic_tables",
     "create_factor_tables",
     "create_position_tables",
     "create_screener_tables",

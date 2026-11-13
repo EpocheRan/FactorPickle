@@ -291,7 +291,7 @@ def test_end_to_end_research_cycle(tmp_path) -> None:
         library_root=tmp_path / "factors",
     )
     controller = CampaignController(tmp_path / "campaigns")
-    campaign = controller.create("e2e", max_rounds=2)
+    campaign = controller.create_synthetic("e2e", max_rounds=2)
     payload = run_research_cycle(
         campaign["campaign_id"],
         artifact,

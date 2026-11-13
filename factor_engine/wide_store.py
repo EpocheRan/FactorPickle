@@ -1,4 +1,4 @@
-"""factor_daily_wide 写路径（factor_engine 拥有）。
+"""screener_feature_daily 写路径（factor_engine 拥有）。
 
 screener 只负责编排/查询；宽表写入实现放在这里，避免 screener 持有写逻辑。
 """
@@ -72,5 +72,5 @@ def upsert_wide(db, frame: pd.DataFrame) -> int:
     if not rows:
         return 0
     columns = ", ".join(f'"{column}"' for column in WIDE_DB_COLUMNS)
-    sql = f'INSERT INTO "factor_daily_wide" ({columns}) VALUES %s'
+    sql = f'INSERT INTO "screener_feature_daily" ({columns}) VALUES %s'
     return db.execute_values(sql, rows, page_size=500)

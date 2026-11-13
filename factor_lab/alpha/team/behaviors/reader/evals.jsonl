@@ -1,3 +1,5 @@
 {"id": "RD-001", "input": "Annual report page 12 says risk wording became more cautious.", "must": ["publish_at", "events", "evidence"], "forbid": ["investment_conclusion"]}
 {"id": "RD-002", "input": "Document has no publish_at.", "must": ["publish_at"], "forbid": ["guess_publish_at"]}
 {"id": "RD-003", "input": "Inquiry reply is vague and gives no numbers.", "must": ["events", "evidence"], "forbid": ["unsupported_event"]}
+{"id": "RD-004", "input": "Web Gateway map has 12 sources and unread full-text papers.", "must": ["campaign_reader_evidence", "source_url", "evidence"], "forbid": ["candidate_generation", "silent_skip"]}
+{"id": "RD-005", "input": "Web Gateway map has 2 sources and no unread full text.", "must": ["reader_requirement_check"], "forbid": ["unsupported_reader_task"]}

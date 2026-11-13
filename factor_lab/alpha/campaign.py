@@ -47,6 +47,9 @@ class CampaignController:
         max_rounds: int = 5,
         budget: float | None = None,
         campaign_id: str | None = None,
+        prior_campaign_ids: list[str] | None = None,
+        memory_root: str | Path | None = None,
+        context_budget_chars: int = 12_000,
     ) -> dict[str, Any]:
         if not str(objective).strip():
             raise CampaignError("objective must not be empty")
@@ -66,12 +69,39 @@ class CampaignController:
             "max_rounds": int(max_rounds),
             "budget": budget,
             "used_budget": 0.0,
+            "full_team_protocol": True,
+            "protocol_requirements": {
+                "model_facing_roles_per_campaign": ["web-gateway", "pathfinder", "ml-planner", "factor-builder"],
+                "fresh_task_ids": True,
+                "campaign_scoped_outputs": True,
+                "pathfinder_rejudgment": True,
+                "max_candidates_per_campaign": 2,
+            },
+            "parent_campaign_ids": list(prior_campaign_ids or []),
+            "research_memory": True,
             "state": "running",
             "n_rounds": 0,
             "created_at": config.now_iso(),
             "updated_at": config.now_iso(),
         }
         write_json_atomic(directory / "campaign.json", record)
+        from factor_lab.alpha.research_memory import ResearchMemory
+
+        memory = ResearchMemory(root=memory_root, campaign_root=self.root)
+        memory.write_context(
+            campaign_id,
+            list(prior_campaign_ids or []),
+            budget_chars=int(context_budget_chars),
+        )
+        return record
+
+    def create_synthetic(self, objective: str, *, max_rounds: int = 5, budget: float | None = None, campaign_id: str | None = None) -> dict[str, Any]:
+        """Create a synthetic fixture campaign; never valid as research."""
+        record = self.create(objective, max_rounds=max_rounds, budget=budget, campaign_id=campaign_id)
+        record["full_team_protocol"] = False
+        record["synthetic_fixture"] = True
+        record["research_memory"] = False
+        write_json_atomic(self._path(record["campaign_id"]) / "campaign.json", record)
         return record
 
     def _path(self, campaign_id: str) -> Path:
@@ -118,8 +148,13 @@ class CampaignController:
             "research_question": payload.get("research_question"),
             "factor_refs": payload.get("factor_refs") or [],
             "data_manifest": payload.get("data_manifest"),
+            "data_provenance": payload.get("data_provenance"),
             "ml_plan_id": payload.get("ml_plan_id"),
             "research_result": payload.get("research_result"),
+            "evaluation_universe": payload.get("evaluation_universe"),
+            "evaluation_contract": payload.get("evaluation_contract"),
+            "long_only": payload.get("long_only"),
+            "promotion": payload.get("promotion"),
             "agents": list(payload.get("agents") or []),
             "team_tasks": list(payload.get("team_tasks") or payload.get("team_task_ids") or []),
             "protocol": payload.get("protocol"),

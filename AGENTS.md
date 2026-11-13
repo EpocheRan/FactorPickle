@@ -82,7 +82,8 @@ as the source of truth.
   `output/factor_lab/factors/generated/`; do not copy them into Git.
 - Edge Cards are evidence, not promotion. Only validated/active cards may be
   allocated; unvalidated cards never reach the account.
-- Research uses long-short signal evidence; deployment remains long-only.
+- Research uses long-only net excess as primary evidence; long-short is a diagnostic, not a promotion veto. Deployment remains long-only.
+- New campaigns write `team/research_context.json` and must read its hard negatives/source hashes before proposing a question; memory policy and data provenance are enforced by `campaign-audit`. The validation ledger lives under `output/factor_lab/alpha/memory/`. DeepSeek Flash compression is optional and configured only in gitignored `config.json`.
 - Every expression that touches labels is trial-accounted. Search/dev/ML/holdout events also go to the append-only `output/factor_lab/alpha/trial_events.jsonl` sink; holdout is locked and its use log is `output/factor_lab/alpha/holdout_uses.jsonl`.
 - Before opening or resuming a campaign, run `python -m factor_lab alpha campaign-preflight --campaign-id <id>`; it verifies frozen policy, pre-registration, team provenance, artifact membership and holdout state.
 - Missing data or environment readiness is a blocker; report it and do not

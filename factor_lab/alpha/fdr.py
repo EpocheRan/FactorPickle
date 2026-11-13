@@ -168,6 +168,46 @@ def _p_ic(metrics: dict[str, Any]) -> float | None:
     return float(p_value_from_t(ic_t, n_dates))
 
 
+def _primary_statistic() -> str:
+    try:
+        from factor_lab.alpha.mandate import load_mandate
+
+        evidence = load_mandate().research_evidence or {}
+        return str(evidence.get("primary") or "long_short")
+    except Exception:  # noqa: BLE001
+        return "long_short"
+
+
+def _long_only_t(metrics: dict[str, Any]) -> tuple[float, int] | None:
+    long_only = metrics.get("long_only") or {}
+    size = long_only.get("size_screened") or {}
+    try:
+        t_stat = float(size.get("long_only_t"))
+        n_dates = int(size.get("n_dates") or 0)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(t_stat) or n_dates < 3:
+        return None
+    return t_stat, n_dates
+
+
+def _p_primary(metrics: dict[str, Any]) -> float | None:
+    if _primary_statistic() == "long_only":
+        values = _long_only_t(metrics)
+        if values is not None:
+            return float(p_value_from_t(values[0], values[1]))
+    return None
+
+
+def _p_primary_pos(metrics: dict[str, Any]) -> float | None:
+    if _primary_statistic() == "long_only":
+        values = _long_only_t(metrics)
+        if values is not None:
+            two_sided = float(p_value_from_t(values[0], values[1]))
+            return two_sided / 2.0 if values[0] > 0 else 1.0
+    return None
+
+
 def _trial_record(
     *,
     expression: str,
@@ -181,6 +221,7 @@ def _trial_record(
     created_at: str | None = None,
     recosted: bool = False,
     cost_model: dict[str, Any] | None = None,
+    horizon: Any | None = None,
 ) -> dict[str, Any]:
     canonical = canonical_expression(expression)
     return {
@@ -190,16 +231,23 @@ def _trial_record(
         "family_id": family_id,
         "stage": stage,
         "trial_type": trial_type,
+        "horizon": horizon,
         "expression": expression,
         "canonical_expression": canonical,
         "source": source,
         "metrics": metrics,
         "p_net": _p_net(metrics),
+        "p_net_two_sided": _p_net(metrics),
+        "p_net_one_sided_positive": _p_pos(metrics),
         "p_pos": _p_pos(metrics),
         "p_ic": _p_ic(metrics),
+        "p_primary": _p_primary(metrics),
+        "p_primary_one_sided_positive": _p_primary_pos(metrics),
+        "primary_statistic": _primary_statistic(),
+        "p_label": "p_net/p_net_two_sided are two-sided; p_pos/p_net_one_sided_positive are one-sided positive",
         "n_dates": (metrics or {}).get("n_dates"),
         "net_t": (metrics or {}).get("net_t"),
-        "cost_model": cost_model or ((metrics or {}).get("metrics_spec") or {}).get("cost"),
+        "cost_model": cost_model or (metrics or {}).get("cost_model") or ((metrics or {}).get("metrics_spec") or {}).get("cost"),
         "recosted": bool(recosted),
         "created_at": created_at or config.now_iso(),
     }
@@ -392,6 +440,7 @@ def build_ledger(
                 created_at=attempt.get("created_at"),
                 recosted=bool(attempt.get("recosted")),
                 cost_model=((attempt.get("metrics") or {}).get("metrics_spec") or {}).get("cost"),
+                horizon=attempt.get("horizon"),
             )
         )
     rows.extend(_team_trials(policy, family_by_campaign))
@@ -572,8 +621,8 @@ def family_fdr(
             or (not program_mode and row.get("family_id") == family_id)
         )
         and row.get("stage") == "dev"
-        and (row.get("p_pos") is not None or row.get("p_net") is not None)
-        and math.isfinite(float(row.get("p_pos") if row.get("p_pos") is not None else row.get("p_net")))
+        and (row.get("p_primary") is not None or row.get("p_pos") is not None or row.get("p_net") is not None)
+        and math.isfinite(float(row.get("p_primary") if row.get("p_primary") is not None else (row.get("p_pos") if row.get("p_pos") is not None else row.get("p_net"))))
     ]
     if not rows:
         raise ValueError(f"family has no FDR trials: {family_id}")
@@ -587,7 +636,14 @@ def family_fdr(
     for row in unique.values():
         if row.get("p_pos") is None:
             row["p_pos"] = _p_pos(row.get("metrics") or {})
-    ordered = sorted(unique.values(), key=lambda row: (float(row["p_pos"]), row["canonical_expression"]))
+        if row.get("p_primary") is None:
+            row["p_primary"] = _p_primary(row.get("metrics") or {})
+        if row.get("p_primary_one_sided_positive") is None:
+            row["p_primary_one_sided_positive"] = _p_primary_pos(row.get("metrics") or {})
+        if row.get("p_primary") is None:
+            row["p_primary"] = row.get("p_net")
+            row["p_primary_one_sided_positive"] = row.get("p_pos")
+    ordered = sorted(unique.values(), key=lambda row: (float(row["p_primary_one_sided_positive"]), row["canonical_expression"]))
     if candidate_expression is not None:
         candidate_canonical = canonical_expression(candidate_expression)
         matches = [index for index, row in enumerate(ordered) if row["canonical_expression"] == candidate_canonical]
@@ -604,12 +660,12 @@ def family_fdr(
             if (row.get("metrics") or {}).get("net_spread") is not None
             and float((row.get("metrics") or {}).get("net_spread") or 0.0) > 0
         ]
-        candidate = min(positive or ordered, key=lambda row: (float(row["p_net"]), row["canonical_expression"]))
+        candidate = min(positive or ordered, key=lambda row: (float(row["p_primary_one_sided_positive"]), row["canonical_expression"]))
         rank = ordered.index(candidate) + 1
     n_eff_info = estimate_n_eff((row["canonical_expression"] for row in ordered), threshold=threshold, sensitivity=sensitivity)
     n_raw = len(ordered)
     n_eff = int(n_eff_info["n_eff"])
-    p = float(candidate["p_pos"])
+    p = float(candidate["p_primary_one_sided_positive"])
     bh_q = min(1.0, p * n_eff / rank) if n_eff else 1.0
     bh_threshold = q * rank / n_eff if n_eff else 0.0
     passed = bool(n_eff and p <= bh_threshold)
@@ -652,6 +708,8 @@ def family_fdr(
         "n_eff_threshold": n_eff_info["threshold"],
         "rank": rank,
         "p_net": p,
+        "p_primary": p,
+        "primary_statistic": candidate.get("primary_statistic") or _primary_statistic(),
         "p_net_two_sided": candidate.get("p_net"),
         "bh_q": bh_q,
         "bh_threshold": bh_threshold,

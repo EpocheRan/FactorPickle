@@ -1,6 +1,6 @@
 """因子方向（族先验）的唯一事实源。
 
-背景：``factor_registry`` 里逐条登记的 ``direction`` 与
+背景：``custom_factor_registry`` 里逐条登记的 ``direction`` 与
 ``research/report/definitions.py`` 的族先验不一致——例如
 ``liquidity.turnover_*`` 在 registry 里是 ``positive``，而报告口径是 ``-1``
 （短期换手放大 = 拥挤 = 未来收益低）。方向错会把整张评估表反号，

@@ -1,4 +1,4 @@
-"""factor_daily_wide 写路径归属 factor_engine。"""
+"""screener_feature_daily 写路径归属 factor_engine。"""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ class FakeDB:
         return len(rows)
 
 
-def test_upsert_wide_writes_factor_daily_wide():
+def test_upsert_wide_writes_screener_feature_daily():
     frame = pd.DataFrame(
         [
             {
@@ -34,7 +34,7 @@ def test_upsert_wide_writes_factor_daily_wide():
     written = upsert_wide(db, frame)
     assert written == 1
     sql, rows, page_size = db.calls[0]
-    assert 'INSERT INTO "factor_daily_wide"' in sql
+    assert 'INSERT INTO "screener_feature_daily"' in sql
     assert len(rows[0]) == len(WIDE_DB_COLUMNS)
     assert page_size == 500
 

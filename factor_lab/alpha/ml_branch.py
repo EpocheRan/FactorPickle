@@ -24,10 +24,12 @@ from typing import Any, Iterable
 import numpy as np
 import pandas as pd
 
-from factor_metrics import rank_ic_frame
+from factor_metrics import evaluate_long_only, rank_ic_frame
 
+from factor_lab.alpha.compiler import compile_expression
 from factor_lab.alpha.data import AlphaDataset
 from factor_lab.alpha.universe import UniversePolicy, universe_summary
+from factor_lab.alpha.validation import validate as validate_dsl
 from factor_lab.core import config
 from factor_lab.core.store import write_json_atomic
 
@@ -131,19 +133,44 @@ def _stack_panel(frame: pd.DataFrame) -> tuple[np.ndarray, list[pd.Timestamp], l
 def validate_ml_features(features: list[str], available_fields: Iterable[str] | None = None) -> dict[str, Any]:
     """Validate ML features against the panel and expose the expanded-axis catalog.
 
-    ML features remain explicit (no auto-injection), but this check makes a
-    missing expanded field fail with the catalog hint instead of an opaque
-    tensor-shape error.
+    A feature is either a raw PIT field (``close``, ``margin_rzye``, ...) or a
+    deterministic DSL expression (``rank(div(fin_net_income, fin_total_assets))``,
+    ``ts_std(returns, 20)``, ``div(ts_mean(abs(returns),20), ts_mean(amount,20))``).
+    Expressions are validated with the same DSL validator as factors; raw fields
+    remain explicit (no auto-injection).
     """
     from factor_lab.alpha.data_axes import ml_feature_catalog
 
     catalog = ml_feature_catalog()
     expanded = set(catalog.get("expanded_fields") or [])
     names = [str(item) for item in features if str(item).strip()]
-    missing = sorted({name for name in names if available_fields is not None and name not in set(available_fields)})
-    if missing:
-        raise ValueError(f"unknown ML features: {missing}; expanded fields available: {sorted(expanded)}")
+    if available_fields is not None:
+        available = {str(item) for item in available_fields}
+        missing = []
+        for name in names:
+            if name in available:
+                continue
+            report = validate_dsl(name, known_fields=available)
+            if not report.ok:
+                missing.append(name)
+        if missing:
+            raise ValueError(
+                f"unknown ML features/expressions: {missing}; "
+                f"raw expanded fields available: {sorted(expanded)}"
+            )
     return {"features": names, "expanded_features": sorted(set(names) & expanded), "catalog": catalog}
+
+
+def _feature_frame(feature: str, context: Any) -> pd.DataFrame:
+    """Return a raw field or compile a deterministic derived-feature DSL expression."""
+    name = str(feature).strip()
+    if name in context.fields:
+        return context.fields[name]
+    report = validate_dsl(name, known_fields=context.field_names)
+    if not report.ok:
+        raise ValueError(f"invalid ML feature expression {name!r}: {report.issues}")
+    frame, _ = compile_expression(name, context)
+    return frame
 
 
 def plan_from_dict(payload: dict[str, Any]) -> MLPlan:
@@ -175,13 +202,15 @@ def plan_from_dict(payload: dict[str, Any]) -> MLPlan:
 def build_ml_bundle(dataset: AlphaDataset, plan: MLPlan, *, max_rows: int | None = None, universe: pd.DataFrame | None = None) -> dict[str, Any]:
     """Build a date-aligned feature/label bundle with PIT masks."""
     context = dataset.context
-    missing = [name for name in plan.features if name not in context.fields]
-    if missing:
-        raise ValueError(f"unknown ML features: {missing}")
+    feature_context = dataset.evaluation_context()
+    feature_frames = [
+        _feature_frame(name, feature_context).reindex(index=context.close.index, columns=context.close.columns)
+        for name in plan.features
+    ]
     # Rows are dates; columns are symbols. Stack each feature into a 3D tensor
     # and flatten to (date, symbol, feature) for deterministic fitting.
     feature_tensor = np.stack(
-        [context.fields[name].to_numpy(dtype=float) for name in plan.features],
+        [frame.to_numpy(dtype=float) for frame in feature_frames],
         axis=-1,
     )
     close = context.close
@@ -323,6 +352,70 @@ def _rank_ic(
     return [float(value) for value in clean.tolist()]
 
 
+def _long_only_diagnostic(
+    dataset: AlphaDataset,
+    plan: MLPlan,
+    *,
+    date_indices: np.ndarray,
+    symbol_indices: np.ndarray,
+    predictions: np.ndarray,
+    bundle: dict[str, Any],
+    universe: pd.DataFrame | None,
+) -> dict[str, Any]:
+    """Build the actual long-only top-quintile book from OOS ML scores.
+
+    This is a construction/deployability diagnostic, not a promotion gate.  It
+    uses the shared calibrated evaluator so fees, next-open entry, turnover and
+    universe handling stay identical to the deterministic Gate.
+    """
+    construction = {
+        "schema": "factor_lab.alpha.ml_long_only_construction.v1",
+        "book": "top_quintile_equal_weight",
+        "top_fraction": 0.2,
+        "entry_rule": "next_open",
+        "rebalance_horizon": int(plan.target_horizon),
+        "buy_fee_bps": 2.44,
+        "sell_fee_bps": 7.44,
+    }
+    record = {
+        "schema": "factor_lab.alpha.ml_long_only.v1",
+        "construction": construction,
+        "available": False,
+    }
+    try:
+        dates = [pd.Timestamp(bundle["dates"][int(index)]) for index in date_indices]
+        symbols = [str(bundle["symbols"][int(index)]) for index in symbol_indices]
+        scores = pd.DataFrame({"date": dates, "symbol": symbols, "pred": np.asarray(predictions, dtype=float)})
+        wide = scores.pivot(index="date", columns="symbol", values="pred")
+        context = dataset.context
+        wide = wide.reindex(index=context.close.index, columns=context.close.columns)
+        oos_dates = wide.dropna(how="all").index
+        wide = wide.loc[oos_dates]
+        close = context.close.loc[oos_dates]
+        open_ = context.fields.get("open")
+        open_ = open_.loc[oos_dates] if open_ is not None else None
+        mask = None
+        if universe is not None:
+            mask = universe.reindex(index=oos_dates, columns=context.close.columns).fillna(False).astype(bool)
+        metrics = evaluate_long_only(
+            wide,
+            close,
+            open_=open_,
+            horizon=int(plan.target_horizon),
+            cost_bps=20.0,
+            top_fraction=0.2,
+            min_names=10,
+            universe=mask,
+            buy_fee_bps=2.44,
+            sell_fee_bps=7.44,
+        )
+        record["metrics"] = metrics
+        record["available"] = True
+    except Exception as exc:  # noqa: BLE001
+        record["error"] = f"{type(exc).__name__}: {exc}"
+    return record
+
+
 def run_ml_experiment(
     dataset: AlphaDataset,
     plan: MLPlan,
@@ -438,6 +531,15 @@ def run_ml_experiment(
             "signal evidence is research evidence, not deployment approval",
         ],
     }
+    long_only = _long_only_diagnostic(
+        dataset,
+        plan,
+        date_indices=groups,
+        symbol_indices=symbols_oos,
+        predictions=predictions,
+        bundle=bundle,
+        universe=universe,
+    )
     result = {
         "schema": ML_RESULT_SCHEMA,
         "plan": plan.to_dict(),
@@ -452,6 +554,7 @@ def run_ml_experiment(
             "n_effective_oos": float(n_effective),
             "n_oos_rows": int(len(targets)),
         },
+        "long_only": long_only,
         "model_card": model_card,
         "created_at": config.now_iso(),
         "evaluation_spec": {

@@ -36,6 +36,8 @@ from factor_lab.core import config
 
 
 REPORT_SCHEMA = "factor_lab.alpha.research_portfolio.v1"
+RUN_START_UTC = "2026-11-12T14:56:00+00:00"
+RUN_END_UTC = "2026-11-13T00:00:00+00:00"
 ROLES = [
     ("pathfinder", "PathFinder"),
     ("web-gateway", "Web Gateway"),
@@ -163,6 +165,21 @@ def _rel_link(path: Path | str | None, base_dir: Path) -> str:
     except Exception:  # noqa: BLE001
         rel = str(path)
     return rel.replace("\\", "/")
+
+
+def _run_group(created_at: str | None) -> str:
+    """Group campaigns into the 9-hour run, post-run replication, or legacy."""
+    try:
+        value = datetime.fromisoformat(str(created_at or "").replace("Z", "+00:00"))
+        start = datetime.fromisoformat(RUN_START_UTC)
+        end = datetime.fromisoformat(RUN_END_UTC)
+        if start <= value <= end:
+            return "nine_hour_run"
+        if value > end:
+            return "post_run_replication"
+        return "legacy"
+    except Exception:  # noqa: BLE001
+        return "legacy"
 
 
 def _kind_for(campaign_id: str, objective: str) -> str:
@@ -386,8 +403,18 @@ def _conclusion(campaign_id: str, rounds: list[dict[str, Any]], team_files: list
         text = KNOWN_CONCLUSIONS.get(campaign_id, "")
     if not text:
         evaluated = [r for r in rounds if (r.get("research_result") or {}).get("metrics")]
-        best = max((float((r.get("research_result") or {}).get("metrics", {}).get("net_t") or -999) for r in evaluated), default=None)
-        text = f"{len(evaluated)} evaluated rounds; best net_t={_fmt_num(best)}; stopped={rounds[-1].get('decision') if rounds else 'unknown'}."
+        def _long_only_t(round_row: dict[str, Any]) -> float:
+            result = round_row.get("research_result") or {}
+            long_only = round_row.get("long_only") or result.get("long_only") or {}
+            size = long_only.get("size_screened") or {}
+            try:
+                return float(size.get("long_only_t"))
+            except (TypeError, ValueError):
+                return -999.0
+
+        gate_pass_rounds = [r for r in evaluated if _round_long_only_verdict(r) == "pass"]
+        best = max((_long_only_t(r) for r in (gate_pass_rounds or evaluated)), default=None)
+        text = f"{len(evaluated)} evaluated rounds; best long-only t={_fmt_num(best)}; stopped={rounds[-1].get('decision') if rounds else 'unknown'}."
     if not next_text:
         next_text = "继续前先固定新的 pre-registration；未通过 program FDR 的候选不得 freeze。"
     return text, next_text
@@ -426,6 +453,18 @@ def _one_sided_p(value: Any) -> float | None:
         return float(1.0 - NormalDist().cdf(z)) if z > 0 else 1.0
     except (TypeError, ValueError):
         return None
+
+
+def _round_long_only_verdict(row: dict[str, Any]) -> str:
+    result = row.get("research_result") or {}
+    metrics = result.get("metrics") or {}
+    promotion = row.get("promotion") or result.get("promotion") or {}
+    coverage = metrics.get("coverage")
+    try:
+        coverage_ok = coverage is not None and float(coverage) >= 0.90
+    except (TypeError, ValueError):
+        coverage_ok = False
+    return "pass" if promotion.get("verdict") == "pass" and coverage_ok else "fail"
 
 
 def _campaign_record(
@@ -488,13 +527,30 @@ def _campaign_record(
         factor_id = str(refs[0].get("factor_id")) if refs else ""
         artifact = artifact_by_id.get(factor_id) or artifacts.get(factor_id) or {}
         fdr = fdr_by_factor.get(factor_id) or {}
+        long_only = row.get("long_only") or result.get("long_only") or {}
+        size_screened = long_only.get("size_screened") or {}
+        promotion = row.get("promotion") or result.get("promotion") or {}
+        coverage = metrics.get("coverage")
+        long_only_pass = bool(
+            promotion.get("verdict") == "pass"
+            and coverage is not None
+            and float(coverage) >= 0.90
+        )
+        primary_verdict = "pass" if long_only_pass else ("insufficient_evidence" if coverage is None else "fail")
         candidates.append(
             {
                 "factor_id": factor_id,
                 "family": artifact.get("family") or (refs[0].get("family") if refs else ""),
                 "expression": artifact.get("expression") or "",
                 "metrics": metrics,
-                "verdict": evaluation.get("verdict") or result.get("verdict") or "",
+                "long_only": long_only,
+                "promotion": promotion,
+                "long_only_t": size_screened.get("long_only_t"),
+                "long_only_net_excess_annualized": size_screened.get("long_only_net_excess_annualized"),
+                "coverage": coverage,
+                "verdict": primary_verdict,
+                "research_verdict": evaluation.get("verdict") or result.get("verdict") or "",
+                "long_short_verdict": evaluation.get("long_short_verdict") or evaluation.get("verdict") or "",
                 "program_fdr": (fdr.get("program_fdr") or {}).get("passed") if isinstance(fdr.get("program_fdr"), dict) else None,
                 "program_p": (fdr.get("program_fdr") or {}).get("p_net") if isinstance(fdr.get("program_fdr"), dict) else None,
                 "program_threshold": (fdr.get("program_fdr") or {}).get("bh_threshold") if isinstance(fdr.get("program_fdr"), dict) else None,
@@ -505,7 +561,7 @@ def _campaign_record(
             }
         )
     gate_pass = [row for row in candidates if row.get("verdict") == "pass"]
-    best = max(candidates, key=lambda row: float(row.get("metrics", {}).get("net_t") or -999), default=None)
+    best = max(candidates, key=lambda row: float(row.get("long_only_t") or -999), default=None)
     dataset_manifests = []
     for row in rounds:
         data_manifest = row.get("data_manifest")
@@ -578,8 +634,9 @@ def _campaign_record(
                 conclusion = str(payload["conclusion"])
             break
     agents_used = [role for role, row in evidence.items() if row.get("used")]
-    best_candidates = [row for row in candidates if isinstance(row.get("metrics"), dict) and row["metrics"].get("net_t") is not None]
-    best = max(best_candidates, key=lambda row: float(row["metrics"].get("net_t") or -999), default=None)
+    best_candidates = [row for row in candidates if row.get("long_only_t") is not None]
+    gate_pass_candidates = [row for row in best_candidates if row.get("verdict") == "pass"]
+    best = max(gate_pass_candidates or best_candidates, key=lambda row: float(row["long_only_t"] or -999), default=None)
     gate_pass = [row for row in candidates if row.get("verdict") == "pass"]
     return {
         "campaign_id": campaign_id,
@@ -600,7 +657,11 @@ def _campaign_record(
                 "decision": row.get("decision"),
                 "schema": (row.get("research_result") or {}).get("schema") or "",
                 "metrics": (row.get("research_result") or {}).get("metrics") or {},
-                "verdict": (row.get("research_result") or {}).get("evaluation", {}).get("verdict") if isinstance((row.get("research_result") or {}).get("evaluation"), dict) else "",
+                "long_only": row.get("long_only") or (row.get("research_result") or {}).get("long_only"),
+                "promotion": row.get("promotion") or (row.get("research_result") or {}).get("promotion"),
+                "evaluation_universe": (row.get("research_result") or {}).get("evaluation_universe"),
+                "research_verdict": (row.get("research_result") or {}).get("evaluation", {}).get("verdict") if isinstance((row.get("research_result") or {}).get("evaluation"), dict) else "",
+                "verdict": _round_long_only_verdict(row),
                 "agents": row.get("agents") or [],
                 "team_tasks": row.get("team_tasks") or [],
                 "factor_refs": [ref.get("factor_id") for ref in row.get("factor_refs") or [] if isinstance(ref, dict)],
@@ -654,6 +715,7 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
     campaigns.sort(key=lambda row: (str(row.get("created_at_full") or ""), row["campaign_id"]))
     for index, row in enumerate(campaigns, start=1):
         row["phase"] = index
+        row["run_group"] = _run_group(row.get("created_at_full"))
 
     # Map factor ids to campaigns before attaching Edge Cards / FDR.
     factor_campaign: dict[str, str] = {}
@@ -787,19 +849,29 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
     except Exception:  # noqa: BLE001
         cost_policy = {}
     huses = holdout_uses()
-    # Program-level population (not the raw ledger count).
-    from factor_lab.alpha.fdr import program_fdr as _program_fdr, load_ledger as _load_ledger
+    # Program-level population: use the effective expression count, not an
+    # arbitrary "first ledger row" candidate.
+    from factor_lab.alpha.fdr import estimate_n_eff as _estimate_n_eff, load_family_policy as _load_family_policy, load_ledger as _load_ledger
     try:
         _ledger = _load_ledger()
-        _candidate = next((row.get("canonical_expression") for row in _ledger if row.get("canonical_expression") and row.get("family_id") != "legacy-unassigned"), "rank(close)")
-        _prog = _program_fdr(_candidate, ledger=_ledger)
+        _expressions = [str(row.get("canonical_expression") or row.get("expression") or "") for row in _ledger if row.get("canonical_expression") or row.get("expression")]
+        _n_eff = _estimate_n_eff(_expressions)
+        _family_policy = _load_family_policy()
+        _q = float(_family_policy.get("q") or 0.10)
         from statistics import NormalDist
 
-        fdr_population = {key: _prog.get(key) for key in ("n_trials", "n_unique", "n_eff", "q", "rank", "bh_threshold", "bh_threshold_t")}
-        if fdr_population.get("n_eff"):
-            rank1_p = float(fdr_population["q"]) / float(fdr_population["n_eff"])
-            fdr_population["rank1_p"] = rank1_p
-            fdr_population["rank1_t"] = NormalDist().inv_cdf(1.0 - rank1_p / 2.0)
+        fdr_population = {
+            "n_trials": len(_ledger),
+            "n_unique": int(_n_eff.get("n_unique") or 0),
+            "n_eff": int(_n_eff.get("n_eff") or 0),
+            "q": _q,
+            "rank": 1,
+            "bh_threshold": None,
+            "bh_threshold_t": None,
+            "rank1_p": (_q / float(_n_eff.get("n_eff"))) if _n_eff.get("n_eff") else None,
+        }
+        if fdr_population["rank1_p"] is not None:
+            fdr_population["rank1_t"] = NormalDist().inv_cdf(1.0 - float(fdr_population["rank1_p"]) / 2.0)
     except Exception:  # noqa: BLE001
         fdr_population = {}
     # Edge Cards that cannot be attributed to a campaign (rendered explicitly, never dropped).
@@ -823,12 +895,12 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
     portfolio_conclusions = [
         {
             "title": "研究结论：没有可冻结资产",
-            "body": f"最新 Edge Cards：{killed} killed / {research_cards} research / {validated} validated。没有 passed freeze；Allocator 仍为 baseline；holdout 保持锁定。" if not fdr_any else "存在 FDR pass 记录，需逐条复核。",
+            "body": f"最新 Edge Cards：{killed} killed / {research_cards} research / {validated} validated。long-only 是主证据，long-short 仅诊断；没有通过 long-only program FDR + 独立确认的候选，Allocator 仍为 baseline，holdout 保持锁定。" if not fdr_any else "存在 FDR pass 记录，需逐条复核。",
             "tone": "bad",
         },
         {
-            "title": "门禁结论：program FDR 是主约束",
-            "body": "多个候选在 Gate 或 family-level FDR 上通过，但 joint program denominator 拒绝；freeze 只能使用 program-level FDR。",
+            "title": "long-only primary：Gate 之后还有 FDR 和独立确认",
+            "body": "long-only net excess 是主统计量；long-short 只作诊断。promotion 需要 long-only Gate + coverage + long-only program FDR + 独立验证，Gate pass 不等于 validated。",
             "tone": "warn",
         },
         {
@@ -848,6 +920,9 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
         "base_dir": deliverables,
         "kpis": {
             "campaigns": len(campaigns),
+            "nine_hour_campaigns": sum(1 for row in campaigns if row.get("run_group") == "nine_hour_run"),
+            "post_run_campaigns": sum(1 for row in campaigns if row.get("run_group") == "post_run_replication"),
+            "legacy_campaigns": sum(1 for row in campaigns if row.get("run_group") == "legacy"),
             "meaningful_campaigns": len(meaningful),
             "calibration_campaigns": len(calibrated),
             "attempts": int(memory.get("n_attempts") or len(_read_jsonl(lab_root / "alpha" / "memory" / "attempts.jsonl"))),
@@ -858,6 +933,7 @@ def build_portfolio(root: str | Path | None = None, *, base_dir: str | Path | No
             "research_cards": research_cards,
             "validated": validated,
             "best_net_t": ((best_campaign or {}).get("best") or {}).get("metrics", {}).get("net_t"),
+            "best_long_only_t": ((best_campaign or {}).get("best") or {}).get("long_only_t"),
             "best_factor": ((best_campaign or {}).get("best") or {}).get("factor_id"),
             "fdr_any": fdr_any,
             "agents_used": len({role for row in campaigns for role in row.get("agents_used") or []}),

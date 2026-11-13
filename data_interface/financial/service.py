@@ -16,7 +16,7 @@ import json
 import logging
 import time
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, Callable
 
 from data_interface.common.config import get_config
 from data_interface.common.trading_calendar import TradingCalendar
@@ -35,6 +35,12 @@ from data_interface.common.security_code import (  # noqa: F401  (对外保持�
 )
 from data_interface.common.timeutil import now_cn
 
+from .fields import (
+    STATEMENT_TYPE_TO_TABLE,
+    VALUATION_COLUMNS,
+    VALUATION_COMPANION_FIELDS,
+    VALUATION_TARGET_FIELDS,
+)
 from .normalizer import (
     merge_fina_indicator,
     normalize_code,
@@ -49,6 +55,45 @@ from .sources.akshare_source import AkShareFinancialSource
 from .sources.tushare_source import TushareSource, get_shared_tushare_source
 
 logger = logging.getLogger("DataInterface.FinancialService")
+
+#: ``formula_version`` that wrote raw Tushare 万 / percent units (2017-2022 bulk
+#: backfill).  Rows carrying it need the unit repair described in the backfill
+#: plan; the rebuild rewrites them as :attr:`FinancialMetricsCalculator.formula_version`
+#: so a second run is a pure no-op recompute.
+LEGACY_FORMULA_VERSION = "backfill.v1"
+SHARE_UNIT_SCALE = 10_000.0
+YIELD_UNIT_SCALE = 0.01
+
+#: Columns read for the statement index.  Subsetting the statement tables to the
+#: fields the valuation formulas consume keeps the index small; ``period_type`` and
+#: ``fiscal_year`` are mandatory because ``quarterize`` collapses into "sum of four
+#: cumulative values" when ``period_type`` is missing.
+_STATEMENT_INDEX_FIELDS = {
+    "IS": ["revenue", "total_revenue", "gross_profit", "ebit", "ebitda", "net_income"],
+    "CF": ["operating_cash_flow", "free_cash_flow"],
+    "BS": [
+        "cash_and_cash_equivalents",
+        "total_debt",
+        "short_term_debt",
+        "long_term_debt",
+        "total_assets",
+        "total_equity",
+        "total_liabilities",
+        "total_current_assets",
+        "total_current_liabilities",
+    ],
+}
+_STATEMENT_META_FIELDS = [
+    "code",
+    "period_end",
+    "publish_date",
+    "period_type",
+    "fiscal_year",
+    "report_type",
+]
+#: Fields reported by the rebuild (nine targets + cheap companions).
+VALUATION_REPORT_FIELDS = list(VALUATION_TARGET_FIELDS) + list(VALUATION_COMPANION_FIELDS)
+
 
 
 def _infer_exchange(code: str) -> str:
@@ -732,6 +777,264 @@ class FinancialDataService:
             grouped.setdefault(str(row.get("code")), []).append(row)
         return grouped
 
+    # ------------------------------------------------- 估值派生列原地重建
+    def load_valuation_statement_index(
+        self,
+    ) -> dict[str, dict[str, list[dict[str, Any]]]]:
+        """Load every consolidated, publish-dated statement row once, by code.
+
+        ``period_type`` / ``fiscal_year`` are part of the projection on purpose:
+        without them ``quarterize`` silently degrades to summing four cumulative
+        reports (2.5-3x inflated TTM).  Rows are ordered by ``publish_date`` so the
+        incremental PIT walk can add versions in disclosure order.
+        """
+        index: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        for statement_type, fields in _STATEMENT_INDEX_FIELDS.items():
+            table = STATEMENT_TYPE_TO_TABLE[statement_type]
+            columns = ", ".join(_STATEMENT_META_FIELDS + fields)
+            rows = self.db.query(
+                f'SELECT {columns} FROM "{table}" '
+                "WHERE report_type = 'consolidated' AND publish_date IS NOT NULL "
+                "ORDER BY code, publish_date, period_end"
+            ) or []
+            keys = _STATEMENT_META_FIELDS + fields
+            for row in rows:
+                record = dict(zip(keys, row))
+                code = str(record.pop("code"))
+                bucket = index.get(code)
+                if bucket is None:
+                    bucket = index[code] = {
+                        name: [] for name in _STATEMENT_INDEX_FIELDS
+                    }
+                bucket[statement_type].append(record)
+            logger.info(
+                "statement index %s: %s rows for %s codes so far",
+                table, f"{len(rows):,}", f"{len(index):,}",
+            )
+        return index
+
+    def rebuild_valuation_derived(
+        self,
+        start_date: str,
+        end_date: str,
+        *,
+        codes: list[str] | None = None,
+        chunk: int = 2000,
+        dry_run: bool = False,
+        on_month: Callable[[dict[str, Any]], None] | None = None,
+        statement_index: dict[str, dict[str, list[dict[str, Any]]]] | None = None,
+        skip_months: Any = (),
+    ) -> dict[str, Any]:
+        """Recompute every derived ``fin_valuation_daily`` column in place.
+
+        The formula contract is unchanged: statements are filtered with the same
+        point-in-time rule as ``_visible_as_of`` (``publish_date <= trade_date``,
+        latest version per ``period_end``), TTM is four strictly consecutive
+        quarters, and ratios come from ``FinancialMetricsCalculator``.  What the
+        rebuild adds is (a) the 2017-2022 unit repair (万 -> 股/元, percent ->
+        fraction for rows written as ``backfill.v1``) and (b) the derived columns
+        the bulk writer never produced.
+
+        Writes are ``INSERT`` only on the existing ``(ts, code, source)`` dedup
+        key, so the row count is invariant.  Rows already rewritten carry the
+        current ``formula_version`` and are therefore recomputed with scale 1.0,
+        which makes the phase idempotent and resumable at month granularity.
+
+        ``market_cap_change_pct`` uses the previous row of the same
+        ``(code, source)`` inside the rebuilt range; when the range does not start
+        at the table's first date, a bounded lookback seeds the first month.
+        """
+        start = str(start_date)[:10]
+        end = str(end_date)[:10]
+        skipped = {str(item)[:7] for item in (skip_months or ())}
+        months = [
+            item for item in _month_ranges(start, end) if item[0][:7] not in skipped
+        ]
+        wanted = {normalize_code(code) for code in codes} if codes else None
+        started = time.time()
+        index = statement_index if statement_index is not None else self.load_valuation_statement_index()
+
+        before = self.repository.valuation_field_coverage(
+            start, end, VALUATION_REPORT_FIELDS, codes=codes
+        )
+        seed = (
+            self._valuation_previous_market_caps(months[0][0], start) if months else {}
+        )
+        summary: dict[str, Any] = {
+            "schema": "factor_lab.valuation_rebuild.v1",
+            "start": start,
+            "end": end,
+            "months": [month for month, _ in months],
+            "skipped_months": sorted(skipped),
+            "dry_run": bool(dry_run),
+            "codes_filter": len(wanted) if wanted else None,
+            "statement_codes": len(index),
+            "chunk": int(chunk),
+            "before": before,
+            "months_detail": [],
+            "totals": {
+                "rows_read": 0,
+                "rows_written": 0,
+                "rows_without_statements": 0,
+                "fields": {field: 0 for field in VALUATION_REPORT_FIELDS},
+            },
+        }
+        previous_market_cap = seed
+        for month_start, month_end in months:
+            detail = self._rebuild_valuation_month(
+                month_start,
+                month_end,
+                index=index,
+                wanted=wanted,
+                previous_market_cap=previous_market_cap,
+                chunk=chunk,
+                dry_run=dry_run,
+            )
+            summary["months_detail"].append(detail)
+            totals = summary["totals"]
+            totals["rows_read"] += detail["rows_read"]
+            totals["rows_written"] += detail["rows_written"]
+            totals["rows_without_statements"] += detail["rows_without_statements"]
+            for field, count in detail["fields"].items():
+                totals["fields"][field] += count
+            previous_market_cap = detail.pop("_previous_market_cap")
+            logger.info(
+                "[%s] read=%s written=%s %.1fs%s",
+                detail["month"],
+                f"{detail['rows_read']:,}",
+                f"{detail['rows_written']:,}",
+                detail["seconds"],
+                " (dry-run)" if dry_run else "",
+            )
+            if on_month is not None:
+                on_month({key: value for key, value in detail.items() if not key.startswith("_")})
+        summary["seconds"] = round(time.time() - started, 1)
+        summary["after"] = (
+            before
+            if dry_run
+            else self.repository.valuation_field_coverage(
+                start, end, VALUATION_REPORT_FIELDS, codes=codes
+            )
+        )
+        summary["predicted"] = _coverage_payload(
+            summary["totals"]["fields"], summary["totals"]["rows_read"]
+        )
+        summary["measured"] = _coverage_payload(
+            summary["after"]["fields"], summary["after"]["rows"]
+        )
+        return summary
+
+    def _valuation_previous_market_caps(
+        self, month_start: str, range_start: str
+    ) -> dict[tuple[str, str], float]:
+        """Seed ``market_cap_change_pct`` for the first rebuilt month.
+
+        Only issued when the rebuild does not start at the table's first row.
+        The lookback is bounded to 120 days; a code suspended longer than that
+        gets a null first-month change ratio rather than a fabricated one.
+        """
+        first = self.db.query(
+            'SELECT min(ts) FROM "fin_valuation_daily"', (), fetch_all=False
+        )
+        first_ts = first[0] if first else None
+        if first_ts is None or range_start <= str(first_ts)[:10]:
+            return {}
+        lookback = (
+            datetime.fromisoformat(month_start) - timedelta(days=120)
+        ).strftime("%Y-%m-%d")
+        rows = self.db.query(
+            "SELECT code, source, market_cap, formula_version, ts "
+            'FROM "fin_valuation_daily" '
+            "WHERE ts >= CAST(%s AS TIMESTAMP) AND ts < CAST(%s AS TIMESTAMP) "
+            "LATEST ON ts PARTITION BY code, source",
+            (lookback, month_start),
+        ) or []
+        seed: dict[tuple[str, str], float] = {}
+        for code, source, market_cap, formula_version, _ts in rows:
+            if market_cap is None:
+                continue
+            scale = SHARE_UNIT_SCALE if str(formula_version) == LEGACY_FORMULA_VERSION else 1.0
+            seed[(str(code), str(source))] = float(market_cap) * scale
+        return seed
+
+    def _rebuild_valuation_month(
+        self,
+        month_start: str,
+        month_end: str,
+        *,
+        index: dict[str, dict[str, list[dict[str, Any]]]],
+        wanted: set[str] | None,
+        previous_market_cap: dict[tuple[str, str], float],
+        chunk: int,
+        dry_run: bool,
+    ) -> dict[str, Any]:
+        started = time.time()
+        rows = self.repository.get_valuation_rows(month_start, month_end)
+        if wanted is not None:
+            rows = [row for row in rows if str(row[1]) in wanted]
+        now = now_cn()
+        output: list[tuple] = []
+        counts = {field: 0 for field in VALUATION_REPORT_FIELDS}
+        without_statements = 0
+        calculator = self.metrics
+        previous = dict(previous_market_cap)
+
+        # rows are ordered by (ts, code, source): one incremental PIT view per
+        # code, and one inputs computation reused by every source row of the date.
+        current_code: str | None = None
+        view: _PitVisibility | None = None
+        inputs = None
+        code_has_statements = False
+        for row in rows:
+            ts, code, source = row[0], str(row[1]), str(row[21])
+            if code != current_code:
+                current_code = code
+                view = _PitVisibility(code, index.get(code) or {})
+                code_has_statements = not view.empty
+                inputs = None
+            assert view is not None
+            if view.advance(ts) or inputs is None:
+                inputs = view.compute(calculator)
+            if not code_has_statements:
+                without_statements += 1
+            daily_basic = _daily_basic_from_stored_row(row)
+            daily_basic["ingested_at"] = now
+            out = calculator.valuation_row_from_inputs(
+                code=code,
+                trade_date=ts,
+                daily_basic=daily_basic,
+                inputs=inputs,
+                previous_market_cap=previous.get((code, source)),
+            )
+            for field in VALUATION_REPORT_FIELDS:
+                if out.get(field) is not None:
+                    counts[field] += 1
+            previous[(code, source)] = out.get("market_cap")
+            output.append([out.get(column) for column in VALUATION_COLUMNS])
+
+        written = 0
+        if not dry_run and output:
+            written = self.repository.upsert_valuation_rows(output, page_size=chunk)
+            if written != len(output):
+                raise RuntimeError(
+                    f"{month_start}..{month_end} 写入行数不一致: "
+                    f"读 {len(output):,} 写 {written:,}"
+                )
+        detail = {
+            "month": month_start[:7],
+            "start": month_start,
+            "end": month_end,
+            "rows_read": len(rows),
+            "rows_written": written,
+            "rows_without_statements": without_statements,
+            "fields": counts,
+            "coverage": _coverage_payload(counts, len(rows)),
+            "seconds": round(time.time() - started, 1),
+            "_previous_market_cap": previous,
+        }
+        return detail
+
+
     def _try_akshare_valuation(
         self, code: str, start_date: str, end_date: str, reason: str
     ) -> int:
@@ -1269,3 +1572,122 @@ class FinancialDataService:
                 }
             ]
         )
+
+
+# --------------------------------------------------------------- 重建辅助实现
+class _PitVisibility:
+    """Incremental point-in-time view of one code's statements.
+
+    The visible set changes only on a disclosure event, so a month of trade dates
+    is walked with three monotone cursors and the four-quarter TTM is recomputed
+    only when a version actually becomes visible.  Semantics match
+    ``FinancialDataService._visible_as_of``: ``publish_date <= trade_date`` and the
+    latest published version per ``period_end`` wins.
+    """
+
+    __slots__ = ("code", "_groups", "_cursors", "_visible", "_inputs")
+
+    def __init__(self, code: str, groups: dict[str, list[dict[str, Any]]]):
+        self.code = code
+        self._groups = groups
+        self._cursors = {name: 0 for name in _STATEMENT_INDEX_FIELDS}
+        self._visible: dict[str, dict[Any, dict[str, Any]]] = {
+            name: {} for name in _STATEMENT_INDEX_FIELDS
+        }
+        self._inputs = None
+
+    @property
+    def empty(self) -> bool:
+        return not any(self._groups.get(name) for name in _STATEMENT_INDEX_FIELDS)
+
+    @property
+    def inputs(self):
+        return self._inputs
+
+    def advance(self, as_of: datetime) -> bool:
+        """Make visible every version published on or before ``as_of``."""
+        changed = False
+        for name, rows in self._groups.items():
+            cursor = self._cursors[name]
+            visible = self._visible[name]
+            while cursor < len(rows) and rows[cursor]["publish_date"] <= as_of:
+                row = rows[cursor]
+                period_end = row["period_end"]
+                current = visible.get(period_end)
+                if current is None or row["publish_date"] > current["publish_date"]:
+                    visible[period_end] = row
+                    changed = True
+                cursor += 1
+            self._cursors[name] = cursor
+        return changed
+
+    def compute(self, calculator: FinancialMetricsCalculator):
+        ordered = {
+            name: sorted(items.values(), key=lambda item: item["period_end"])
+            for name, items in self._visible.items()
+        }
+        self._inputs = calculator.valuation_inputs(
+            ordered["IS"], ordered["BS"], ordered["CF"]
+        )
+        return self._inputs
+
+
+def _scaled(value: Any, scale: float) -> Any:
+    if value is None or scale == 1.0:
+        return value
+    try:
+        return float(value) * scale
+    except (TypeError, ValueError):
+        return None
+
+
+def _daily_basic_from_stored_row(row: Any) -> dict[str, Any]:
+    """Rebuild the ``daily_basic`` payload from a stored valuation row.
+
+    Rows written by :data:`LEGACY_FORMULA_VERSION` carry Tushare's raw units
+    (万股 / 万元 / percent); everything else is already canonical.
+    """
+    values = dict(zip(VALUATION_COLUMNS, row))
+    legacy = str(values.get("formula_version") or "") == LEGACY_FORMULA_VERSION
+    share_scale = SHARE_UNIT_SCALE if legacy else 1.0
+    yield_scale = YIELD_UNIT_SCALE if legacy else 1.0
+    return {
+        "close": values.get("close"),
+        "total_share": _scaled(values.get("total_share"), share_scale),
+        "market_cap": _scaled(values.get("market_cap"), share_scale),
+        "float_market_cap": _scaled(values.get("float_market_cap"), share_scale),
+        "pe_ttm": values.get("pe_ttm"),
+        "pb_mrq": values.get("pb_mrq"),
+        "ps_ttm": values.get("ps_ttm"),
+        "dividend_yield": _scaled(values.get("dividend_yield"), yield_scale),
+        "source": values.get("source") or "derived",
+    }
+
+
+def _month_ranges(start_date: str, end_date: str) -> list[tuple[str, str]]:
+    start = datetime.fromisoformat(str(start_date)[:10])
+    end = datetime.fromisoformat(str(end_date)[:10])
+    if end < start:
+        raise ValueError(f"end {end_date} < start {start_date}")
+    ranges: list[tuple[str, str]] = []
+    cursor = start.replace(day=1)
+    while cursor <= end:
+        next_month = (cursor + timedelta(days=32)).replace(day=1)
+        lower = max(cursor, start)
+        upper = min(next_month - timedelta(days=1), end)
+        if lower <= upper:
+            ranges.append((lower.strftime("%Y-%m-%d"), upper.strftime("%Y-%m-%d")))
+        cursor = next_month
+    return ranges
+
+
+def _coverage_payload(counts: dict[str, int], rows: int) -> dict[str, Any]:
+    fields = {
+        field: {
+            "nonnull": int(counts.get(field, 0)),
+            "null": int(rows - counts.get(field, 0)),
+            "coverage": round(counts.get(field, 0) / rows, 6) if rows else 0.0,
+        }
+        for field in VALUATION_REPORT_FIELDS
+    }
+    return {"rows": int(rows), "fields": fields}

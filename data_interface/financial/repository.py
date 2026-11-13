@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 from data_interface.common.questdb_client import QuestDBClient
 
@@ -76,6 +76,22 @@ class FinancialRepository:
 
     def upsert_valuation(self, rows: Iterable[dict[str, Any]]) -> int:
         return self._insert("fin_valuation_daily", VALUATION_COLUMNS, rows)
+
+    def upsert_valuation_rows(
+        self, rows: Iterable[Sequence[Any]], *, page_size: int = 1000
+    ) -> int:
+        """批量写 ``fin_valuation_daily``（``VALUES %s`` + ``execute_values``）。
+
+        行是**位置元组**，顺序即 :data:`VALUATION_COLUMNS`；只做 ``INSERT``，
+        依赖表上的 ``DEDUP UPSERT KEYS(ts, code, source)`` 覆盖同一个键，
+        因此重建前后行数不变。
+        """
+        payload = [tuple(row) for row in rows]
+        if not payload:
+            return 0
+        quoted = ", ".join(f'"{column}"' for column in VALUATION_COLUMNS)
+        sql = f'INSERT INTO "fin_valuation_daily" ({quoted}) VALUES %s'
+        return int(self.db.execute_values(sql, payload, page_size=page_size) or 0)
 
     def upsert_raw_reports(self, rows: Iterable[dict[str, Any]]) -> int:
         return self._insert("fin_raw_report", RAW_REPORT_COLUMNS, rows)
@@ -347,3 +363,74 @@ class FinancialRepository:
             (code, dataset),
         )
         return rows[0] if rows else None
+
+    # --------------------------------------------------- 估值重建（批量读/覆盖）
+    def get_valuation_rows(
+        self,
+        start_date: str,
+        end_date: str,
+        *,
+        codes: Sequence[str] | None = None,
+    ) -> list[tuple]:
+        """按月读取估值行，列顺序固定为 :data:`VALUATION_COLUMNS`。
+
+        只读，不做任何单位换算；调用方决定 ``formula_version`` 对应的缩放。
+        """
+        columns = ", ".join(f'"{column}"' for column in VALUATION_COLUMNS)
+        conditions = [
+            "ts >= CAST(%s AS TIMESTAMP)",
+            "ts <= CAST(%s AS TIMESTAMP)",
+        ]
+        params: list[Any] = [start_date, end_date]
+        if codes:
+            placeholders = ", ".join(["%s"] * len(codes))
+            conditions.append(f"code IN ({placeholders})")
+            params.extend(codes)
+        sql = (
+            f"SELECT {columns} FROM \"fin_valuation_daily\" WHERE "
+            + " AND ".join(conditions)
+            + " ORDER BY ts, code, source"
+        )
+        return list(self.db.query(sql, tuple(params)) or [])
+
+    def valuation_field_coverage(
+        self,
+        start_date: str,
+        end_date: str,
+        fields: Sequence[str],
+        *,
+        codes: Sequence[str] | None = None,
+    ) -> dict[str, Any]:
+        """一条聚合 SQL 返回总行数与每个字段的非空行数。"""
+        safe = [field for field in fields if field.replace("_", "").isalnum()]
+        if len(safe) != len(fields):
+            raise ValueError(f"非法字段名: {fields}")
+        aggregates = ", ".join(
+            f'sum(case when "{field}" is not null then 1 else 0 end) AS "{field}"'
+            for field in safe
+        )
+        conditions = [
+            "ts >= CAST(%s AS TIMESTAMP)",
+            "ts <= CAST(%s AS TIMESTAMP)",
+        ]
+        params: list[Any] = [start_date, end_date]
+        if codes:
+            placeholders = ", ".join(["%s"] * len(codes))
+            conditions.append(f"code IN ({placeholders})")
+            params.extend(codes)
+        sql = (
+            f'SELECT count() AS "rows", {aggregates} FROM "fin_valuation_daily" '
+            "WHERE " + " AND ".join(conditions)
+        )
+        row = self.db.query(sql, tuple(params), fetch_all=False)
+        if not row:
+            return {"rows": 0, "fields": {field: 0 for field in safe}, "coverage": {}}
+        total = int(row[0] or 0)
+        counts = {field: int(row[index + 1] or 0) for index, field in enumerate(safe)}
+        return {
+            "rows": total,
+            "fields": counts,
+            "coverage": {
+                field: (counts[field] / total if total else 0.0) for field in safe
+            },
+        }

@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Iterable
 
@@ -219,8 +220,174 @@ def latest_row(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
     return ordered[-1] if ordered else {}
 
 
+@dataclass(frozen=True)
+class ValuationInputs:
+    """Strategy-independent valuation inputs for one PIT snapshot.
+
+    Split out of :meth:`FinancialMetricsCalculator.build_valuation_row` so a bulk
+    rebuild can compute the expensive part (four-quarter TTM + latest balance
+    sheet) once per ``(code, publish event)`` and reuse it for every trade date
+    until the next disclosure.  The field set is closed: adding a field here is a
+    formula change and must be reflected in the rebuild contract.
+    """
+
+    income_ttm: dict[str, float | None] = field(default_factory=dict)
+    cash_ttm: dict[str, float | None] = field(default_factory=dict)
+    balance: dict[str, Any] = field(default_factory=dict)
+    total_debt: float | None = None
+    cash: float | None = None
+    net_working_capital: float | None = None
+    balance_available: bool = False
+
+
+def valuation_inputs(
+    income_rows: list[dict[str, Any]],
+    balance_rows: list[dict[str, Any]],
+    cash_flow_rows: list[dict[str, Any]],
+) -> ValuationInputs:
+    """Compute :class:`ValuationInputs` from PIT-visible statement rows.
+
+    ``*_rows`` must already be filtered to the versions known at the trade date
+    (see ``FinancialDataService._visible_as_of``); this function applies no
+    point-in-time logic of its own.
+    """
+    income_ttm = ttm(income_rows, INCOME_TTM_FIELDS)
+    cash_ttm = ttm(cash_flow_rows, CASH_FLOW_TTM_FIELDS)
+    balance = latest_row(balance_rows)
+
+    cash = balance.get("cash_and_cash_equivalents")
+    total_debt = balance.get("total_debt")
+    if total_debt is None:
+        total_debt = (balance.get("short_term_debt") or 0.0) + (
+            balance.get("long_term_debt") or 0.0
+        )
+    # 没有资产负债表就不能假装 EV = 市值
+    balance_available = bool(balance) and any(
+        balance.get(key) is not None
+        for key in (
+            "total_assets",
+            "total_equity",
+            "total_liabilities",
+            "cash_and_cash_equivalents",
+            "total_debt",
+        )
+    )
+    current_assets = balance.get("total_current_assets")
+    current_liabilities = balance.get("total_current_liabilities")
+    net_working_capital = None
+    if current_assets is not None and current_liabilities is not None:
+        net_working_capital = current_assets - current_liabilities
+
+    return ValuationInputs(
+        income_ttm=income_ttm,
+        cash_ttm=cash_ttm,
+        balance=balance,
+        total_debt=total_debt,
+        cash=cash,
+        net_working_capital=net_working_capital,
+        balance_available=balance_available,
+    )
+
+
+def valuation_row_from_inputs(
+    *,
+    code: str,
+    trade_date: datetime,
+    daily_basic: dict[str, Any],
+    inputs: ValuationInputs,
+    previous_market_cap: float | None = None,
+    formula_version: str = "v2",
+) -> dict[str, Any]:
+    """Assemble the 24-column ``fin_valuation_daily`` row from prepared inputs.
+
+    ``daily_basic`` carries the daily market fields in canonical units (股 / 元 /
+    fraction) — no scaling happens here.  Formula semantics are unchanged from
+    ``build_valuation_row``; see the module docstring for the invariants.
+    """
+    income_ttm = inputs.income_ttm
+    cash_ttm = inputs.cash_ttm
+    balance = inputs.balance
+    net_working_capital = inputs.net_working_capital
+
+    market_cap = daily_basic.get("market_cap")
+    close = daily_basic.get("close")
+    total_share = daily_basic.get("total_share")
+    if market_cap is None and close is not None and total_share is not None:
+        market_cap = close * total_share
+
+    enterprise_value = None
+    if market_cap is not None and inputs.balance_available:
+        enterprise_value = market_cap + (inputs.total_debt or 0.0) - (inputs.cash or 0.0)
+
+    net_income_ttm = income_ttm.get("net_income")
+    revenue_ttm = income_ttm.get("revenue") or income_ttm.get("total_revenue")
+    gross_profit_ttm = income_ttm.get("gross_profit")
+    ebit_ttm = income_ttm.get("ebit")
+    ebitda_ttm = income_ttm.get("ebitda")
+    ocf_ttm = cash_ttm.get("operating_cash_flow")
+    fcf_ttm = cash_ttm.get("free_cash_flow")
+    equity = balance.get("total_equity")
+
+    market_cap_change_pct = None
+    if previous_market_cap not in (None, 0) and market_cap is not None:
+        market_cap_change_pct = market_cap / previous_market_cap - 1
+
+    return {
+        "ts": trade_date,
+        "code": code,
+        "close": close,
+        "total_share": total_share,
+        "market_cap": market_cap,
+        "float_market_cap": daily_basic.get("float_market_cap"),
+        "enterprise_value": enterprise_value,
+        "pe_ttm": daily_basic.get("pe_ttm") or _safe_div(market_cap, net_income_ttm),
+        "pb_mrq": daily_basic.get("pb_mrq") or _safe_div(market_cap, equity),
+        "ps_ttm": daily_basic.get("ps_ttm") or _safe_div(market_cap, revenue_ttm),
+        "pcf_ttm": _safe_div(market_cap, ocf_ttm),
+        "pfcf": _safe_div(market_cap, fcf_ttm),
+        "ev_ebitda": _safe_div(enterprise_value, ebitda_ttm),
+        "ev_ebit": _safe_div(enterprise_value, ebit_ttm),
+        "ev_sales": _safe_div(enterprise_value, revenue_ttm),
+        "ev_gross_profit": _safe_div(enterprise_value, gross_profit_ttm),
+        "ev_fcf": _safe_div(enterprise_value, fcf_ttm),
+        "p_nwc": _safe_div(market_cap, net_working_capital),
+        "earnings_yield": _safe_div(net_income_ttm, market_cap),
+        "dividend_yield": daily_basic.get("dividend_yield"),
+        "market_cap_change_pct": market_cap_change_pct,
+        "source": daily_basic.get("source", "derived"),
+        "formula_version": formula_version,
+        "ingested_at": daily_basic.get("ingested_at") or now_cn(),
+    }
+
+
 class FinancialMetricsCalculator:
     formula_version = "v2"
+
+    def valuation_inputs(
+        self,
+        income_rows: list[dict[str, Any]],
+        balance_rows: list[dict[str, Any]],
+        cash_flow_rows: list[dict[str, Any]],
+    ) -> ValuationInputs:
+        return valuation_inputs(income_rows, balance_rows, cash_flow_rows)
+
+    def valuation_row_from_inputs(
+        self,
+        *,
+        code: str,
+        trade_date: datetime,
+        daily_basic: dict[str, Any],
+        inputs: ValuationInputs,
+        previous_market_cap: float | None = None,
+    ) -> dict[str, Any]:
+        return valuation_row_from_inputs(
+            code=code,
+            trade_date=trade_date,
+            daily_basic=daily_basic,
+            inputs=inputs,
+            previous_market_cap=previous_market_cap,
+            formula_version=self.formula_version,
+        )
 
     def build_valuation_row(
         self,
@@ -233,81 +400,14 @@ class FinancialMetricsCalculator:
         cash_flow_rows: list[dict[str, Any]],
         previous_market_cap: float | None = None,
     ) -> dict[str, Any]:
-        income_ttm = ttm(income_rows, INCOME_TTM_FIELDS)
-        cash_ttm = ttm(cash_flow_rows, CASH_FLOW_TTM_FIELDS)
-        balance = latest_row(balance_rows)
-
-        market_cap = daily_basic.get("market_cap")
-        close = daily_basic.get("close")
-        total_share = daily_basic.get("total_share")
-        if market_cap is None and close is not None and total_share is not None:
-            market_cap = close * total_share
-
-        cash = balance.get("cash_and_cash_equivalents")
-        total_debt = balance.get("total_debt")
-        if total_debt is None:
-            total_debt = (balance.get("short_term_debt") or 0.0) + (
-                balance.get("long_term_debt") or 0.0
-            )
-        # 没有资产负债表就不能假装 EV = 市值
-        balance_available = bool(balance) and any(
-            balance.get(key) is not None
-            for key in (
-                "total_assets",
-                "total_equity",
-                "total_liabilities",
-                "cash_and_cash_equivalents",
-                "total_debt",
-            )
+        inputs = self.valuation_inputs(income_rows, balance_rows, cash_flow_rows)
+        return self.valuation_row_from_inputs(
+            code=code,
+            trade_date=trade_date,
+            daily_basic=daily_basic,
+            inputs=inputs,
+            previous_market_cap=previous_market_cap,
         )
-        enterprise_value = None
-        if market_cap is not None and balance_available:
-            enterprise_value = market_cap + (total_debt or 0.0) - (cash or 0.0)
-
-        net_income_ttm = income_ttm.get("net_income")
-        revenue_ttm = income_ttm.get("revenue") or income_ttm.get("total_revenue")
-        gross_profit_ttm = income_ttm.get("gross_profit")
-        ebit_ttm = income_ttm.get("ebit")
-        ebitda_ttm = income_ttm.get("ebitda")
-        ocf_ttm = cash_ttm.get("operating_cash_flow")
-        fcf_ttm = cash_ttm.get("free_cash_flow")
-        equity = balance.get("total_equity")
-        current_assets = balance.get("total_current_assets")
-        current_liabilities = balance.get("total_current_liabilities")
-        net_working_capital = None
-        if current_assets is not None and current_liabilities is not None:
-            net_working_capital = current_assets - current_liabilities
-
-        market_cap_change_pct = None
-        if previous_market_cap not in (None, 0) and market_cap is not None:
-            market_cap_change_pct = market_cap / previous_market_cap - 1
-
-        return {
-            "ts": trade_date,
-            "code": code,
-            "close": close,
-            "total_share": total_share,
-            "market_cap": market_cap,
-            "float_market_cap": daily_basic.get("float_market_cap"),
-            "enterprise_value": enterprise_value,
-            "pe_ttm": daily_basic.get("pe_ttm") or _safe_div(market_cap, net_income_ttm),
-            "pb_mrq": daily_basic.get("pb_mrq") or _safe_div(market_cap, equity),
-            "ps_ttm": daily_basic.get("ps_ttm") or _safe_div(market_cap, revenue_ttm),
-            "pcf_ttm": _safe_div(market_cap, ocf_ttm),
-            "pfcf": _safe_div(market_cap, fcf_ttm),
-            "ev_ebitda": _safe_div(enterprise_value, ebitda_ttm),
-            "ev_ebit": _safe_div(enterprise_value, ebit_ttm),
-            "ev_sales": _safe_div(enterprise_value, revenue_ttm),
-            "ev_gross_profit": _safe_div(enterprise_value, gross_profit_ttm),
-            "ev_fcf": _safe_div(enterprise_value, fcf_ttm),
-            "p_nwc": _safe_div(market_cap, net_working_capital),
-            "earnings_yield": _safe_div(net_income_ttm, market_cap),
-            "dividend_yield": daily_basic.get("dividend_yield"),
-            "market_cap_change_pct": market_cap_change_pct,
-            "source": daily_basic.get("source", "derived"),
-            "formula_version": self.formula_version,
-            "ingested_at": daily_basic.get("ingested_at") or now_cn(),
-        }
 
     def build_indicator_rows(
         self,

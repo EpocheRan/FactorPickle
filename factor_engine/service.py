@@ -60,7 +60,7 @@ class FactorEngineService:
         self._registry_synced = False
 
     def sync_registry(self) -> int:
-        """把内置因子写入 factor_registry / factor_alias（幂等）。"""
+        """把当前内置定义写入 custom_factor_registry / custom_factor_alias（幂等）。"""
         specs = self.list_factors()
         written = 0
         if hasattr(self.store, "upsert_registry"):
@@ -80,7 +80,7 @@ class FactorEngineService:
         try:
             self.sync_registry()
         except Exception as exc:
-            logger.warning("同步 factor_registry 失败: %s", exc)
+            logger.warning("同步 custom_factor_registry 失败: %s", exc)
         self._registry_synced = True
 
     def register_builtins(self) -> list[str]:

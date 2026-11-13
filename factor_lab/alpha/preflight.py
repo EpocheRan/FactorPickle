@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from factor_lab.alpha.governance import find_frozen_candidate, holdout_uses, policy_snapshot
+from factor_lab.alpha.mandate import data_capability_blockers, load_mandate
 from factor_lab.alpha.power import analyze_power
 from factor_lab.alpha.prereg import verify_frozen
 from factor_lab.alpha.protocol_audit import audit_campaign
@@ -47,6 +48,16 @@ def preflight(campaign_id: str) -> dict[str, Any]:
         issues.extend(audit.get("issues") or ["protocol audit failed"])
     current_policy = policy_snapshot()
     checks["policy_hash_present"] = bool(current_policy.get("policy_hash"))
+    from factor_lab.alpha.evaluation_contract import load_holdout_v2
+    from factor_lab.alpha.trial_accounting import ledger_snapshot_hash
+
+    checks["ledger_snapshot"] = ledger_snapshot_hash() is not None
+    if not checks["ledger_snapshot"]:
+        issues.append("missing frozen family-ledger snapshot")
+    holdout_v2 = load_holdout_v2()
+    checks["forward_holdout_frozen"] = bool(holdout_v2.get("holdout_start")) and not bool(holdout_v2.get("confirmation_allowed"))
+    if not checks["forward_holdout_frozen"]:
+        warnings.append("forward holdout is not in a frozen/not-confirmed state")
     uses = holdout_uses()
     checks["holdout_unused"] = len(uses) == 0
     if uses:
@@ -87,6 +98,10 @@ def preflight(campaign_id: str) -> dict[str, Any]:
     if n_eff and n_trials:
         power = analyze_power(n_periods=max(1, int(campaign.get("max_rounds") or 1)), n_trials=n_trials, n_eff=n_eff)
         warnings.append(f"power rank1 |t| {power.get('rank1_z'):.2f} for current ledger; plan sample size explicitly")
+    mandate = load_mandate()
+    capability_blockers = data_capability_blockers(mandate)
+    if capability_blockers:
+        warnings.append(f"mandate capability gaps (do not claim promotion-grade replication): {capability_blockers}")
     return {
         "schema": "factor_lab.alpha.campaign_preflight.v1",
         "campaign_id": campaign_id,
@@ -95,6 +110,8 @@ def preflight(campaign_id: str) -> dict[str, Any]:
         "issues": issues,
         "warnings": warnings,
         "policy": current_policy,
+        "mandate": mandate.to_dict(),
+        "data_capability_blockers": capability_blockers,
         "holdout_uses": len(uses),
         "pre_registration_hash": (json.loads(frozen.read_text(encoding="utf-8")).get("pre_registration_hash") if frozen.exists() else None),
     }

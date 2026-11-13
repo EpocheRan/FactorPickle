@@ -14,7 +14,7 @@
   },
   "universe": {
     "policy_file": "factor_lab/alpha/policy/universe.json",
-    "top_n": 800,
+    "top_n": 1000,
     "lookback_days": 60,
     "min_history_days": 120
   },
@@ -31,6 +31,6 @@
     "fee_source": "actual A-share fee schedule: commission 1.8, handling 0.34, regulatory 0.20, transfer 0.10, sell stamp 5.0"
   },
   "entry_rule": "next_open",
-  "horizon": 5,
+  "horizon": 20,
   "execution": "factor_lab.alpha.ten_year.audit / run_expression"
 }

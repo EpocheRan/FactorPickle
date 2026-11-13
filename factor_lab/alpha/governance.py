@@ -16,7 +16,7 @@ from typing import Any
 from factor_lab.core import config
 
 
-POLICY_FILES = ("families.json", "gates.json", "universe.json", "holdout.json")
+POLICY_FILES = ("families.json", "gates.json", "universe.json", "holdout.json", "holdout_v2.json", "mandate.json")
 
 
 def policy_dir() -> Path:

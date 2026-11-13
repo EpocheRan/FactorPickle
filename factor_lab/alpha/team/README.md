@@ -49,6 +49,29 @@ There are no version directories or historical behavior files. Git carries
 behavior history. The roster is read from
 this directory, and all mutable state is under `output/factor_lab`.
 
+
+## Research memory
+
+Every new campaign writes `team/research_context.json`
+(`factor_lab.alpha.research_context.v2`). PathFinder must read it and treat
+`hard_constraints.hard_negatives` as binding: failed/unverified validation
+cannot be ignored, source hashes are checked by audit, and exact duplicate
+expressions are blocked.
+
+Validation evidence is appended to
+`output/factor_lab/alpha/memory/validation_results.jsonl`. The structured facts
+are authoritative; an LLM summary may be used for long lineages but cannot
+replace the facts or source ids. DeepSeek Flash is the optional compressor
+adapter (`factor_lab.alpha.llm_compressor.DeepSeekCompressor`), configured only
+in gitignored `config.json`.
+
+The Lead should use:
+
+```bash
+python -m factor_lab alpha memory
+python -m factor_lab alpha memory --memory-action build-context --campaign-id CAMP-... --parent-campaign-id CAMP-...
+```
+
 ## Boundaries
 
 - PathFinder decides research direction; no data access or code execution.

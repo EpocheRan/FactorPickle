@@ -1,0 +1,10 @@
+{
+  "schema": "factor_lab.alpha.execution_policy.v1",
+  "buy_fee_bps": 2.44,
+  "sell_fee_bps": 7.44,
+  "impact_coeff_bps": 10.0,
+  "max_participation": 0.10,
+  "limit_tolerance": 0.005,
+  "aum_cny": 1000000.0,
+  "note": "Paper execution at next open with raw prices; square-root impact proxy. ST/new-stock/delisting flags require an external security master and are explicit blockers when absent."
+}

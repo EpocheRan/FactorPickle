@@ -28,9 +28,13 @@ def evaluate_long_only(
     top_fraction: float = 0.20,
     min_names: int = 5,
     universe: pd.DataFrame | None = None,
+    tradability: pd.DataFrame | None = None,
     spec: MetricsSpec | None = None,
 ) -> dict[str, Any]:
     cost_spec = spec or alpha_gate_spec()
+    if tradability is not None:
+        eligible = (universe if universe is not None else pd.DataFrame(True, index=factor.index, columns=factor.columns))
+        universe = eligible.reindex(index=tradability.index, columns=tradability.columns).fillna(False).astype(bool) & tradability.fillna(False).astype(bool)
     payload = _core_long_only(
         factor,
         close,
@@ -57,6 +61,7 @@ def evaluate_long_only_expression(
     end: str | None = None,
     top_fraction: float = 0.20,
     universe: pd.DataFrame | None = None,
+    tradability: pd.DataFrame | None = None,
     spec: MetricsSpec | None = None,
 ) -> dict[str, Any]:
     factor, report = compile_expression(expression, context)
@@ -80,6 +85,7 @@ def evaluate_long_only_expression(
         open_=open_.loc[factor.index] if open_ is not None else None,
         top_fraction=top_fraction,
         universe=universe,
+        tradability=tradability,
         spec=spec,
     )
     result["expression"] = str(expression)

@@ -67,3 +67,25 @@ def test_family_fdr_can_include_legacy_for_reclassification() -> None:
     assert result["denominator"] == "program_all_families+legacy"
     assert result["n_unique"] == 2
     assert result["passed"] is False
+
+
+def test_fdr_uses_long_only_primary_when_available() -> None:
+    from factor_lab.alpha.fdr import _p_primary, _p_primary_pos
+
+    metrics = {
+        "n_dates": 148,
+        "net_t": 9.0,
+        "long_only": {
+            "size_screened": {
+                "n_dates": 148,
+                "long_only_t": 2.5,
+                "long_only_net_excess_annualized": 0.05,
+            }
+        },
+    }
+    p_two = _p_primary(metrics)
+    p_pos = _p_primary_pos(metrics)
+    assert p_two is not None and p_pos is not None
+    assert 0.0 < p_pos < p_two
+    # primary p is derived from long_only_t, not the LS net_t=9.0
+    assert p_two > 0.001

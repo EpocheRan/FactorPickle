@@ -170,3 +170,26 @@ def test_confirm_marks_insufficient_evidence_as_parked(tmp_path, monkeypatch) ->
     assert result["red_team"]["passed"] is False
     assert result["path"].startswith(str(tmp_path))
 
+
+
+def test_long_only_primary_keeps_long_short_as_diagnostic() -> None:
+    result = {
+        "metrics": {
+            "net_spread": -0.001,
+            "net_t": -1.0,
+            "ic_mean": -0.01,
+            "turnover": 0.2,
+            "n_dates": 107,
+            "coverage": 0.955,
+        }
+    }
+    explained = explain_result(
+        result,
+        research_evidence={"primary": "long_only", "long_short_role": "diagnostic"},
+        long_only_status="pass",
+        long_only_reasons=[],
+    )
+    assert explained["verdict"] == "pass"
+    assert explained["primary_evidence"] == "long_only"
+    assert explained["long_short_verdict"] == "fail"
+    assert any("diagnostic" in caveat for caveat in explained["caveats"])

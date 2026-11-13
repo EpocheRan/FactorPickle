@@ -1,10 +1,10 @@
 {
   "schema": "factor_lab.alpha.universe_policy.v1",
-  "name": "pit_liquidity_800",
+  "name": "pit_liquidity_1000",
   "enabled": true,
   "min_history_days": 120,
   "min_close": 0.0,
   "require_positive_volume": true,
-  "top_n": 800,
+  "top_n": 1000,
   "lookback_days": 60
 }

@@ -192,6 +192,8 @@ class Scope:
     chunk: int = 500
     min_codes: int = 2500
     codes: tuple[str, ...] = ()
+    datasets: tuple[str, ...] = ()
+    fresh: bool = False
 
 
 @dataclass
@@ -200,6 +202,10 @@ class PhaseResult:
     rows: int
     skipped: bool = False
     gaps: list[dict] | None = None
+    done: bool = True
+    blocked: tuple[str, ...] = ()
+    #: 结构化明细（如 valuation_derived 的逐月覆盖），供 CLI 打印/落盘。
+    details: dict | None = None
 
 
 PHASES: dict[str, Callable[[Api, Scope], PhaseResult]] = {}
@@ -224,8 +230,25 @@ def run_phase(name: str, scope: Scope) -> PhaseResult:
     from . import phases as _phases  # noqa: F401 - 触发注册
 
     impl = resolve_phase(name)
-    api = Api()
-    return impl(api, scope)
+    return impl(_LazyApi(), scope)
+
+
+class _LazyApi:
+    """Only build the Tushare client when a phase actually asks for data.
+
+    Local-only phases (``valuation_derived``) need zero vendor calls, so
+    constructing ``Api()`` up front would demand a token for no reason.
+    """
+
+    __slots__ = ("_api",)
+
+    def __init__(self) -> None:
+        self._api: "Api | None" = None
+
+    def call(self, name: str, **kwargs):
+        if self._api is None:
+            self._api = Api()
+        return self._api.call(name, **kwargs)
 
 
 __all__ = [
