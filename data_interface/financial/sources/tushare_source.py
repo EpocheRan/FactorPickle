@@ -4,6 +4,10 @@
 
 - 可用：``income`` / ``balancesheet`` / ``cashflow`` / ``fina_indicator`` /
   ``daily_basic`` / ``stock_basic`` / ``dividend`` / ``trade_cal``（均 2000 分档）
+- P0 基础资料（实测可用）：``namechange`` / ``new_share`` / ``suspend_d`` /
+  ``stk_limit`` / ``disclosure_date`` / ``forecast`` / ``express``，
+  统一在 ``acquisition.backfill --phase p0`` 与 ``acquisition run`` 里按
+  交易日/报告期回补。
 - 受限：``report_rc`` 2000 分仅试用，每天 10 次请求；本模块用本地配额文件
   做硬限制，超过后抛出 ``DailyQuotaExceededError``。
 - 不使用任何 ``*_vip`` 接口（5000 分档）。
@@ -34,6 +38,39 @@ from data_interface.common.rate_limiter import SlidingWindowRateLimiter
 from ..normalizer import to_ts_code
 
 logger = logging.getLogger("DataInterface.Tushare")
+
+#: P0 基础资料/公司行动类接口的显式字段。
+#: Tushare 不传 ``fields`` 时只返回默认列，容易漏掉 ``list_status`` / ``type``
+#: / ``update_flag`` 等关键列，因此这里逐接口固定字段。
+STOCK_BASIC_FIELDS = (
+    "ts_code,symbol,name,area,industry,fullname,enname,market,exchange,"
+    "list_status,list_date,delist_date,is_hs,act_name,act_ent_type"
+)
+NAMECHANGE_FIELDS = "ts_code,name,start_date,end_date,ann_date,change_reason"
+NEW_SHARE_FIELDS = (
+    "ts_code,sub_code,name,ipo_date,issue_date,amount,market_amount,price,"
+    "pe,limit_amount,funds,ballot"
+)
+SUSPEND_D_FIELDS = "ts_code,trade_date,suspend_timing,suspend_type"
+STK_LIMIT_FIELDS = "trade_date,ts_code,up_limit,down_limit"
+DISCLOSURE_DATE_FIELDS = "ts_code,ann_date,end_date,pre_date,actual_date"
+FORECAST_FIELDS = (
+    "ts_code,ann_date,end_date,type,p_change_min,p_change_max,net_profit_min,"
+    "net_profit_max,last_parent_net,first_ann_date,summary,change_reason,"
+    "update_flag"
+)
+EXPRESS_FIELDS = (
+    "ts_code,ann_date,end_date,revenue,operate_profit,total_profit,n_income,"
+    "total_assets,total_hldr_eqy_exc_min_int,diluted_eps,diluted_roe,"
+    "yoy_net_profit,bps,perf_summary,update_flag"
+)
+
+
+def _compact_date(value: Any) -> str | None:
+    """``2024-01-02`` / ``20240102`` → ``20240102``。"""
+    if value is None or value == "":
+        return None
+    return str(value).replace("-", "")[:8]
 
 
 class DailyQuotaGuard:
@@ -329,14 +366,192 @@ class TushareSource:
     def fetch_stock_basic(self, code: str | None = None, **kwargs) -> list[dict[str, Any]]:
         # 不显式传 fields 时，Tushare 默认不返回 list_status / delist_date，
         # 会导致 profile 写入 list_status=NULL，进而从 A 股股票池消失。
-        kwargs.setdefault(
-            "fields",
-            "ts_code,symbol,name,area,industry,fullname,enname,market,"
-            "exchange,list_status,list_date,delist_date,is_hs",
-        )
+        kwargs.setdefault("fields", STOCK_BASIC_FIELDS)
         if code:
             kwargs["ts_code"] = to_ts_code(code)
         return self._call("stock_basic", self.pro.stock_basic, **kwargs)
+
+    # ------------------------------------------------------------ P0 基础资料
+    def fetch_namechange(
+        self,
+        *,
+        code: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """历史名称变更（含 ST 区间）。
+
+        时间过滤按**公告日** ``ann_date``；每条记录的 ``start_date`` /
+        ``end_date`` 是该名称实际生效的区间。
+        """
+        kwargs: dict[str, Any] = {"fields": NAMECHANGE_FIELDS}
+        if code:
+            kwargs["ts_code"] = to_ts_code(code)
+        if _compact_date(start_date):
+            kwargs["start_date"] = _compact_date(start_date)
+        if _compact_date(end_date):
+            kwargs["end_date"] = _compact_date(end_date)
+        if offset is not None:
+            kwargs["offset"] = int(offset)
+        if limit is not None:
+            kwargs["limit"] = int(limit)
+        return self._call("namechange", self.pro.namechange, **kwargs)
+
+    def fetch_new_share(
+        self,
+        *,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """新股发行/上市信息；时间过滤按**上市日** ``ipo_date``。"""
+        kwargs: dict[str, Any] = {"fields": NEW_SHARE_FIELDS}
+        if _compact_date(start_date):
+            kwargs["start_date"] = _compact_date(start_date)
+        if _compact_date(end_date):
+            kwargs["end_date"] = _compact_date(end_date)
+        if offset is not None:
+            kwargs["offset"] = int(offset)
+        if limit is not None:
+            kwargs["limit"] = int(limit)
+        return self._call("new_share", self.pro.new_share, **kwargs)
+
+    def fetch_suspend_d(
+        self,
+        *,
+        trade_date: str | None = None,
+        code: str | None = None,
+        suspend_type: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """停复牌明细；``suspend_type``：``S`` 停牌 / ``R`` 复牌。
+
+        按交易日全市场一次返回（``trade_date``），也可按代码 + 区间取。
+        """
+        kwargs: dict[str, Any] = {"fields": SUSPEND_D_FIELDS}
+        if trade_date:
+            kwargs["trade_date"] = _compact_date(trade_date)
+        if code:
+            kwargs["ts_code"] = to_ts_code(code)
+        if start_date:
+            kwargs["start_date"] = _compact_date(start_date)
+        if end_date:
+            kwargs["end_date"] = _compact_date(end_date)
+        if suspend_type:
+            kwargs["suspend_type"] = suspend_type
+        return self._call("suspend_d", self.pro.suspend_d, **kwargs)
+
+    def fetch_stk_limit(
+        self,
+        *,
+        trade_date: str | None = None,
+        code: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """每日涨跌停价格；按交易日全市场一次返回。"""
+        kwargs: dict[str, Any] = {"fields": STK_LIMIT_FIELDS}
+        if trade_date:
+            kwargs["trade_date"] = _compact_date(trade_date)
+        if code:
+            kwargs["ts_code"] = to_ts_code(code)
+        if start_date:
+            kwargs["start_date"] = _compact_date(start_date)
+        if end_date:
+            kwargs["end_date"] = _compact_date(end_date)
+        if offset is not None:
+            kwargs["offset"] = int(offset)
+        if limit is not None:
+            kwargs["limit"] = int(limit)
+        return self._call("stk_limit", self.pro.stk_limit, **kwargs)
+
+    def fetch_disclosure_date(
+        self,
+        *,
+        code: str | None = None,
+        end_date: str | None = None,
+        ann_date: str | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """财报披露计划；``end_date`` 是报告期（如 ``20240331``）。
+
+        返回 ``pre_date``（预约披露日）与 ``actual_date``（实际披露日），
+        ``ann_date`` 是这份预约被公告的日期，可用于 PIT 对齐。
+        """
+        kwargs: dict[str, Any] = {"fields": DISCLOSURE_DATE_FIELDS}
+        if code:
+            kwargs["ts_code"] = to_ts_code(code)
+        if end_date:
+            kwargs["end_date"] = _compact_date(end_date)
+        if ann_date:
+            kwargs["ann_date"] = _compact_date(ann_date)
+        if offset is not None:
+            kwargs["offset"] = int(offset)
+        if limit is not None:
+            kwargs["limit"] = int(limit)
+        return self._call("disclosure_date", self.pro.disclosure_date, **kwargs)
+
+    def fetch_forecast(
+        self,
+        *,
+        ann_date: str | None = None,
+        code: str | None = None,
+        period: str | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """业绩预告；必须给 ``ann_date`` 或 ``ts_code``（接口约束）。
+
+        按 ``ann_date`` 单日拉取可得到当天公告的全市场预告，适合逐日回补。
+        """
+        kwargs: dict[str, Any] = {"fields": FORECAST_FIELDS}
+        if ann_date:
+            kwargs["ann_date"] = _compact_date(ann_date)
+        if code:
+            kwargs["ts_code"] = to_ts_code(code)
+        if period:
+            kwargs["period"] = _compact_date(period)
+        if offset is not None:
+            kwargs["offset"] = int(offset)
+        if limit is not None:
+            kwargs["limit"] = int(limit)
+        return self._call("forecast", self.pro.forecast, **kwargs)
+
+    def fetch_express(
+        self,
+        *,
+        period: str | None = None,
+        ann_date: str | None = None,
+        code: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """业绩快报；单次最多返回 2000 行，调用方需用 ``offset`` 翻页。"""
+        kwargs: dict[str, Any] = {"fields": EXPRESS_FIELDS}
+        if period:
+            kwargs["period"] = _compact_date(period)
+        if ann_date:
+            kwargs["ann_date"] = _compact_date(ann_date)
+        if code:
+            kwargs["ts_code"] = to_ts_code(code)
+        if start_date:
+            kwargs["start_date"] = _compact_date(start_date)
+        if end_date:
+            kwargs["end_date"] = _compact_date(end_date)
+        if offset is not None:
+            kwargs["offset"] = int(offset)
+        if limit is not None:
+            kwargs["limit"] = int(limit)
+        return self._call("express", self.pro.express, **kwargs)
 
     def fetch_price_history(
         self,

@@ -300,10 +300,10 @@ __all__ = ["Membership", "PanelData", "load_panel"]
 
 
 def stored_factor_panel(factor_id: str, close: pd.DataFrame, start: str, end: str) -> pd.DataFrame:
-    """从 factor_value_daily（物化结果）取单因子面板。"""
+    """从 custom_factor_value_daily（物化结果）取单因子面板。"""
     codes = ",".join(f"'{c}'" for c in close.columns)
     frame = _query(
-        "select ts, code, value from factor_value_daily "
+        "select ts, code, value from custom_factor_value_daily "
         f"where factor_id='{factor_id}' and ts between '{start}' and '{end}' "
         f"and code in ({codes})",
         timeout=600,

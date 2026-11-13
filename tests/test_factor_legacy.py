@@ -11,7 +11,7 @@ def test_legacy_specs_cover_screener_columns():
     ids = {spec.factor_id for spec in specs}
     assert len(ids) == len(specs)
     for spec in specs:
-        assert spec.source.dataset == "factor_daily_wide"
+        assert spec.source.dataset == "screener_daily_wide_view"
         assert spec.version == "daily-v1"
         assert spec.freq == "1d"
         assert spec.aliases and spec.aliases[0].startswith("legacy.")

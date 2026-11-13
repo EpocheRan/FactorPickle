@@ -1,0 +1,1228 @@
+{
+  "schema": "factor_lab.alpha.families.v1",
+  "q": 0.1,
+  "n_eff": {
+    "method": "expression_jaccard",
+    "threshold": 0.7,
+    "sensitivity_thresholds": [
+      0.5,
+      0.7,
+      0.9
+    ]
+  },
+  "families": [
+    {
+      "family_id": "fam-max-lottery",
+      "research_question": "Does the MAX/lottery mechanism survive attribution, coverage and family-level multiple-testing in the A-share dev window?",
+      "mechanism_tags": [
+        "MAX_60",
+        "lottery-demand",
+        "MAX-conditioned"
+      ],
+      "campaign_ids": [
+        "CAMP-548013a26d",
+        "CAMP-9126b55d26",
+        "CAMP-e8d05b7311",
+        "CAMP-382cbc7893"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-low-price-value",
+      "research_question": "After MAX attribution was falsified, is the residual low-nominal-price + PB-value composite load-bearing and robust enough to freeze?",
+      "mechanism_tags": [
+        "low-nominal-price",
+        "pb-value"
+      ],
+      "campaign_ids": [
+        "CAMP-24d0c741d3",
+        "CAMP-4319413b27"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-p0-margin",
+      "research_question": "Does leverage crowding in margin financing predict negative 5-day long-short returns in the pool, so that a factor oriented high = low margin build / low margin balance relative to size earns a positive spread after costs?",
+      "mechanism": "Margin financing is exchange-disclosed after close (T+1 in expressions). Crowded leveraged longs and forced deleveraging should predict underperformance: recent margin-balance growth and margin balance relative to market cap are the crowding proxies. Both candidates are oriented high = low crowding => expected positive 5-day long-short spread.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "margin_rzye",
+        "margin_rqye",
+        "margin_rzmre",
+        "margin_rqyl",
+        "float_mv",
+        "total_mv"
+      ]
+    },
+    {
+      "family_id": "fam-p0-flow-structure",
+      "research_question": "Is 5-day order-size structure in moneyflow priced — large plus extra-large net buying positive and small-order net buying negative — in the cross-section of 5-day forward returns?",
+      "mechanism": "Order-size decomposition separates informed large-ticket flow from retail small-ticket flow; large-order net inflow should predict positive and retail small-order net inflow negative short-horizon returns. Flows are normalized by same-window amount to be cross-sectionally comparable; moneyflow is after-close and used with a T+1 lag.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "mf_buy_sm",
+        "mf_buy_lg",
+        "mf_buy_elg",
+        "mf_sell_sm",
+        "mf_sell_lg",
+        "mf_sell_elg",
+        "mf_net_amount",
+        "amount"
+      ]
+    },
+    {
+      "family_id": "fam-p0-quality",
+      "research_question": "Do accruals (earnings not backed by cash, negative) and gross profitability (positive) predict 5-day forward returns in the pool?",
+      "mechanism": "Quality/accrual anomaly: high accruals signal low earnings quality and subsequent underperformance, while high gross profit over total assets signals quality and outperformance. Financial statements are PIT-aligned to publish_date and carried forward by the panel; no label or future-return inputs.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "fin_net_income",
+        "fin_operating_cash_flow",
+        "fin_total_assets",
+        "fin_total_equity",
+        "fin_total_liabilities",
+        "fin_revenue",
+        "fin_gross_profit",
+        "fin_research_and_development_expense",
+        "fin_basic_eps"
+      ]
+    },
+    {
+      "family_id": "fam-p0-valuation",
+      "research_question": "Does a non-PB valuation multiple (low PS_TTM) add a positive 5-day value spread in the pool, distinct from the already-tested low-PB/low-price composite?",
+      "mechanism": "Sales-multiple value premium: low price-to-sales predicts higher subsequent returns; PS_TTM is selected over PB to keep novelty versus the existing low-price/low-PB composite. Valuation is daily PIT with coverage above 0.90; one candidate only to hold the family-level budget.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "pb_mrq",
+        "pe_ttm",
+        "ps_ttm",
+        "total_mv",
+        "float_mv"
+      ]
+    },
+    {
+      "family_id": "fam-p1-block-trade",
+      "research_question": "Does block-trade activity (amount share over 5 days, count intensity over 20 days) predict negative 5-day returns because block trades clear at discounts and signal large-holder supply?",
+      "mechanism": "Block trades are negotiated at discounts and mostly reflect large-holder distribution; the event table is announcement-dated and p1_events lags it one trading day, so the features are PIT-safe. High block-trade intensity should predict underperformance; candidates are oriented high = low block intensity. Event flow is zero-filled (true zero) upstream.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "block_amount",
+        "block_vol",
+        "block_vwap",
+        "block_count",
+        "amount",
+        "volume",
+        "close"
+      ]
+    },
+    {
+      "family_id": "fam-p1-top-list",
+      "research_question": "Does Dragon-Tiger-list buying pressure positively and raw listing intensity negatively predict 5-day returns in the pool?",
+      "mechanism": "Top-list large-seat net buying relative to amount carries positive short-horizon information, while raw listing intensity reflects attention-driven crowding and predicts reversal. The event table is after-close disclosed and p1_events lags it one trading day; non-stock rows are filtered upstream and event flow is zero-filled.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "top_amount",
+        "top_l_buy",
+        "top_l_sell",
+        "top_net_amount",
+        "top_count",
+        "amount"
+      ]
+    },
+    {
+      "family_id": "fam-p1-holder-number",
+      "research_question": "Does a declining shareholder count (chip concentration) predict positive 5-day returns in the pool?",
+      "mechanism": "Fewer holders per stock means concentrated chips and lower retail crowding; holder-number disclosures are announcement-dated, p1_events lags them one trading day, and the state is forward-filled. Candidates use the disclosed change (holder_chg) and its 60-day smoothed level, both oriented high = holder decline.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "holder_num",
+        "holder_chg",
+        "holder_days_since"
+      ]
+    },
+    {
+      "family_id": "fam-p1-repurchase",
+      "research_question": "Does actual repurchase execution (amount intensity relative to float cap over 20 days, execution-count persistence) predict positive 5-day returns as a management-confidence signal?",
+      "mechanism": "Executed buybacks are a costly signal of undervaluation and reduce float; repurchase announcements are announcement-dated and p1_events lags them one trading day, with execution fields zero-filled when there is no repurchase. Amount intensity is normalized by float market cap to avoid a pure size bet; the second candidate measures execution persistence via event count.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-b79c47ef2d"
+      ],
+      "fields": [
+        "rep_amount",
+        "rep_vol",
+        "rep_count",
+        "float_mv"
+      ]
+    },
+    {
+      "family_id": "fam-p1-holder-robust",
+      "research_question": "Does holder-number robustness survive orthogonalization and concentration variants?",
+      "mechanism": "Shareholder-count changes reflect ownership concentration/retail crowding; robustness vs turnover/size and level variants.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-35db6b3056"
+      ],
+      "fields": [
+        "holder_num",
+        "holder_chg",
+        "holder_days_since",
+        "turnover",
+        "float_mv",
+        "amount"
+      ]
+    },
+    {
+      "family_id": "fam-expanded-incremental",
+      "research_question": "Do P0/P1 expanded axes add incremental information in combinations?",
+      "mechanism": "Incremental combinations/residuals of margin, flow, block/top events, holder/repurchase against price/value/turnover controls.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-a54ad429f3"
+      ],
+      "fields": [
+        "margin_rzye",
+        "margin_rqye",
+        "margin_rzmre",
+        "margin_rqyl",
+        "mf_buy_lg",
+        "mf_buy_elg",
+        "mf_sell_lg",
+        "mf_sell_elg",
+        "block_amount",
+        "top_net_amount",
+        "rep_amount",
+        "holder_chg",
+        "turnover",
+        "float_mv",
+        "pb_mrq",
+        "amount"
+      ]
+    },
+    {
+      "family_id": "fam-ml-expanded-control",
+      "research_question": "Does a deterministic expanded-axis control provide a benchmark for the ML experiment?",
+      "mechanism": "Deterministic non-ML control: top-list net buying minus margin purchase intensity.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-d07a274118"
+      ],
+      "fields": [
+        "top_net_amount",
+        "margin_rzmre",
+        "amount"
+      ]
+    },
+    {
+      "family_id": "ml_signal",
+      "research_question": "Does a distilled ML model add falsifiable signal over deterministic controls?",
+      "mechanism": "Non-deep-learning ML distilled to DSL; admission-gated, program-FDR counted.",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-d07a274118"
+      ],
+      "fields": [
+        "margin_rzmre",
+        "mf_net_amount",
+        "top_net_amount",
+        "holder_chg",
+        "pb_mrq",
+        "turnover"
+      ]
+    },
+    {
+      "family_id": "fam-holder-10y",
+      "research_question": "Does shareholder concentration survive 10y PIT top-800?",
+      "mechanism": "ownership breadth/concentration; holder_chg/holder_num",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-0f9b786f80"
+      ],
+      "fields": [
+        "holder_chg",
+        "holder_num",
+        "holder_days_since",
+        "close_raw",
+        "float_mv",
+        "turnover",
+        "pb_mrq"
+      ]
+    },
+    {
+      "family_id": "fam-rank-native-10y",
+      "research_question": "Can a rank-native ridge pass admission and distill faithfully on 10y PIT top-800?",
+      "mechanism": "rank-native linear composite/distillation",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-362d30cbb5"
+      ],
+      "fields": [
+        "returns",
+        "turnover",
+        "mf_net_amount",
+        "holder_chg",
+        "fin_basic_eps"
+      ]
+    },
+    {
+      "family_id": "fam-singlefold-10y",
+      "research_question": "Single-fit rank-native ML plus signed rank composite on 10y PIT top-800",
+      "mechanism": "single walk-forward coefficient vector / rank composite",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-9ded21c30e"
+      ],
+      "fields": [
+        "returns",
+        "turnover",
+        "mf_net_amount",
+        "holder_chg",
+        "fin_basic_eps"
+      ]
+    },
+    {
+      "family_id": "fam-horizon20-10y",
+      "research_question": "Horizon-20 cost-aware rank-native ML/control on 10y PIT top-800",
+      "mechanism": "20-day horizon / lower borrow-adjusted turnover",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-356f31ae6b"
+      ],
+      "fields": [
+        "returns",
+        "turnover",
+        "mf_net_amount",
+        "holder_chg",
+        "fin_basic_eps"
+      ]
+    },
+    {
+      "family_id": "fam-lottery-purge-10y",
+      "research_question": "External-evidence lottery/MAX purge of top quantile on 10y PIT top-800",
+      "mechanism": "MAX/lottery contamination purge; external A-share MAX anomaly + limits-to-arbitrage",
+      "pre_registered": true,
+      "campaign_ids": [
+        "CAMP-d95264e8cd"
+      ],
+      "fields": [
+        "returns",
+        "turnover",
+        "mf_net_amount",
+        "holder_chg",
+        "fin_basic_eps"
+      ]
+    },
+    {
+      "family_id": "fam-shortinterest-10y",
+      "research_question": "Does low short-interest/融券余额 predict long-only returns under the 20d mandate after size and regime controls?",
+      "mechanism_tags": [
+        "short_interest",
+        "margin",
+        "regime"
+      ],
+      "campaign_ids": [
+        "CAMP-cf9b606323"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-efficiency-change-10y",
+      "research_question": "Does 252d delta asset turnover replicate as a long-only 20d signal on the wider pool?",
+      "mechanism_tags": [
+        "delta_ATO",
+        "DuPont",
+        "efficiency"
+      ],
+      "campaign_ids": [
+        "CAMP-cf9b606323"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-illiquidity-price-10y",
+      "research_question": "Does the Amihud+low-price composite survive the long-only 20d mandate and size screen?",
+      "mechanism_tags": [
+        "Amihud",
+        "low-price",
+        "illiquidity-premium"
+      ],
+      "campaign_ids": [
+        "CAMP-cf9b606323"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-innovation-10y",
+      "research_question": "Does R&D intensity replicate as a long-only 20d signal?",
+      "mechanism_tags": [
+        "R&D",
+        "innovation",
+        "intangible"
+      ],
+      "campaign_ids": [
+        "CAMP-cf9b606323"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-growth-10y",
+      "research_question": "Does revenue growth replicate at 20d/60d after actual costs?",
+      "mechanism_tags": [
+        "revenue-growth",
+        "fundamental-momentum"
+      ],
+      "campaign_ids": [
+        "CAMP-cf9b606323"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-retail-flow-2026",
+      "research_question": "Do retail small-order order-flow imbalances predict A-share long-only returns after attention and size controls?",
+      "mechanism_tags": [
+        "retail-flow",
+        "order-imbalance",
+        "attention"
+      ],
+      "campaign_ids": [
+        "CAMP-435e3ebaf5"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-institutional-flow-2026",
+      "research_question": "Do institutional large/extra-large order-flow imbalances predict long-only 20d returns in A-shares?",
+      "mechanism_tags": [
+        "institutional-flow",
+        "smart-money",
+        "order-imbalance"
+      ],
+      "campaign_ids": [
+        "CAMP-435e3ebaf5"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-block-trade-2026",
+      "research_question": "Does the block-trade premium/discount or block-trade intensity predict long-only 20d returns?",
+      "mechanism_tags": [
+        "block-trade",
+        "informed-trading",
+        "liquidity"
+      ],
+      "campaign_ids": [
+        "CAMP-435e3ebaf5"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-repurchase-2026",
+      "research_question": "Does share-repurchase intensity predict long-only 20d returns after the 2024-2025 buyback regime?",
+      "mechanism_tags": [
+        "repurchase",
+        "signaling",
+        "corporate-action"
+      ],
+      "campaign_ids": [
+        "CAMP-435e3ebaf5"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-holder-dispersion-2026",
+      "research_question": "Does shareholder-number/dispersion change predict long-only 20d returns through retail attention?",
+      "mechanism_tags": [
+        "holder-number",
+        "ownership-dispersion",
+        "retail-attention"
+      ],
+      "campaign_ids": [
+        "CAMP-435e3ebaf5"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-overnight-max-2026",
+      "research_question": "Do overnight versus intraday extreme-return components have different cross-sectional predictive signs in A-shares?",
+      "mechanism_tags": [
+        "overnight",
+        "intraday",
+        "MAX",
+        "lottery"
+      ],
+      "campaign_ids": [
+        "CAMP-9a0c068c52"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-accruals-global-2026",
+      "research_question": "Does the global accruals-quality anomaly survive in A-shares under a long-only 20d mandate?",
+      "mechanism_tags": [
+        "accruals",
+        "earnings-quality",
+        "global-anomaly"
+      ],
+      "campaign_ids": [
+        "CAMP-9a0c068c52"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-profitability-global-2026",
+      "research_question": "Does gross profitability (Novy-Marx) predict A-share long-only returns?",
+      "mechanism_tags": [
+        "profitability",
+        "quality",
+        "global-anomaly"
+      ],
+      "campaign_ids": [
+        "CAMP-9a0c068c52"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-lowvol-global-2026",
+      "research_question": "Does low-volatility / betting-against-beta survive in A-shares as a long-only 20d signal?",
+      "mechanism_tags": [
+        "low-volatility",
+        "BAB",
+        "global-anomaly"
+      ],
+      "campaign_ids": [
+        "CAMP-9a0c068c52"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-nonlinear-value-quality-2026",
+      "research_question": "Does a nonlinear value-quality interaction (SSRN nonlinearities) add over linear rank composites?",
+      "mechanism_tags": [
+        "nonlinear",
+        "value",
+        "quality",
+        "interaction"
+      ],
+      "campaign_ids": [
+        "CAMP-9a0c068c52"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-composite-core5-2026",
+      "research_question": "Does an equal-weight rank composite of five economically distinct A-share components improve long-only 20d deployment over its components?",
+      "mechanism_tags": [
+        "factor-composite",
+        "ensemble",
+        "diversification"
+      ],
+      "campaign_ids": [
+        "CAMP-9091939333"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-composite-fundamental3-2026",
+      "research_question": "Does a fundamental-momentum composite (delta ATO, revenue growth, gross profitability) deliver a stable long-only 20d edge?",
+      "mechanism_tags": [
+        "factor-composite",
+        "fundamental",
+        "quality"
+      ],
+      "campaign_ids": [
+        "CAMP-9091939333"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-composite-quality-value-ownership-2026",
+      "research_question": "Does a quality + value + shareholder-dispersion composite improve long-only 20d robustness?",
+      "mechanism_tags": [
+        "factor-composite",
+        "quality-value",
+        "ownership"
+      ],
+      "campaign_ids": [
+        "CAMP-9091939333"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-ablation-10y",
+      "research_question": "Does removing the returns leg improve the composite?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-66762b57ef"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-accruals-10y",
+      "research_question": "Does low accruals predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-37ff03fb1f"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-amihud-decile-10y",
+      "research_question": "Does top-decile Amihud improve LO significance?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-7bf824ae37"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-amihud-longonly-10y",
+      "research_question": "Does Amihud long-only work at 20d?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-af8318b3b7"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-attention-10y",
+      "research_question": "Does low abnormal turnover predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-679d673db8"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-blocktrade-10y",
+      "research_question": "Does low block-trade activity predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-4c7091e8cb"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-cfyield-10y",
+      "research_question": "Does cash-flow yield predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-cab708aaeb"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-composite-lo5-10y",
+      "research_question": "Does composite long-only 5d work?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-13b4ff0748"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-composite-longonly-10y",
+      "research_question": "Does composite long-only 20d work?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-4a70668f42"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-ctc-10y",
+      "research_question": "Does low price-turnover correlation predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-a38da097ec"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-downside-risk-10y",
+      "research_question": "Does low downside semideviation predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-faabc13a63"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-efficiency-10y",
+      "research_question": "Does asset turnover predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-79688adbc4"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-eventflow-10y",
+      "research_question": "Does top-list attention purge fix Q5?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-082e385ef9"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-execution-reversal-10y",
+      "research_question": "Is 1-week reversal untradable due limit-up/T+1?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-4d2a395ccd"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-financing-10y",
+      "research_question": "Does financing days-to-cover predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-9de1c2ef7d"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-growth-lo-10y",
+      "research_question": "Does revenue-growth long-only work?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-1771001fa8"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-illiquidity-10y",
+      "research_question": "Is Amihud illiquidity premium monetizable?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-1701c58054"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-investment-10y",
+      "research_question": "Does low asset growth predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-22c4f811d6"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-kurt-10y",
+      "research_question": "Does low kurtosis predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-9ae9bc2530"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-leverage-change-10y",
+      "research_question": "Does rising leverage predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-97833d5bbb"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-liquidity-change-10y",
+      "research_question": "Does declining Amihud predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-191b7b29f9"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-low-turnover-10y",
+      "research_question": "Is low-turnover premium monetizable in top800?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-113b9abaa4"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-lowprice-10y",
+      "research_question": "Is low-price premium monetizable?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-0ff94f9c7a"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-lowvol-10y",
+      "research_question": "Is low-vol anomaly monetizable?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-68e459b7ed"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-moneyflow-10y",
+      "research_question": "Is weekly main-fund inflow rate monetizable?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-e7d014e1ec"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-nonmono-10y",
+      "research_question": "Is Q5 underperformance a 5-day MAX/lottery tail?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-32b8498728"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-quality-10y",
+      "research_question": "Is gross profitability monetizable?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-170e37bfd4"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-repurchase-10y",
+      "research_question": "Is repurchase intensity predictive?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-d5e56b4cd6"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-reversal-10y",
+      "research_question": "Is standalone 1-week reversal tradable after costs?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-c8e3460ecf"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-safety-10y",
+      "research_question": "Does low leverage predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-a7c779d4c5"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-shortconstraint-10y",
+      "research_question": "Does Q5 underperformance concentrate in hard-to-short names?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-6e3db13eb0"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-shortinterest-lo-10y",
+      "research_question": "Is short-interest long-only 20d robust?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-e96f3b55b7"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-shortinterest-post24-10y",
+      "research_question": "Does high short interest reverse post-2024?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-b8640f9979"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-size-10y",
+      "research_question": "Is size premium monetizable?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-f2a774a2a7"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-size-crowd-10y",
+      "research_question": "Does excluding smallest-30% shell/size names fix Q5 underperformance?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-5fd43ad72a"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-skew-10y",
+      "research_question": "Does low skew predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-ab4ce3d16a"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-turnover-reversal-10y",
+      "research_question": "Can skip-week formation cut turnover enough?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-dc847e666e"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-value-10y",
+      "research_question": "Is EP value monetizable?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-9e8c6e06e1"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-vol-reversal-10y",
+      "research_question": "Is reversal stronger after volatility rises?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-fb385870ae"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-volume-growth-10y",
+      "research_question": "Does low volume growth predict returns?",
+      "mechanism_tags": [
+        "historical-backfill",
+        "frozen-prereg"
+      ],
+      "campaign_ids": [
+        "CAMP-8149471776"
+      ],
+      "pre_registered": true,
+      "registration_source": "frozen-prereg-backfill"
+    },
+    {
+      "family_id": "fam-weak-ensemble-2026",
+      "research_question": "Can a fixed equal-weight rank ensemble of individually weak positive signals increase statistical power without selecting a single holy-grail factor?",
+      "mechanism_tags": [
+        "weak-signal-ensemble",
+        "power",
+        "diversification"
+      ],
+      "campaign_ids": [
+        "CAMP-441bc2dd8b"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-weak-ensemble-smooth-2026",
+      "research_question": "Does a turnover-aware 60d-smoothed Weak5 equal-weight ensemble retain statistical power under cost_impact_v1?",
+      "mechanism_tags": [
+        "weak-signal-ensemble",
+        "smoothing",
+        "turnover"
+      ],
+      "campaign_ids": [
+        "CAMP-b61c4d1845"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-basic-cashflow-value-2026",
+      "research_question": "Do newly admitted Basic cash-flow/valuation axes (ev_fcf-style FCF yield, gross profitability) support a pre-registered positive long-only 20d premium after the cost/impact Gate in the size-screened PIT liquidity-1000 pool?",
+      "mechanism_tags": [
+        "cashflow-value",
+        "fcf-yield",
+        "quality-conditioning",
+        "cost-impact-gate"
+      ],
+      "campaign_ids": [
+        "CAMP-a0f95bb345"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-multifactor-10x-2026",
+      "research_question": "Which of ten distinct-mechanism fixed multi-factor equal-weight rank composites is deployable long-only at 20d after actual fees and the cost/impact Gate?",
+      "mechanism_tags": [
+        "multi-factor",
+        "fixed-composite",
+        "equal-weight-rank",
+        "systematic-battery",
+        "cost-impact-gate"
+      ],
+      "campaign_ids": [
+        "CAMP-66ffeecd96"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-web-inspired-10x-2026",
+      "research_question": "Do ten web-inspired fixed 5-8 component equal-weight multi-factor composites clear the long-only 20d cost/impact Gate and FDR?",
+      "mechanism_tags": [
+        "multi-factor",
+        "web-inspired",
+        "fixed-composite",
+        "5-8-components",
+        "systematic-battery"
+      ],
+      "campaign_ids": [
+        "CAMP-6935afcb69"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-multifactor-iter-2026",
+      "research_question": "Does a sequential 10-campaign multi-factor iteration produce a deployable long-only 20d composite?",
+      "mechanism_tags": [
+        "multi-factor",
+        "iterative-campaigns",
+        "fixed-composite",
+        "cost-impact-gate"
+      ],
+      "campaign_ids": [
+        "CAMP-b8eca9d96e",
+        "CAMP-e29fc229c0",
+        "CAMP-4b3209fe38",
+        "CAMP-e01b43c9f4",
+        "CAMP-51cf2516ce",
+        "CAMP-c211f9e5fa",
+        "CAMP-4bf571ad75",
+        "CAMP-58daa10765",
+        "CAMP-ed977ea91d",
+        "CAMP-4d0830aebe"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-web-dhs-iter1-2026",
+      "research_question": "Does removing the sparse rep_count leg from the DHS behavioral composite produce a deployable long-only 20d premium?",
+      "mechanism_tags": [
+        "multi-factor",
+        "behavioral",
+        "repurchase",
+        "earnings-improvement",
+        "cost-impact-gate"
+      ],
+      "campaign_ids": [
+        "CAMP-b8eca9d96e"
+      ],
+      "pre_registered": true
+    },
+    {
+      "family_id": "fam-adaptive-iter-2026",
+      "research_question": "Adaptive iteration from the closest prior multi-factor candidate: does a result-driven component sequence clear the long-only 20d Gate?",
+      "mechanism_tags": [
+        "multi-factor",
+        "adaptive-iteration",
+        "ownership",
+        "quality",
+        "cost-impact-gate"
+      ],
+      "campaign_ids": [
+        "CAMP-555b5a06fe",
+        "CAMP-57b52ee3ef",
+        "CAMP-7ff809cdfe",
+        "CAMP-a132de0581",
+        "CAMP-a132de0581",
+        "CAMP-7e22bfbd99",
+        "CAMP-8ec0a13532",
+        "CAMP-ded554316b",
+        "CAMP-25de576174",
+        "CAMP-dd96b49887",
+        "CAMP-80ef11654d"
+      ],
+      "pre_registered": true
+    }
+  ],
+  "legacy_family_id": "legacy-unassigned",
+  "policy_version": "2026-11-13.6",
+  "require_registered_family": true
+}

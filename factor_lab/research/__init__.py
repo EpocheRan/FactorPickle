@@ -1,1 +1,0 @@
-"""Factor Lab research package."""

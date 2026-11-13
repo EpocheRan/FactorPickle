@@ -43,8 +43,14 @@ python -m acquisition backfill --phase <name>
 当前保留的数据/运维脚本：
 
 `backfill_history.py`、`export_index_minutes.py`、`import_minutes_csv.py`、
-`fetch_minute_pilot.py`、`init_database.py`、`migrate_database.py`、`migrate_factors.py`、
+`fetch_minute_pilot.py`、`init_database.py`、`migrate_database.py`、
 `repair_index_data.py`、`fix_index_series.py`、`verify_pipeline.py`。
+
+## 因子资产
+
+- Basic：源表保留，字段目录是 `basic_data_catalog`；没有 `basic_data_daily` 实体表。
+- Custom：`custom_factor_registry` / `custom_factor_value_daily` / `custom_factor_value_latest` / `custom_factor_lineage`。
+- 统一发现：`asset_catalog` view。
 
 ## 统一入口
 

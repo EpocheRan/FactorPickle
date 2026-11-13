@@ -1,207 +1,220 @@
 {
-    "questdb": {
-        "host": "localhost",
-        "port": 8812,
-        "user": "admin",
-        "password": "quest",
-        "database": "stocks",
-        "rest_port": 9000,
-        "connect_retries": 30,
-        "connect_retry_interval_seconds": 2.0
-    },
-    "tushare": {
-        "enabled": true,
-        "token": "<YOUR_TUSHARE_TOKEN>",
-        "points": 2000,
-        "requests_per_minute": 200,
-        "daily_request_limit_per_api": 100000,
-        "max_retries": 3,
-        "retry_backoff_seconds": 2.0,
-        "report_rc_daily_limit": 10,
-        "quota_state_file": "data/runtime/tushare_quota.json"
-    },
-    "market": {
-        "default_source": "questdb",
-        "realtime_source": "tencent",
-        "request_timeout_seconds": 8,
-        "incremental_source_priority": [
-            "baostock",
-            "akshare",
-            "tushare"
-        ],
-        "intraday_source_priority": [
-            "sina",
-            "baostock"
-        ],
-        "default_ohlc_frequency": "d"
-    },
-    "boards": {
-        "source": "eastmoney_slist",
-        "request_interval_seconds": 0.12,
-        "max_retries": 4,
-        "return_weight": "equal"
-    },
-    "disclosure": {
-        "source": "eastmoney",
-        "page_size": 500,
-        "max_pages": 1200,
-        "page_delay_seconds": 0.15,
-        "announcement_page_size": 100,
-        "announcement_max_pages": 5
-    },
-    "financial": {
-        "source_priority": [
-            "tushare",
-            "akshare",
-            "baostock"
-        ],
-        "statement_start_year": 2000,
-        "valuation_start_year": 2020,
-        "restatement_lookback_years": 1,
-        "estimate_enabled": true,
-        "estimate_source_priority": [
-            "tushare_report_rc",
-            "akshare_profit_forecast"
-        ],
-        "valuation_source_priority": [
-            "tushare_daily_basic",
-            "akshare_indicator"
-        ],
-        "disclosure_lag_days": {
-            "Q1": 30,
-            "H1": 62,
-            "Q3": 31,
-            "FY": 120
-        }
-    },
-    "moneyflow": {
-        "source_priority": [
-            "tushare.moneyflow"
-        ],
-        "quality_min_rows": 1000
-    },
-    "concept": {
-        "daily_source_priority": [
-            "akshare.ths_index"
-        ],
-        "member_source_priority": [
-            "akshare.em_board",
-            "ths.scrape"
-        ],
-        "member_max_boards_per_run": 20,
-        "member_drop_guard": 0.7,
-        "scrape_max_pages": 60,
-        "scrape_sleep_seconds": 0.35
-    },
-    "screener": {
-        "enabled": true,
-        "benchmark": {
-            "code": "000300",
-            "market": "IDX"
-        },
-        "daily": {
-            "beta_window": 252,
-            "beta_min_periods": 60,
-            "volatility_window": 20,
-            "volatility_60_window": 60,
-            "atr_window": 14,
-            "atr_method": "RMA",
-            "avg_volume_windows": [
-                5,
-                20,
-                60
-            ],
-            "high_low_window": 252,
-            "high_low_min_periods": 120,
-            "ma_windows": [
-                5,
-                10,
-                20,
-                60,
-                120,
-                250
-            ],
-            "formula_version": "daily-v1"
-        },
-        "baseline": {
-            "freq": "5m",
-            "lookback_days": 20,
-            "min_sample_days": 5,
-            "max_missing_bucket_ratio": 0.1,
-            "max_age_days": 7,
-            "formula_version": "baseline-v1"
-        },
-        "backfill": {
-            "max_lookback_bars": 260,
-            "max_sync_codes": 300,
-            "max_sync_days": 750,
-            "sync_budget_ms": 2000,
-            "code_chunk_size": 200,
-            "daily_chunk_years": 2,
-            "minute_chunk_days": 5,
-            "source_priority": [
-                "baostock",
-                "akshare",
-                "tushare"
-            ],
-            "intraday_source_priority": [
-                "baostock",
-                "akshare"
-            ],
-            "negative_cache_ttl_hours": 24,
-            "max_retries": 3,
-            "lock_ttl_seconds": 300,
-            "fetch_missing_reference": false,
-            "max_reference_fetch": 20,
-            "fetch_benchmark": false
-        },
-        "worker": {
-            "max_workers": 2,
-            "progress_interval": 50,
-            "start_on_bootstrap": false,
-            "queue_size": 100
-        },
-        "query": {
-            "default_limit": 100,
-            "max_limit": 1000
-        }
-    },
-    "acquisition": {
-        "daily_start_date": "2020-01-01",
-        "moneyflow_start_date": "2020-01-01",
-        "valuation_start_date": "2023-01-01",
-        "daily_batch_days": 20,
-        "valuation_batch_days": 5,
-        "financial_start_year": 2020,
-        "financial_batch_stocks": 15,
-        "include_funds": true,
-        "fund_universe_min_count": 500,
-        "min_universe_size": 1000,
-        "empty_day_retry_limit": 3
-    },
-    "server": {
-        "name": "QuantDataServer",
-        "transport": "http",
-        "host": "0.0.0.0",
-        "port": 8080
-    },
-    "logging": {
-        "level": "INFO",
-        "directory": "logs",
-        "file": "mcp_server.log",
-        "max_bytes": 10485760,
-        "backup_count": 7,
-        "console_level": "ERROR"
-    },
-    "zzshare": {
-        "enabled": true,
-        "token": "YOUR_ZZSHARE_TOKEN_HERE",
-        "requests_per_minute": {
-            "stk_mins": 60,
-            "daily": 180,
-            "default": 60
-        },
-        "timeout_seconds": 15,
-        "max_retries": 3
+  "questdb": {
+    "host": "localhost",
+    "port": 8812,
+    "user": "admin",
+    "password": "quest",
+    "database": "stocks",
+    "rest_port": 9000,
+    "connect_retries": 30,
+    "connect_retry_interval_seconds": 2.0
+  },
+  "tushare": {
+    "enabled": true,
+    "token": "<YOUR_TUSHARE_TOKEN>",
+    "points": 2000,
+    "requests_per_minute": 200,
+    "daily_request_limit_per_api": 100000,
+    "max_retries": 3,
+    "retry_backoff_seconds": 2.0,
+    "report_rc_daily_limit": 10,
+    "quota_state_file": "data/runtime/tushare_quota.json"
+  },
+  "market": {
+    "default_source": "questdb",
+    "realtime_source": "tencent",
+    "request_timeout_seconds": 8,
+    "incremental_source_priority": [
+      "baostock",
+      "akshare",
+      "tushare"
+    ],
+    "intraday_source_priority": [
+      "sina",
+      "baostock"
+    ],
+    "calendar_source_priority": [
+      "tushare",
+      "akshare"
+    ],
+    "default_ohlc_frequency": "d"
+  },
+  "boards": {
+    "source": "eastmoney_slist",
+    "request_interval_seconds": 0.12,
+    "max_retries": 4,
+    "return_weight": "equal"
+  },
+  "disclosure": {
+    "source": "eastmoney",
+    "page_size": 500,
+    "max_pages": 1200,
+    "page_delay_seconds": 0.15,
+    "announcement_page_size": 100,
+    "announcement_max_pages": 5
+  },
+  "financial": {
+    "source_priority": [
+      "tushare",
+      "akshare",
+      "baostock"
+    ],
+    "statement_start_year": 2000,
+    "valuation_start_year": 2020,
+    "restatement_lookback_years": 1,
+    "estimate_enabled": true,
+    "estimate_source_priority": [
+      "tushare_report_rc",
+      "akshare_profit_forecast"
+    ],
+    "valuation_source_priority": [
+      "tushare_daily_basic",
+      "akshare_indicator"
+    ],
+    "disclosure_lag_days": {
+      "Q1": 30,
+      "H1": 62,
+      "Q3": 31,
+      "FY": 120
     }
+  },
+  "moneyflow": {
+    "source_priority": [
+      "tushare.moneyflow"
+    ],
+    "quality_min_rows": 1000
+  },
+  "concept": {
+    "daily_source_priority": [
+      "akshare.ths_index"
+    ],
+    "member_source_priority": [
+      "akshare.em_board",
+      "ths.scrape"
+    ],
+    "member_max_boards_per_run": 20,
+    "member_drop_guard": 0.7,
+    "scrape_max_pages": 60,
+    "scrape_sleep_seconds": 0.35
+  },
+  "screener": {
+    "enabled": true,
+    "benchmark": {
+      "code": "000300",
+      "market": "IDX"
+    },
+    "daily": {
+      "beta_window": 252,
+      "beta_min_periods": 60,
+      "volatility_window": 20,
+      "volatility_60_window": 60,
+      "atr_window": 14,
+      "atr_method": "RMA",
+      "avg_volume_windows": [
+        5,
+        20,
+        60
+      ],
+      "high_low_window": 252,
+      "high_low_min_periods": 120,
+      "ma_windows": [
+        5,
+        10,
+        20,
+        60,
+        120,
+        250
+      ],
+      "formula_version": "daily-v1"
+    },
+    "baseline": {
+      "freq": "5m",
+      "lookback_days": 20,
+      "min_sample_days": 5,
+      "max_missing_bucket_ratio": 0.1,
+      "max_age_days": 7,
+      "formula_version": "baseline-v1"
+    },
+    "backfill": {
+      "max_lookback_bars": 260,
+      "max_sync_codes": 300,
+      "max_sync_days": 750,
+      "sync_budget_ms": 2000,
+      "code_chunk_size": 200,
+      "daily_chunk_years": 2,
+      "minute_chunk_days": 5,
+      "source_priority": [
+        "baostock",
+        "akshare",
+        "tushare"
+      ],
+      "intraday_source_priority": [
+        "baostock",
+        "akshare"
+      ],
+      "negative_cache_ttl_hours": 24,
+      "max_retries": 3,
+      "lock_ttl_seconds": 300,
+      "fetch_missing_reference": false,
+      "max_reference_fetch": 20,
+      "fetch_benchmark": false
+    },
+    "worker": {
+      "max_workers": 2,
+      "progress_interval": 50,
+      "start_on_bootstrap": false,
+      "queue_size": 100
+    },
+    "query": {
+      "default_limit": 100,
+      "max_limit": 1000
+    }
+  },
+  "acquisition": {
+    "daily_start_date": "2020-01-01",
+    "moneyflow_start_date": "2020-01-01",
+    "valuation_start_date": "2023-01-01",
+    "daily_batch_days": 20,
+    "valuation_batch_days": 5,
+    "financial_start_year": 2020,
+    "financial_batch_stocks": 15,
+    "include_funds": true,
+    "fund_universe_min_count": 500,
+    "min_universe_size": 1000,
+    "empty_day_retry_limit": 3
+  },
+  "server": {
+    "name": "QuantDataServer",
+    "transport": "http",
+    "host": "0.0.0.0",
+    "port": 8080
+  },
+  "logging": {
+    "level": "INFO",
+    "directory": "logs",
+    "file": "mcp_server.log",
+    "max_bytes": 10485760,
+    "backup_count": 7,
+    "console_level": "ERROR"
+  },
+  "zzshare": {
+    "enabled": true,
+    "token": "YOUR_ZZSHARE_TOKEN_HERE",
+    "requests_per_minute": {
+      "stk_mins": 60,
+      "daily": 180,
+      "default": 60
+    },
+    "timeout_seconds": 15,
+    "max_retries": 3
+  },
+  "llm": {
+    "deepseek": {
+      "api_key": "",
+      "base_url": "https://api.deepseek.com",
+      "model": "deepseek-flash",
+      "timeout_seconds": 120,
+      "max_retries": 2
+    }
+  }
 }

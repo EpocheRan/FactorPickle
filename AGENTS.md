@@ -9,34 +9,88 @@ Git history carries changes. When editing docs, rewrite the current truth
 instead of appending "changed", "removed", "old" or "legacy" narratives.
 This applies to every README in the repository.
 
-This workspace is a Factor Lab research environment. If the user asks to
-research factors:
+## Alpha engine
+
+The workspace is an Alpha research engine. If the user asks to research
+factors or run an Alpha campaign:
 
 1. Read `FACTOR_LAB.md`.
-2. Read `factor_lab/team/roles.json` and create **all 8 durable teammates** from it in parallel.
-3. Verify the full team is running/inactive (Lead + 8) before creating any research task.
-4. Run `python -m factor_lab doctor`.
-5. If green, run `python -m factor_lab campaign start --objective "研究因子"`.
+2. Read `factor_lab/alpha/ENGINEERING_CONTRACT.md`; it is binding.
+3. Run `python -m factor_lab doctor`.
+4. Bootstrap the team: `python -m factor_lab alpha team plan`; use
+   `list_agents` and spawn every missing member with `spawn_teammate` and the
+   plan prompts; then `list_agents`, `python -m factor_lab alpha team verify`,
+   and `python -m factor_lab alpha behavior --behavior-action verify`.
+5. **Campaign protocol (mandatory, alpha-campaign-v2):** every new campaign
+   must delegate model-facing work via shared tasks and `send_message`:
+   a PathFinder research question, a FactorBuilder artifact, a Web Gateway
+   cited discovery step, and an ML Planner decision (plan or explicit
+   falsifiable skip reason). Reader is used when external sources need
+   structured extraction. Record task ids and teammate outputs under
+   `output/factor_lab/alpha/campaigns/<campaign_id>/team/`. A Lead-only research
+   campaign is a protocol violation; the Lead may run deterministic services
+   only on teammate outputs (or for a mechanical re-run explicitly labeled
+   `protocol: deterministic-maintenance`).
+   Each campaign writes `team/team_manifest.json`; every campaign round records
+   `agents`, `team_tasks` and `protocol`. Run
+   `python -m factor_lab alpha campaign-audit --campaign-id <id>` and
+   `python -m factor_lab alpha campaign-preflight --campaign-id <id>`; a strict
+   audit failure is a protocol failure even when the factor evidence is
+   reproducible. Do not retro-edit historical rounds.
+   ML routing: every new campaign has an explicit ML Planner decision; PathFinder
+   must return `ml_branch`, and a false branch needs a concrete falsifiable
+   reason. Web Gateway must produce a cited discovery map even when the answer
+   is "no new external evidence" (record reuse/gaps). See
+   `campaign_protocol.external_evidence_policy` and `ml_planner_policy`.
+6. Keep research state under `output/factor_lab`.
 
-Never create the R1 task DAG before the team roster exists. A task board is
-not a team; spawning one worker and queueing blocked tasks is a bootstrap bug.
+The five model-facing roles are `PathFinder`, `Web Gateway`, `ML Planner`,
+`FactorBuilder`, and `Reader`. Runner, Research Runtime, Evaluator,
+Supervisor, Falsifier, Registrar and Allocator are deterministic services.
+The agent runtime is DeepSeek Harness; do not build a separate agent runtime.
+The canonical protocol is emitted by `alpha team plan` under
+`campaign_protocol`.
 
-Rules:
+## Agent-team change control
 
-- Do not edit production modules (`research/`, `factors/`, `data_interface/`) for a research run.
-- Runner data access must go through `data_interface`; never add direct QuestDB/SQL access to Factor Lab.
-- Do not promote factors or change policy; those require human G4.
-- Write all research state under `output/factor_lab`.
-- Generated factor code/spec/tests/manifests are runtime research data under
-  `output/factor_lab/factors/generated/`. Do not copy, mirror, or move them into
-  the repository; they are not portable design assets.
-- Portable design is limited to code, contracts, `factor_lab/team/roles.json`,
-  and `factor_lab/sources/catalog.json`. Never duplicate runtime state into Git.
-- Data axis is chosen by PathFinder from the campaign-scoped `data_capabilities`.
-  Do not write "ohlcv_1d only" / "no financial/moneyflow/margin" into a round
-  directive. Unverified services require a readiness probe, not a prohibition.
-- If the environment or data is not ready, report `blocker_feedback` and wait; do not fabricate results.
-- Web discovery: DSH subagents inherit tools by default. The `web_gateway.js` child may call `web_search` directly, or the main session may search and pass results in; then run
-  `python -m factor_lab discovery ingest --result <gateway-result.json>`. The Gateway LLM must keep URLs and citations.
-- Tool availability is a preset/composition property, not a prompt prohibition. If a child lacks tools, inspect its Agent preset plugins and service activation.
-- Budget pricing is configured at input ¥0.04 / output ¥8.00 per million tokens; record actual usage through `factor_lab.budget.record_usage`.
+Any optimization to the agent-team logic is itself a source change. If we change
+routing, delegation, roles, campaign protocol, task-board workflow, manifest
+requirements or audit rules, the same change must update the relevant source of
+truth before use:
+
+- `factor_lab/alpha/team/roles.json` for roles and campaign policy;
+- behavior `system.md` / `contract.json` / `evals.jsonl` for model-facing rules;
+- `factor_lab/alpha/campaign.py`, `protocol_audit.py` and `preflight.py` for
+  enforcement;
+- regression tests and current docs.
+
+Conversation-only protocol changes are not binding. Do not rely on chat memory
+as the source of truth.
+
+## Rules
+
+- Keep data access behind `data_interface`; Alpha loads panels through
+  `factor_lab.runtime.data_interface_adapter` and `panel_builder`.
+- Factor-evaluation algorithms live in the shared IO-free `factor_metrics`
+  core (the production report's calibrated implementations); do not add a
+  second formula implementation in a product. See
+  `docs/design/factor_evaluation_contract.md`.
+- Never add direct QuestDB/SQL access to Alpha modules.
+- Write only disposable runtime artifacts under `output/factor_lab`; never
+  write roles, prompts, behavior contracts, eval suites, policy or config there.
+- Generated factor artifacts are runtime data under
+  `output/factor_lab/factors/generated/`; do not copy them into Git.
+- Edge Cards are evidence, not promotion. Only validated/active cards may be
+  allocated; unvalidated cards never reach the account.
+- Research uses long-only net excess as primary evidence; long-short is a diagnostic, not a promotion veto. Deployment remains long-only.
+- New campaigns write `team/research_context.json` and must read its hard negatives/source hashes before proposing a question; memory policy and data provenance are enforced by `campaign-audit`. The validation ledger lives under `output/factor_lab/alpha/memory/`. DeepSeek Flash compression is optional and configured only in gitignored `config.json`.
+- Every expression that touches labels is trial-accounted. Search/dev/ML/holdout events also go to the append-only `output/factor_lab/alpha/trial_events.jsonl` sink; holdout is locked and its use log is `output/factor_lab/alpha/holdout_uses.jsonl`.
+- Before opening or resuming a campaign, run `python -m factor_lab alpha campaign-preflight --campaign-id <id>`; it verifies frozen policy, pre-registration, team provenance, artifact membership and holdout state.
+- Missing data or environment readiness is a blocker; report it and do not
+  fabricate results.
+- Web discovery must preserve URLs, retrieval times, and citations. Raw HTML
+  is not admitted into PathFinder context.
+- Do not use LLM output to override a deterministic Gate verdict.
+- Never open a research campaign as Lead-only: create the team tasks, delegate
+  the model-facing work, record teammate outputs in the campaign `team/`
+  directory, and label mechanical re-runs `protocol: deterministic-maintenance`.

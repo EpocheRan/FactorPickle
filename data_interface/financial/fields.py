@@ -242,6 +242,35 @@ VALUATION_COLUMNS = [
     "ingested_at",
 ]
 
+#: The nine valuation/cash-flow targets the derived rebuild must bring to the
+#: pre-registered ``coverage >= 0.90`` gate on the ten-year panel.
+VALUATION_TARGET_FIELDS = [
+    "ev_fcf",
+    "ev_ebit",
+    "ev_ebitda",
+    "ev_sales",
+    "ev_gross_profit",
+    "pcf_ttm",
+    "pfcf",
+    "earnings_yield",
+    "p_nwc",
+]
+
+#: Cheap companions produced by the same computation (unit normalisation,
+#: vendor-ratio preservation, EV input).
+VALUATION_COMPANION_FIELDS = [
+    "enterprise_value",
+    "dividend_yield",
+    "pe_ttm",
+    "pb_mrq",
+    "ps_ttm",
+    "total_share",
+    "market_cap",
+    "float_market_cap",
+    "market_cap_change_pct",
+]
+
+
 SYNC_STATE_COLUMNS = [
     "updated_at",
     "code",

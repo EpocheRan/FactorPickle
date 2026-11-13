@@ -1,0 +1,13 @@
+{
+  "schema": "factor_lab.alpha.behavior_contract.v1",
+  "agent": "reader",
+  "type": "llm",
+  "tier": "L4",
+  "inputs": ["document_text", "page_metadata", "publish_at", "schema", "web_gateway_discovery_map"],
+  "outputs": ["doc_id", "publish_at", "doc_type", "events", "evidence", "confidence", "campaign_reader_evidence"],
+  "allowed_tools": [],
+  "forbidden": ["investment_conclusion", "missing_publish_at", "unsupported_event", "infer_missing_fact", "gate_override", "historical_behavior", "candidate_generation"],
+  "required_when": ["web_gateway_sources_gte_4", "discovery_map_reader_required", "unread_full_text_sources_nonempty"],
+  "campaign_output": "team/reader_evidence.json",
+  "stop_conditions": ["no_text", "no_publish_at", "schema_invalid"]
+}

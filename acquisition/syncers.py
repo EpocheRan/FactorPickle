@@ -128,9 +128,55 @@ def stock_basic(scope: Scope) -> dict:
     return {"dataset": "stock_basic", "rows_written": int(written), "done": True}
 
 
+def stock_basic_history(scope: Scope) -> dict:
+    return _service().sync_stock_basic_history()
+
+
+def namechange(scope: Scope) -> dict:
+    return _service().sync_namechange(
+        start_date=scope.start, end_date=scope.end
+    )
+
+
+def new_share(scope: Scope) -> dict:
+    return _service().sync_new_share(
+        start_date=scope.start, end_date=scope.end
+    )
+
+
+def suspend_d(scope: Scope) -> dict:
+    return _service().sync_suspend_d(start_date=scope.start, end_date=scope.end)
+
+
+def stk_limit(scope: Scope) -> dict:
+    return _service().sync_stk_limit(start_date=scope.start, end_date=scope.end)
+
+
+def disclosure_date(scope: Scope) -> dict:
+    return _service().sync_disclosure_date(
+        start_date=scope.start, end_date=scope.end
+    )
+
+
+def forecast(scope: Scope) -> dict:
+    return _service().sync_forecast(start_date=scope.start, end_date=scope.end)
+
+
+def express(scope: Scope) -> dict:
+    return _service().sync_express(start_date=scope.start, end_date=scope.end)
+
+
 REAL_SYNCERS = {
     "trading_calendar": trading_calendar,
     "stock_basic": stock_basic,
+    "stock_basic_history": stock_basic_history,
+    "namechange": namechange,
+    "new_share": new_share,
+    "suspend_d": suspend_d,
+    "stk_limit": stk_limit,
+    "disclosure_date": disclosure_date,
+    "forecast": forecast,
+    "express": express,
     "ohlcv_1d": daily,
     "benchmark": benchmark,
     "financial": financial,

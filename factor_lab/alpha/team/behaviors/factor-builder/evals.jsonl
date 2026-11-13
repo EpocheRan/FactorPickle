@@ -1,0 +1,3 @@
+{"id": "FB-001", "input": "Mechanism: accrual quality.", "must": ["family", "factor_id", "expression", "data_contract"], "forbid": ["future_function"]}
+{"id": "FB-002", "input": "Unknown field fin_magic is requested.", "must": ["data_contract"], "forbid": ["unknown_field"]}
+{"id": "FB-003", "input": "Candidate looks promising.", "must": ["family", "factor_id"], "forbid": ["capital_allocation"]}

@@ -1,0 +1,222 @@
+{
+  "schema": "factor_lab.alpha.team.v1",
+  "team_id": "alpha-core",
+  "lead": "lead",
+  "roles": [
+    {
+      "name": "pathfinder",
+      "display_name": "PathFinder",
+      "type": "llm",
+      "required": true,
+      "tier": "L0",
+      "behavior": "behaviors/pathfinder"
+    },
+    {
+      "name": "web-gateway",
+      "display_name": "Web Gateway",
+      "type": "llm",
+      "required": true,
+      "tier": "L2",
+      "behavior": "behaviors/web-gateway"
+    },
+    {
+      "name": "ml-planner",
+      "display_name": "ML Planner",
+      "type": "llm",
+      "required": true,
+      "tier": "L3",
+      "behavior": "behaviors/ml-planner"
+    },
+    {
+      "name": "factor-builder",
+      "display_name": "FactorBuilder",
+      "type": "llm",
+      "required": true,
+      "tier": "L0",
+      "behavior": "behaviors/factor-builder"
+    },
+    {
+      "name": "reader",
+      "display_name": "Reader",
+      "type": "llm",
+      "required": true,
+      "tier": "L4",
+      "behavior": "behaviors/reader"
+    }
+  ],
+  "deterministic_services": [
+    "Runner",
+    "Research Runtime",
+    "Evaluator",
+    "Supervisor",
+    "Falsifier",
+    "Registrar",
+    "Allocator",
+    "ML Runtime"
+  ],
+  "verification": {
+    "dsh_lead_tool": "list_agents",
+    "spawn_tool": "spawn_teammate",
+    "message_tool": "send_message",
+    "required_team_size": 5,
+    "rule": "verify all five durable teammates are running or inactive before creating research tasks; every new campaign or research round must delegate model-facing work to the five teammates"
+  },
+  "campaign_protocol": {
+    "schema": "factor_lab.alpha.campaign_protocol.v1",
+    "rule": "Every new campaign or research round MUST delegate model-facing work to the five DSH teammates; a Lead-only campaign is a protocol violation.",
+    "minimum_per_campaign": [
+      "pathfinder",
+      "factor-builder"
+    ],
+    "required_external_per_campaign": [
+      "web-gateway"
+    ],
+    "required_ml_decision_per_campaign": [
+      "ml-planner"
+    ],
+    "recommended_per_campaign": [
+      "reader"
+    ],
+    "reader_policy": {
+      "default": "Reader is required when the Web Gateway discovery map has at least 4 cited sources, when the map explicitly requires Reader, or when it records unread/paywalled full-text sources; otherwise Reader is recommended.",
+      "required_when": {
+        "web_gateway_sources_gte": 4,
+        "discovery_map_reader_required": true,
+        "unread_full_text_sources_nonempty": true
+      },
+      "output": "team/reader_evidence.json",
+      "evidence_schema": "factor_lab.alpha.reader_evidence.v1",
+      "effective_from": "2026-11-13T11:20:00+08:00",
+      "historical_missing": "warning",
+      "boundary": "Reader extracts structured evidence only; it never generates, ranks or promotes a candidate."
+    },
+    "delegation": [
+      "list_agents and spawn_teammate any missing member from the plan prompts",
+      "create one shared task per delegated role on the task board",
+      "send_message with a self-contained task (role boundaries, inputs, output contract)",
+      "wait for teammate outputs; deterministic services stay with the Lead",
+      "record task ids and teammate outputs under the campaign team directory"
+    ],
+    "record_path": "output/factor_lab/alpha/campaigns/<campaign_id>/team/",
+    "lead_boundary": "The Lead may execute cycle/search/eval/campaign recording only on teammate outputs, or for explicitly labeled mechanical re-runs; the Lead must not generate or interpret candidates alone.",
+    "deterministic_maintenance_label": "protocol: deterministic-maintenance",
+    "violation": "A campaign without teammate evidence is invalid as research and must not be presented as a research result.",
+    "external_evidence_policy": {
+      "default": "Every new alpha-campaign-v2 campaign must have a Web Gateway cited discovery step before PathFinder; if no new evidence exists, record explicit reuse/no-new-evidence rather than silently skipping",
+      "output": "output/factor_lab/discovery/discovery_map_<campaign_id>.json or team/web_gateway_map.json",
+      "boundary": "External evidence may motivate hypotheses but never overrides deterministic Gate/FDR; raw HTML is not forwarded"
+    },
+    "ml_planner_policy": {
+      "default": "Every new alpha-campaign-v2 campaign must have an ML Planner decision: a pre-registered plan or an explicit falsifiable skip reason; ML experiments need not run every campaign, but silent omission is a protocol violation",
+      "signal": "PathFinder must set ml_branch.request_ml_planner with an explicit reason; false is allowed only with a concrete falsifiable reason",
+      "boundary": "ML remains research evidence; it cannot override the deterministic Gate or unlock holdout"
+    },
+    "change_control": {
+      "rule": "Any agent-team logic optimization must be codified in roles/behaviors/enforcement/tests/docs in the same change; conversation-only changes are not binding.",
+      "required": [
+        "roles.json",
+        "behaviors/*/system.md",
+        "behaviors/*/contract.json",
+        "behaviors/*/evals.jsonl",
+        "campaign.py",
+        "protocol_audit.py",
+        "preflight.py",
+        "tests",
+        "current docs",
+        "factor_lab/alpha/research_memory.py",
+        "factor_lab/alpha/llm_compressor.py",
+        "docs/design/research_memory.md"
+      ],
+      "verification": [
+        "python -m factor_lab alpha team verify",
+        "python -m factor_lab alpha behavior --behavior-action verify",
+        "python -m pytest -q"
+      ]
+    },
+    "pathfinder_policy": {
+      "default": "prefer_fixed_multi_factor_composite_when_single_factor_search_is_saturated_or_components_are_economically_complementary",
+      "component_range": [
+        5,
+        8
+      ],
+      "combination_rule": "equal_weight_rank_composite",
+      "single_factor_allowed_when": [
+        "new_mechanism_or_data_axis",
+        "clean_event_study",
+        "composite_would_only_dilute"
+      ],
+      "guardrails": [
+        "components_fixed_before_evaluation",
+        "no_fitted_component_weights",
+        "no_post_hoc_component_selection",
+        "no_combination_scan",
+        "one_hypothesis_at_most_two_candidates",
+        "no_unmotivated_factor_dump",
+        "no_more_than_eight_components"
+      ]
+    },
+    "full_team_delegation": {
+      "required": true,
+      "default_enabled": true,
+      "model_facing_roles_per_campaign": [
+        "web-gateway",
+        "pathfinder",
+        "ml-planner",
+        "factor-builder"
+      ],
+      "reader_required_when_reader_policy_requires": true,
+      "fresh_tasks_only": true,
+      "forbid_reused_task_ids_across_campaigns": true,
+      "campaign_scoped_outputs_only": true,
+      "pathfinder_rejudgment_per_campaign": true,
+      "forbid_batch_preregistration": true,
+      "max_candidates_per_campaign": 2,
+      "definition": "Every campaign must have its own completed model-facing task ids and campaign-scoped outputs. A task id reused from another campaign, a shared PathFinder/FactorBuilder output, or a pre-registration that pre-registers multiple independent campaigns is a protocol violation.",
+      "enforcement": "protocol_audit is binding; new campaigns default full_team_protocol=true and must pass audit before preflight opens or resumes them.",
+      "effective_from": "2026-11-13T17:30:00+08:00"
+    },
+    "task_board_policy": {
+      "purpose": "ephemeral coordination only; the task board is not research evidence and is not a provenance store",
+      "cleanup": "after the campaign outputs are recorded under the campaign team directory and campaign-audit passes, delete that campaign's completed task ids; keep only pending/in_progress tasks",
+      "invariant": "deleting task-board entries must never delete campaign team manifests, frozen pre-registrations, factor artifacts or result files; those remain the durable record",
+      "limit": "the task board is a hard-capped coordination surface; stale completed tasks must not be retained"
+    },
+    "research_evidence_policy": {
+      "primary": "long_only",
+      "long_short_role": "diagnostic",
+      "primary_benchmark": "ew_eligible_pool",
+      "long_only_gate_required": true,
+      "coverage_required": true,
+      "program_fdr_required": true,
+      "independent_validation_required": true,
+      "ls_is_veto": false,
+      "note": "Gate pass is not promotion; long-short evidence is diagnostic and cannot veto a long-only candidate by itself."
+    },
+    "research_memory_policy": {
+      "required": true,
+      "required_from": "2026-11-13T22:40:00+08:00",
+      "require_context": true,
+      "require_parent_campaign_ids_field": true,
+      "require_data_provenance": true,
+      "output": "team/research_context.json",
+      "schema": "factor_lab.alpha.research_context.v2",
+      "compression": {
+        "offline_fallback": "deterministic",
+        "llm_adapter": "factor_lab.alpha.llm_compressor.DeepSeekCompressor",
+        "model": "deepseek-flash"
+      },
+      "legacy": "campaigns created before required_from are grandfathered; they are not treated as memory-valid",
+      "boundary": "The context must carry source hashes and every failed/unverified validation; an LLM may compress narrative but cannot change facts."
+    }
+  },
+  "steps": [
+    "run `python -m factor_lab doctor`",
+    "use `list_agents` to inspect current DSH teammates",
+    "spawn every missing member with `spawn_teammate` and the prompt below",
+    "use `list_agents` again and verify all members are running or inactive",
+    "run `python -m factor_lab alpha team verify` as the static roster check",
+    "before every campaign/round, create shared tasks for the five teammates and delegate model-facing work",
+    "record task ids and teammate outputs under output/factor_lab/alpha/campaigns/<campaign_id>/team/",
+    "start research with `python -m factor_lab alpha campaign ...` or an L0 cycle on teammate outputs"
+  ]
+}

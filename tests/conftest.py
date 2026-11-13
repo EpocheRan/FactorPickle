@@ -99,3 +99,16 @@ def position_interface(sqlite_manager):
     interface.manager = sqlite_manager
     return interface
 
+
+
+@pytest.fixture(autouse=True)
+def _isolate_global_trial_sink(tmp_path_factory, monkeypatch):
+    """Keep tests from appending to the production trial/event sinks."""
+    root = tmp_path_factory.mktemp("global_trials")
+    import factor_lab.alpha.trials as trials
+    import factor_lab.alpha.trial_sink as sink
+
+    monkeypatch.setenv("FACTOR_LAB_TRIALS_DIR", str(root))
+    monkeypatch.setattr(trials, "alpha_dir", lambda: root)
+    monkeypatch.setattr(trials, "trials_path", lambda: root / "trials.jsonl")
+    monkeypatch.setattr(sink, "trial_sink_path", lambda: root / "trial_events.jsonl")

@@ -34,14 +34,14 @@ FactorPickle 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有�
                  ┌──────────────────────────────────────────────┐
                  │  QuestDB：ohlcv_1d / ohlcv_5m / fin_* / ...  │
                  │  margin_detail / top_list / block_trade / ...│
-                 │  concept_* / factor_value_* / index_weight   │
+                 │  concept_* / custom_factor_value_* / index_weight   │
                  └───────────────────┬──────────────────────────┘
                                      │ 读取
                                      ▼
                  ┌──────────────────────────────────────────────┐
                  │        data_interface（数据访问层）           │
                  │ market / financial / moneyflow / sentiment /  │
-                 │ concept / disclosure / api（工具封装）        │
+                 │ basic / concept / disclosure / api（工具封装）│
                  └───────────────────┬──────────────────────────┘
                                      │
               ┌──────────────────────┼───────────────────────┐
@@ -65,7 +65,7 @@ FactorPickle 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有�
 | # | 模块 | 一句话职责 | 文档 |
 |---|---|---|---|
 | 01 | `acquisition` | 数据采集编排：按数据集增量同步、断点续跑、构建调度 | [01-acquisition.md](modules/01-acquisition.md) |
-| 02 | `data_interface` | 统一数据访问：行情/财务/资金流/情绪/板块/披露 + 工具封装 | [02-data-interface.md](modules/02-data-interface.md) |
+| 02 | `data_interface` | 统一数据访问：行情/财务/资金流/情绪/基础资料/板块/披露 + 工具封装 | [02-data-interface.md](modules/02-data-interface.md) |
 | 03 | `factors` | 纯计算层：因子定义（DAG）、算子、横截面变换、面板构建 | [03-factors.md](modules/03-factors.md) |
 | 04 | `factor_engine` | 因子物化层：注册表、批量计算、长表落库、审计 | [04-factor-engine.md](modules/04-factor-engine.md) |
 | 05 | `research` | 因子报告：profile 章节、IC/分层/评级、敏感性、Panel 缓存、pandas/Polars metrics | [05-research.md](modules/05-research.md) |
@@ -75,7 +75,7 @@ FactorPickle 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有�
 | 09 | `position` | 持仓管理：组合/持仓/交易记录、成本与风控模式 | [09-position.md](modules/09-position.md) |
 | 10 | `scripts` | 运维脚本：数据回补、建表/迁移、修复与验收 | [10-scripts.md](modules/10-scripts.md) |
 | 11 | `MCPserver` | MCP 工具服务器：注册各模块工具、传输与生命周期 | [11-mcp-server.md](modules/11-mcp-server.md) |
-| — | `factor_lab` | 自主因子研究运行时：PathFinder / FactorBuilder / Runner / ML / Supervisor | [factor_lab.md](design/factor_lab.md) |
+| — | `factor_lab` | 自主因子研究运行时：PathFinder / FactorBuilder / Runner / ML / Supervisor / Research Memory | [factor_lab.md](design/factor_lab.md) |
 
 ### 当前因子报告口径
 
@@ -89,6 +89,7 @@ FactorPickle 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有�
 - profile 只描述报告章节：`default` 五章，`quick` 三章；
 - `eval_profile` 以 name 唯一；
 - Panel 缓存：`output/cache/research_panel/`，`--no-cache` 强制重建；
+- Factor Lab research memory：`team/research_context.json` + `output/factor_lab/alpha/memory/validation_results.jsonl`；新 campaign 受 memory audit 约束；
 - 空间维度含 `ALL / EX_BSE / INVESTABLE / HIGH_LIQ` 样本敏感性；
 - 时间维度含分月份 IC；
 - metrics 后端：`REPORT_METRICS_BACKEND=auto|pandas|polars`；Rank IC 固定 pandas，
@@ -112,6 +113,7 @@ FactorPickle 是 A 股量化研究平台，**QuestDB 是唯一存储**，所有�
 | [design/fin_daily_materialization.md](design/fin_daily_materialization.md) | 财务因子日频化与面板完整性 |
 | [design/lowfreq_precompute.md](design/lowfreq_precompute.md) | 低频因子预计算与写入 |
 | [design/ai_module.md](design/ai_module.md) | AI/ML 因子模型接入研究体系 |
+| [design/research_memory.md](design/research_memory.md) | 研究记忆：validation ledger、context v2、hard negatives、data provenance、DeepSeek 压缩 |
 
 ### 4.2 指南
 
@@ -174,7 +176,7 @@ MCPserver        -> 全部（注册工具）
 | WAL | 写入后立即读可能读不到，需要重试（`concept/repository.py` 有现成实现） |
 | 去重 | 所有长表用 `DEDUP UPSERT KEYS`；QuestDB 不支持 `DELETE` |
 | 行情 schema | `market` 存交易所（`SSE/SZSE/BSE`），`type` 存品种（`stock/etf/lof/fund/idx`）；OHLC 的 DEDUP 含 `type` |
-| 大表 | `factor_value_daily` 已千万行级，查询必须带 `ts` 范围或 `factor_id` |
+| 大表 | `custom_factor_value_daily` 按需累积 custom 值；查询必须带 `ts` 范围或 `factor_id` |
 | 内存 | 批量写入要分批（`service.build` 每 5 万行冲刷），32G 机器同时只跑一个重任务 |
 | 命名 | 因子 ID 统一 `category.semantic[_window]`，小写；见 `factors/naming.py` |
 

@@ -1,0 +1,11 @@
+{
+  "schema": "factor_lab.alpha.behavior_contract.v1",
+  "agent": "web-gateway",
+  "type": "llm",
+  "tier": "L2",
+  "inputs": ["discovery_brief", "search_results"],
+  "outputs": ["research_question", "leads", "gaps", "sources", "retrieved_at"],
+  "allowed_tools": ["search", "read", "citation_chase"],
+  "forbidden": ["factor_judgment", "raw_html_to_pathfinder", "gate_override", "unsourced_claim", "historical_behavior"],
+  "stop_conditions": ["no_new_leads", "budget_exhausted", "round_cap"]
+}

@@ -1,14 +1,27 @@
-"""backfill 阶段实现（P1：index_weight / valuation）。
+"""backfill 阶段实现。
 
-每个阶段只做三件事：取数（api）、写入（write）、报进度。
-不写 SQL（用 backfill.sql）、不管切片（write 负责）、不管 NaN（write 负责）。
+每个阶段只做三件事：取数（api / data_interface 服务）、写入（write / 服务仓储）、
+报进度。不写 SQL（用 backfill.sql）、不管切片（write 负责）、不管 NaN（write 负责）。
+
+P0 基础资料阶段（``p0`` 及 8 个单数据集阶段）直接复用
+``acquisition.datasets.AShareSyncService`` 的 sync_* 方法：游标、pending 重试
+与任务状态都在那里，回补与增量走同一条代码路径。
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+from pathlib import Path
 
 import pandas as pd
+
+from data_interface.basic.models import P0_DATASETS
+from data_interface.financial.fields import (
+    VALUATION_COMPANION_FIELDS,
+    VALUATION_TARGET_FIELDS,
+)
 
 from . import PhaseResult, Scope, gap_report, max_ts, phase, sql, trading_days, write
 
@@ -64,7 +77,12 @@ def index_weight(api, scope: Scope) -> PhaseResult:
 
 @phase("valuation", tables=("fin_valuation_daily",))
 def valuation(api, scope: Scope) -> PhaseResult:
-    """按交易日补估值日表（sync_valuation 只向前增量，不能回补）。"""
+    """按交易日补估值日表（sync_valuation 只向前增量，不能回补）。
+
+    写入前把 Tushare 的原始单位换成 canonical 单位（万股 -> 股、万元 -> 元、
+    百分数 -> 小数），与 ``normalize_daily_basic`` 保持一致；否则该阶段再次
+    运行时会把 2017-2022 的 10,000x / 100x 单位缺陷重新写回表里。
+    """
     if scope.dry_run:
         return PhaseResult(
             phase="valuation", rows=0,
@@ -87,8 +105,10 @@ def valuation(api, scope: Scope) -> PhaseResult:
             continue
         ts_val = pd.Timestamp(day).to_pydatetime()
         rows = [
-            (ts_val, str(r.ts_code)[:6], r.close, r.total_share, r.total_mv, r.circ_mv,
-             r.pe_ttm, r.pb, r.ps_ttm, r.dv_ttm,
+            (ts_val, str(r.ts_code)[:6], r.close,
+             _canonical(r.total_share, 10_000.0), _canonical(r.total_mv, 10_000.0),
+             _canonical(r.circ_mv, 10_000.0),
+             r.pe_ttm, r.pb, r.ps_ttm, _canonical(r.dv_ttm, 0.01),
              "tushare.daily_basic", "backfill.v1", now)
             for r in frame.itertuples(index=False)
         ]
@@ -96,6 +116,137 @@ def valuation(api, scope: Scope) -> PhaseResult:
         if index % 50 == 0 or index == len(days):
             logger.info("  [%s/%s] %s 累计 %s 行", index, len(days), day, f"{total:,}")
     return PhaseResult(phase="valuation", rows=total)
+
+
+def _canonical(value, scale: float):
+    """Tushare 原始值 -> canonical 单位；缺失返回 None（不让 NaN 进 SQL）。"""
+    number = pd.to_numeric(value, errors="coerce")
+    if pd.isna(number):
+        return None
+    return float(number) * scale
+
+
+VALUATION_DERIVED_FIELDS = list(VALUATION_TARGET_FIELDS) + list(VALUATION_COMPANION_FIELDS)
+#: 逐月续跑状态（只记录已完成月份，不写任何业务数据）。
+VALUATION_DERIVED_STATE = "output/factor_lab/backfill/valuation_derived_progress.json"
+#: 最近一次重算的完整报告（逐月行数 + 前后覆盖）。
+VALUATION_DERIVED_REPORT = "output/factor_lab/backfill/valuation_derived_report.json"
+
+
+@phase("valuation_derived", tables=("fin_valuation_daily",))
+def valuation_derived(api, scope: Scope) -> PhaseResult:  # noqa: ARG001 - 纯本地重算
+    """原地重算 ``fin_valuation_daily`` 的全部派生列（零 Tushare 请求）。
+
+    公式与 ``FinancialMetricsCalculator`` 完全一致，只额外修复 2017-2022 行的
+    ×10,000 / ÷100 单位缺陷。写入只做 ``INSERT``，靠 ``(ts, code, source)``
+    DEDUP 覆盖同键行，行数不变；按自然月切片、按月记录进度，可随时续跑。
+    """
+    from data_interface.financial.service import FinancialDataService
+
+    months = _month_chunks(scope.start, scope.end)
+    state_path = Path(VALUATION_DERIVED_STATE)
+    state = {} if scope.fresh else _load_valuation_state(state_path, scope)
+    completed = set(state.get("months") or [])
+    if scope.fresh and state_path.exists():
+        logger.info("valuation_derived --fresh：忽略并重置 %s", state_path)
+        completed = set()
+        _save_valuation_state(state_path, scope, completed, {})
+    todo = [start for start, _ in months if start[:7] not in completed]
+    logger.info(
+        "valuation_derived %s 个月（%s ~ %s），已完成 %s，本次处理 %s%s",
+        len(months), scope.start, scope.end, len(completed), len(todo),
+        "（dry-run）" if scope.dry_run else "",
+    )
+    if scope.dry_run:
+        service = FinancialDataService()
+        # 覆盖报告用同一个仓储实例（不再新开一个连接），只读一条聚合 SQL。
+        coverage = {
+            "table": "fin_valuation_daily(derived)",
+            **service.repository.valuation_field_coverage(
+                scope.start, scope.end, VALUATION_DERIVED_FIELDS
+            ),
+        }
+        # dry-run 仍然完整跑一遍计算，只是不写库：报告是预测，不是实际写入。
+        result = service.rebuild_valuation_derived(
+            scope.start, scope.end, codes=list(scope.codes) or None,
+            chunk=scope.chunk, dry_run=True, skip_months=completed,
+        )
+        return PhaseResult(
+            phase="valuation_derived", rows=0,
+            gaps=[gap_report("fin_valuation_daily", scope.start, scope.end), coverage],
+            details=result,
+        )
+
+    service = FinancialDataService()
+
+    def _record(detail: dict) -> None:
+        completed.add(detail["month"])
+        _save_valuation_state(state_path, scope, completed, detail)
+
+    result = service.rebuild_valuation_derived(
+        scope.start, scope.end, codes=list(scope.codes) or None,
+        chunk=scope.chunk, dry_run=False, skip_months=completed,
+        on_month=_record,
+    )
+    report_path = Path(VALUATION_DERIVED_REPORT)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+    )
+    totals = result["totals"]
+    logger.info(
+        "valuation_derived 完成：读 %s 行，写 %s 行，%s 秒",
+        f"{totals['rows_read']:,}", f"{totals['rows_written']:,}", result["seconds"],
+    )
+    for field, stat in result["measured"]["fields"].items():
+        logger.info("  %-22s 覆盖 %6.2f%%（%s 行非空）",
+                    field, stat["coverage"] * 100, f"{stat['nonnull']:,}")
+    return PhaseResult(
+        phase="valuation_derived",
+        rows=int(totals["rows_written"]),
+        details=result,
+        gaps=[gap_report("fin_valuation_daily", scope.start, scope.end)],
+    )
+
+
+def _load_valuation_state(path: Path, scope: Scope) -> dict:
+    """读取续跑状态；区间/代码集不同则视为全新运行。"""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    if (
+        payload.get("start") != scope.start
+        or payload.get("end") != scope.end
+        or tuple(payload.get("codes") or ()) != tuple(scope.codes)
+    ):
+        logger.info("valuation_derived 状态与本次区间不同，忽略 %s", path)
+        return {}
+    return payload
+
+
+def _save_valuation_state(path: Path, scope: Scope, completed: set[str], detail: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema": "factor_lab.valuation_derived_state.v1",
+        "start": scope.start,
+        "end": scope.end,
+        "codes": list(scope.codes),
+        "months": sorted(completed),
+        "updated_at": pd.Timestamp.now().isoformat(timespec="seconds"),
+        "last": {
+            "month": detail.get("month"),
+            "rows_read": detail.get("rows_read"),
+            "rows_written": detail.get("rows_written"),
+            "seconds": detail.get("seconds"),
+        },
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
 
 
 def _half_year_chunks(start: str, end: str) -> list[tuple[str, str]]:
@@ -532,3 +683,128 @@ def boards(api, scope: Scope) -> PhaseResult:
     if result["errors"]:
         logger.warning("失败样例: %s", result["errors"][:5])
     return PhaseResult(phase="boards", rows=total)
+
+
+# ---------------------------------------------------------------- P0 基础资料
+def _p0_sync(dataset: str, scope: Scope) -> dict:
+    """调用 acquisition 的 sync_* 方法处理一批（游标与 pending 由它落库）。"""
+    from data_interface.api.runtime import get_sync_service
+
+    service = get_sync_service()
+    method = getattr(service, f"sync_{dataset}")
+    return method(start_date=scope.start, end_date=scope.end)
+
+
+def _p0_phase_run(dataset: str, scope: Scope) -> PhaseResult:
+    if scope.dry_run:
+        return PhaseResult(
+            phase=dataset,
+            rows=0,
+            gaps=[gap_report(dataset, scope.start, scope.end)],
+        )
+    result = _p0_sync(dataset, scope)
+    rows = int(result.get("rows_written") or 0)
+    logger.info(
+        "%s: 写入 %s 行，done=%s%s",
+        dataset,
+        f"{rows:,}",
+        result.get("done"),
+        "（权限不足 BLOCKED）" if result.get("blocked") else "",
+    )
+    return PhaseResult(
+        phase=dataset,
+        rows=rows,
+        done=bool(result.get("done", True)),
+        blocked=(dataset,) if result.get("blocked") else (),
+    )
+
+
+@phase("stock_basic_history", tables=("stock_basic_history",))
+def stock_basic_history(api, scope: Scope) -> PhaseResult:  # noqa: ARG001
+    """全市场 L/P/D 名单快照（每次运行一份，DEDUP 覆盖同一天）。"""
+    return _p0_phase_run("stock_basic_history", scope)
+
+
+@phase("namechange", tables=("namechange",))
+def namechange(api, scope: Scope) -> PhaseResult:  # noqa: ARG001
+    """历史名称/ST 区间，按公告日分年回补。"""
+    return _p0_phase_run("namechange", scope)
+
+
+@phase("new_share", tables=("new_share",))
+def new_share(api, scope: Scope) -> PhaseResult:  # noqa: ARG001
+    """新股发行/上市，按上市日分年回补。"""
+    return _p0_phase_run("new_share", scope)
+
+
+@phase("suspend_d", tables=("suspend_d",))
+def suspend_d(api, scope: Scope) -> PhaseResult:  # noqa: ARG001
+    """停复牌明细，按交易日回补。"""
+    return _p0_phase_run("suspend_d", scope)
+
+
+@phase("stk_limit", tables=("stk_limit",))
+def stk_limit(api, scope: Scope) -> PhaseResult:  # noqa: ARG001
+    """每日涨跌停价格，按交易日回补。"""
+    return _p0_phase_run("stk_limit", scope)
+
+
+@phase("disclosure_date", tables=("disclosure_date",))
+def disclosure_date(api, scope: Scope) -> PhaseResult:  # noqa: ARG001
+    """财报披露计划，按报告期回补。"""
+    return _p0_phase_run("disclosure_date", scope)
+
+
+@phase("forecast", tables=("forecast",))
+def forecast(api, scope: Scope) -> PhaseResult:  # noqa: ARG001
+    """业绩预告，按自然日回补（公告可能落在周末）。"""
+    return _p0_phase_run("forecast", scope)
+
+
+@phase("express", tables=("express",))
+def express(api, scope: Scope) -> PhaseResult:  # noqa: ARG001
+    """业绩快报，按报告期回补（单次 2000 行，自动翻页）。"""
+    return _p0_phase_run("express", scope)
+
+
+@phase("p0", tables=tuple(P0_DATASETS))
+def p0(api, scope: Scope) -> PhaseResult:  # noqa: ARG001
+    """P0 基础资料整体回补：按 ``P0_DATASETS`` 顺序各推进一批。"""
+    datasets = tuple(scope.datasets) or P0_DATASETS
+    unknown = [name for name in datasets if name not in P0_DATASETS]
+    if unknown:
+        raise KeyError(f"未知 P0 数据集: {unknown}；可用: {list(P0_DATASETS)}")
+    if scope.dry_run:
+        return PhaseResult(
+            phase="p0",
+            rows=0,
+            gaps=[
+                gap_report(dataset, scope.start, scope.end) for dataset in datasets
+            ],
+        )
+    total = 0
+    done = True
+    blocked: list[str] = []
+    errors: list[str] = []
+    for dataset in datasets:
+        try:
+            result = _p0_sync(dataset, scope)
+        except Exception as exc:  # noqa: BLE001 - 单个数据集失败不阻断其它
+            logger.warning("%s 回补失败: %s", dataset, exc)
+            errors.append(f"{dataset}: {exc}")
+            done = False
+            continue
+        total += int(result.get("rows_written") or 0)
+        done = done and bool(result.get("done", True))
+        if result.get("blocked"):
+            blocked.append(dataset)
+        logger.info(
+            "%s: 写入 %s 行，done=%s%s",
+            dataset,
+            f"{int(result.get('rows_written') or 0):,}",
+            result.get("done"),
+            "（权限不足 BLOCKED）" if result.get("blocked") else "",
+        )
+    if errors:
+        logger.warning("p0 本轮错误 %s 个: %s", len(errors), errors[:5])
+    return PhaseResult(phase="p0", rows=total, done=done, blocked=tuple(blocked))

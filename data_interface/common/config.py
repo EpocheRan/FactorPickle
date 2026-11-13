@@ -86,12 +86,14 @@ def get_config() -> dict[str, Any]:
 def resolve_questdb_host(config: dict[str, Any] | None = None) -> str:
     """解析 QuestDB 主机名。
 
-    Docker 内使用 ``questdb``；宿主机执行脚本时自动回退到 ``localhost``。
+    Docker 内使用 ``questdb``；宿主机执行脚本时自动回退到 ``127.0.0.1``
+    （不用 ``localhost``：宿主机上 ``localhost`` 可能被 HTTP 代理接管，
+    导致 ``/exec`` 返回 503，而 PG 连接不受影响）。
     """
     cfg = config or get_config()
     host = str(cfg["questdb"]["host"])
     if host == "questdb" and not _running_in_docker():
-        return "localhost"
+        return "127.0.0.1"
     return host
 
 

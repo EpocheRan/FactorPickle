@@ -2,7 +2,7 @@
 
 数据来源：``fin_valuation_daily``（财务服务按 PIT 口径写入的每日估值）。
 这些指标在旧设计里是 screener 的筛选列；现在单独归入 ``Category.VALUATION``，
-与价格/技术/成长/质量因子分离，仍写入 ``factor_value_daily`` 长表。
+与价格/技术/成长/质量因子分离，仍写入 ``custom_factor_value_daily`` 长表。
 """
 
 from __future__ import annotations

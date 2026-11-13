@@ -261,6 +261,7 @@ def generate(
     run_id: str | None = None,
     verify_repro: bool = True,
     panel: Panel | None = None,
+    factor_panel: pd.DataFrame | None = None,
     neutralize: bool = False,
     horizon: int = 5,
     groups: int = 5,
@@ -283,17 +284,20 @@ def generate(
         )
     else:
         category = factor_id.split(".", 1)[0]
-        factor = (
-            financial_factor_panel(factor_id, panel.close,
-                                   str(panel.close.index.min().date()),
-                                   str(panel.data_cutoff.date()))
-            if category in ("quality", "value")
-            else (
-                flow_factor_panel(factor_id, panel)
-                if category == "sentiment"
-                else price_factor_panel(factor_id, panel)
+        if factor_panel is not None:
+            factor = factor_panel.reindex(index=panel.close.index, columns=panel.close.columns)
+        else:
+            factor = (
+                financial_factor_panel(factor_id, panel.close,
+                                       str(panel.close.index.min().date()),
+                                       str(panel.data_cutoff.date()))
+                if category in ("quality", "value")
+                else (
+                    flow_factor_panel(factor_id, panel)
+                    if category == "sentiment"
+                    else price_factor_panel(factor_id, panel)
+                )
             )
-        )
     n_symbols = len(panel.close.columns)
     min_symbols = int(groups) * 5
     if n_symbols < min_symbols:

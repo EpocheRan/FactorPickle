@@ -1,4 +1,4 @@
-"""因子表 DDL 与写入列一致性。"""
+"""Final factor-asset DDL and writer-column consistency."""
 
 from __future__ import annotations
 
@@ -7,7 +7,9 @@ import re
 from scripts.schemas.factor_schema import (
     ALIAS_COLUMNS,
     AUDIT_STATE_COLUMNS,
+    BASIC_DATA_CATALOG_COLUMNS,
     BUILD_STATE_COLUMNS,
+    LINEAGE_COLUMNS,
     REGISTRY_COLUMNS,
     VALUE_ANNOUNCE_COLUMNS,
     VALUE_DAILY_COLUMNS,
@@ -33,13 +35,15 @@ def _find(statements, table_name):
 
 def test_factor_ddl_matches_writer_columns():
     statements = create_factor_tables(None, dry_run=True)
-    assert _ddl_columns(_find(statements, "factor_registry")) == REGISTRY_COLUMNS
-    assert _ddl_columns(_find(statements, "factor_alias")) == ALIAS_COLUMNS
-    assert _ddl_columns(_find(statements, "factor_value_daily")) == VALUE_DAILY_COLUMNS
-    assert _ddl_columns(_find(statements, "factor_value_announce")) == VALUE_ANNOUNCE_COLUMNS
-    assert _ddl_columns(_find(statements, "factor_value_latest")) == VALUE_LATEST_COLUMNS
-    assert _ddl_columns(_find(statements, "factor_build_state")) == BUILD_STATE_COLUMNS
-    assert _ddl_columns(_find(statements, "factor_audit_state")) == AUDIT_STATE_COLUMNS
+    assert _ddl_columns(_find(statements, "basic_data_catalog")) == BASIC_DATA_CATALOG_COLUMNS
+    assert _ddl_columns(_find(statements, "custom_factor_registry")) == REGISTRY_COLUMNS
+    assert _ddl_columns(_find(statements, "custom_factor_alias")) == ALIAS_COLUMNS
+    assert _ddl_columns(_find(statements, "custom_factor_value_daily")) == VALUE_DAILY_COLUMNS
+    assert _ddl_columns(_find(statements, "custom_factor_value_announce")) == VALUE_ANNOUNCE_COLUMNS
+    assert _ddl_columns(_find(statements, "custom_factor_value_latest")) == VALUE_LATEST_COLUMNS
+    assert _ddl_columns(_find(statements, "custom_factor_lineage")) == LINEAGE_COLUMNS
+    assert _ddl_columns(_find(statements, "custom_factor_build_state")) == BUILD_STATE_COLUMNS
+    assert _ddl_columns(_find(statements, "custom_factor_audit_state")) == AUDIT_STATE_COLUMNS
 
 
 def test_factor_dedup_keys_include_designated_timestamp():
@@ -49,21 +53,13 @@ def test_factor_dedup_keys_include_designated_timestamp():
             continue
         designated = re.search(r"TIMESTAMP\((\w+)\)", sql).group(1)
         keys = re.search(r"DEDUP UPSERT KEYS\(([^)]+)\)", sql).group(1)
-        assert designated in keys, f"dedup key 必须包含 designated timestamp: {designated}"
+        assert designated in keys, f"dedup key must include designated timestamp: {designated}"
 
 
-def test_value_tables_are_versioned():
+def test_custom_value_tables_have_no_version_columns():
     statements = create_factor_tables(None, dry_run=True)
-    daily = next(sql for sql in statements if '"factor_value_daily"' in sql)
-    announce = next(sql for sql in statements if '"factor_value_announce"' in sql)
-    for sql in (daily, announce):
-        assert "source_version" in sql
-        assert "version" in sql
-    # 2026-11-05 起：daily 改为「同一交易日/代码/因子重算即覆盖」，
-    # version / source_version 只作审计列，不再进 DEDUP 键；
-    # 公告表仍保留按报告期的多版本键。
-    assert "DEDUP UPSERT KEYS(ts, code, factor_id)" in daily
-    assert "version, source_version" in announce
-    # 事件表必须保留报告期与公告日
-    assert "report_period" in announce
-    assert "announce_date" in announce
+    for table in ("custom_factor_value_daily", "custom_factor_value_announce", "custom_factor_value_latest"):
+        sql = _find(statements, table)
+        assert "definition_hash" not in sql
+        assert "source_version" not in sql
+        assert "version " not in sql

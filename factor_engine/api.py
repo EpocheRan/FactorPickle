@@ -49,7 +49,7 @@ def register_factor_tools(mcp) -> None:
         end_date: str,
         codes: str | list[str] | None = None,
     ) -> dict[str, Any]:
-        """查询因子长表值（factor_value_daily）。"""
+        """查询自定义因子长表值（custom_factor_value_daily）。"""
         ids = _ids(factor_ids)
         if not ids:
             return fail("factor_ids 不能为空", "InvalidArgument")
@@ -71,7 +71,7 @@ def register_factor_tools(mcp) -> None:
         factor_ids: str | list[str],
         codes: str | list[str] | None = None,
     ) -> dict[str, Any]:
-        """查询每个 code × factor 的最新值（factor_value_latest）。"""
+        """查询每个 code × factor 的最新值（custom_factor_value_latest）。"""
         ids = _ids(factor_ids)
         if not ids:
             return fail("factor_ids 不能为空", "InvalidArgument")

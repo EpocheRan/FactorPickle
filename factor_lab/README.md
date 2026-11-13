@@ -22,6 +22,7 @@ factor_lab/
   evaluation/          audit、evaluation、brief、orthogonality、stats、dry-run、supervisor、trace
   research/            campaign、cycle、discovery、web_gateway、research_context、ML、history、parity
   reporting/           dashboard 与模板
+  alpha/               Alpha DSL、编译器、基准、搜索、Red Team
   sources/             精选 discovery 来源
   team/                durable teammate 角色与 bootstrap
   templates/           dashboard HTML

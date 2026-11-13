@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 import os
 from typing import Any, Callable
 
+import numpy as np
 import pandas as pd
 
 
@@ -24,6 +25,14 @@ class DataInterfaceUnavailable(RuntimeError):
 
 class DataGap(RuntimeError):
     """A requested field/service is not exposed by data_interface."""
+
+
+#: Multi-source tie-break for ``fin_valuation_daily``.  Mirrors
+#: ``factor_engine.valuation._SOURCE_PRIORITY``; anything unknown ranks lowest.
+VALUATION_SOURCE_PRIORITY = {"tushare_daily_basic": 2, "akshare_indicator": 1}
+
+#: ``fin_valuation_daily`` column -> panel field name.
+VALUATION_FIELD_ALIASES = {"market_cap": "total_mv", "float_market_cap": "float_mv"}
 
 
 @dataclass
@@ -38,6 +47,12 @@ class DataManifest:
     rows: int = 0
     data_hash: str = ""
     error: str = ""
+    fetch_start: str = ""
+    warmup_days: int = 0
+    n_eval_dates: int = 0
+    n_cells: int = 0
+    adjust: str = ""
+    per_field_coverage: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -51,6 +66,12 @@ class DataManifest:
             "rows": self.rows,
             "data_hash": self.data_hash,
             "error": self.error,
+            "fetch_start": self.fetch_start,
+            "warmup_days": int(self.warmup_days),
+            "n_eval_dates": int(self.n_eval_dates),
+            "n_cells": int(self.n_cells),
+            "adjust": self.adjust,
+            "per_field_coverage": dict(self.per_field_coverage),
         }
 
 
@@ -201,6 +222,58 @@ class DataInterfaceGateway:
             result["error"] = f"{type(exc).__name__}: {exc}"
         return result
 
+    # ---------------------------------------------------------- research pool
+    def liquidity_pool(
+        self,
+        *,
+        start: str,
+        end: str,
+        top_n: int = 1000,
+        min_amount: float = 0.0,
+    ) -> list[str]:
+        """Ex-ante liquidity candidate pool selected only from a pre-period.
+
+        The selection query lives in the runtime gateway, not in an Alpha
+        module. Callers must pass a period before the evaluation window.
+        """
+        if int(top_n) < 2:
+            raise ValueError("top_n must be >= 2")
+        sql = (
+            'SELECT code, avg(amount) AS avg_amount, count() AS n '
+            'FROM "ohlcv_1d" '
+            "WHERE ts >= %s AND ts <= %s AND type <> 'idx' AND amount > %s "
+            "GROUP BY code ORDER BY avg_amount DESC LIMIT %s"
+        )
+        frame = self.query_frame(sql, (str(start), str(end), float(min_amount), int(top_n)))
+        if frame is None or frame.empty or "code" not in frame.columns:
+            raise DataGap("liquidity pool query returned no codes")
+        return sorted({str(value).strip().zfill(6) for value in frame["code"].tolist() if str(value).strip()})
+
+    def research_coverage(self, *, start: str = "2015-01-01", end: str = "2026-11-06") -> dict[str, Any]:
+        """Read-only table coverage summary for the data audit."""
+        specs = {
+            "ohlcv_1d": ('"ohlcv_1d"', "AND type <> 'idx'"),
+            "fin_valuation_daily": ('"fin_valuation_daily"', ""),
+            "moneyflow_daily": ('"moneyflow_daily"', ""),
+            "margin_detail": ('"margin_detail"', ""),
+            "block_trade": ('"block_trade"', ""),
+            "top_list": ('"top_list"', ""),
+            "stk_holdernumber": ('"stk_holdernumber"', ""),
+            "repurchase": ('"repurchase"', ""),
+        }
+        result: dict[str, Any] = {"schema": "factor_lab.alpha.data_coverage.v1", "start": start, "end": end, "tables": {}}
+        for name, (table, extra_where) in specs.items():
+            try:
+                frame = self.query_frame(
+                    f'SELECT min(ts) AS mn, max(ts) AS mx, count() AS n, count_distinct(code) AS codes FROM {table} '
+                    f"WHERE ts >= %s AND ts <= %s {extra_where}",
+                    (str(start), str(end)),
+                )
+                result["tables"][name] = frame.to_dict("records")[0] if len(frame) else {"error": "no rows"}
+            except Exception as exc:  # noqa: BLE001
+                result["tables"][name] = {"error": f"{type(exc).__name__}: {exc}"}
+        return result
+
     # ---------------------------------------------------------------- market
     def ohlc(
         self,
@@ -209,12 +282,14 @@ class DataInterfaceGateway:
         end: str,
         *,
         freq: str = "d",
-        adjust: str = "qfq",
+        adjust: str = "hfq",
     ) -> tuple[dict[str, pd.DataFrame], DataManifest]:
         """Read OHLC through data_interface only.
 
-        ``qfq`` matches the research loader's ``hfq_*`` convention (scale by
-        last adj_factor), so a Runner panel and legacy panel are comparable.
+        ``hfq`` is the point-in-time cumulative adjusted convention: it scales
+        historical prices by adjustment factors known up to each date, so price
+        level factors do not embed future split/dividend information.  ``qfq``
+        remains available only for explicit display/backtest comparisons.
         """
 
         try:
@@ -247,7 +322,7 @@ class DataInterfaceGateway:
         end: str,
         *,
         warmup_days: int = 800,
-        adjust: str = "qfq",
+        adjust: str = "hfq",
     ) -> DataBundle:
         fetch_start = (
             pd.Timestamp(start) - pd.Timedelta(days=int(warmup_days))
@@ -430,37 +505,252 @@ class DataInterfaceGateway:
             end=end,
         )
 
+    def event_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
+        """P1 event-axis features through data_interface.p1_events.
+
+        The raw tables are sparse; data_interface returns daily, zero-filled,
+        PIT-lagged date x code matrices.  This keeps Alpha free of SQL and of
+        event-specific aggregation logic.
+        """
+        try:
+            from data_interface.p1_events import load_p1_events
+        except Exception as exc:  # noqa: BLE001
+            raise DataGap(f"data_interface.p1_events unavailable: {type(exc).__name__}: {exc}") from exc
+        result = load_p1_events(codes, start, end, db=self._get_client())
+        frames = result.frames
+        manifest = DataManifest(
+            services=["p1_events"],
+            fields=sorted(frames),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=int(sum(result.raw_rows.values())),
+            data_hash=_frame_hash(frames),
+        )
+        return DataBundle(kind="p1_events", frames=frames, fields=sorted(frames), manifest=manifest)
+
+    def security_master(self, codes: list[str] | None = None) -> pd.DataFrame:
+        """Current security master row per code (static fields + list date).
+
+        ``is_st``/``industry`` are current-snapshot fields; ``list_date`` is
+        static.  Historical ST/name changes are not present in the table, so
+        callers must not treat ``is_st`` as a historical PIT field.
+        """
+        frame = self.query_frame(
+            "select code, name, is_st, list_date, delist_date, industry, "
+            "sw_l1, sw_l2, sw_l3, total_share, float_share "
+            "from stock_basic_info latest on ts partition by code"
+        )
+        if frame is None or frame.empty:
+            raise DataGap("stock_basic_info has no security master rows")
+        frame = frame.copy()
+        frame["code"] = frame["code"].astype(str)
+        frame = frame.set_index("code")
+        if codes:
+            frame = frame.reindex([str(code) for code in codes])
+        return frame
+
+    def index_weight_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
+        """Index membership/weight matrices, one column per index."""
+        index_codes = {
+            "000300.SH": "index_weight_000300",
+            "000905.SH": "index_weight_000905",
+            "000852.SH": "index_weight_000852",
+            "000001.SH": "index_weight_000001",
+            "000016.SH": "index_weight_000016",
+            "399006.SZ": "index_weight_399006",
+        }
+        literals = ",".join("'" + code + "'" for code in index_codes)
+        frame = self.query_frame(
+            "select ts, index_code, code, weight from index_weight "
+            f"where index_code in ({literals}) and ts <= '{end}' and ts >= '{start}'"
+        )
+        if frame is None or frame.empty:
+            raise DataGap("index_weight returned no rows")
+        if frame.index.name == "ts":
+            frame = frame.reset_index()
+        frame["ts"] = pd.to_datetime(frame["ts"], errors="coerce").dt.tz_localize(None)
+        frame["code"] = frame["code"].astype(str)
+        extras: dict[str, pd.DataFrame] = {}
+        for index_code, field in index_codes.items():
+            part = frame[frame["index_code"].astype(str) == index_code]
+            if part.empty:
+                continue
+            pivot = part.pivot_table(index="ts", columns="code", values="weight", aggfunc="last")
+            if pivot.notna().any().any():
+                extras[field] = pivot
+        if not extras:
+            raise DataGap("index_weight produced no usable matrices")
+        manifest = DataManifest(
+            services=["index_weight"],
+            fields=sorted(extras),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=int(len(frame)),
+            data_hash=_frame_hash(extras),
+        )
+        return DataBundle(kind="index_weight", frames=extras, fields=sorted(extras), manifest=manifest)
+
     def valuation_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
-        # Load every canonical valuation field the table exposes.  The bundle
-        # is a date x code matrix; its columns are factor inputs, not a fixed
-        # market-cap-only contract.
+        """Valuation profile matrices with a deterministic multi-source tie-break.
+
+        ``fin_valuation_daily`` is keyed by ``(ts, code, source)``, so 2020-2022
+        can legitimately hold two producers for one ``(ts, code)``.  A plain
+        ``pivot_table(aggfunc="last")`` has an undefined winner, so the bundle
+        de-duplicates by source priority first — the same order
+        ``factor_engine.valuation`` uses.  ``float_share`` is derived here
+        (``float_market_cap / close``) so it is available as a factor input and
+        declared in the manifest.
+        """
         try:
             from data_interface.financial.fields import VALUATION_COLUMNS
-
-            mapping = {
-                name: name
-                for name in VALUATION_COLUMNS
-                if name not in {"ts", "code", "period_end", "publish_date"}
-            }
-        except Exception:
-            mapping = {"market_cap": "total_mv", "float_market_cap": "float_mv"}
-        mapping["market_cap"] = "total_mv"
-        mapping["float_market_cap"] = "float_mv"
-        return self._extra_bundle(
-            kind="valuation",
-            table="fin_valuation_daily",
-            mapping=mapping,
-            codes=codes,
-            start=start,
-            end=end,
+        except Exception:  # noqa: BLE001 - optional at import time
+            VALUATION_COLUMNS = ["close", "market_cap", "float_market_cap"]
+        wanted = [
+            column
+            for column in VALUATION_COLUMNS
+            if column
+            not in {"ts", "code", "source", "formula_version", "ingested_at", "period_end", "publish_date"}
+        ]
+        columns = ", ".join(["ts", "code", "source"] + wanted)
+        sql = (
+            f"select {columns} from fin_valuation_daily "
+            f"where code in ({self._code_literals(codes)}) "
+            f"and ts between '{start}' and '{end}'"
         )
+        frame = self.query_frame(sql)
+        if frame.empty:
+            raise DataGap(f"fin_valuation_daily returned no rows for {len(codes)} codes")
+        if frame.index.name == "ts":
+            frame = frame.reset_index()
+        frame["ts"] = pd.to_datetime(frame["ts"], errors="coerce").dt.tz_localize(None)
+        frame["code"] = frame["code"].astype(str)
+        frame["_pri"] = (
+            frame["source"].astype(str).map(VALUATION_SOURCE_PRIORITY).fillna(0)
+        )
+        frame = frame.sort_values(["ts", "code", "_pri"], kind="mergesort")
+        frame = frame.drop_duplicates(subset=["ts", "code"], keep="last")
+        if "float_market_cap" in frame.columns and "close" in frame.columns:
+            close = pd.to_numeric(frame["close"], errors="coerce")
+            float_mv = pd.to_numeric(frame["float_market_cap"], errors="coerce")
+            frame["float_share"] = float_mv / close.replace(0.0, np.nan)
+        extras: dict[str, pd.DataFrame] = {}
+        for source_name in wanted + ["float_share"]:
+            if source_name not in frame.columns:
+                continue
+            values = pd.to_numeric(frame[source_name], errors="coerce")
+            if not values.notna().any():
+                continue
+            pivoted = frame.assign(_value=values).pivot_table(
+                index="ts", columns="code", values="_value", aggfunc="last"
+            )
+            if pivoted.notna().any().any():
+                extras[VALUATION_FIELD_ALIASES.get(source_name, source_name)] = pivoted
+        if not extras:
+            raise DataGap("fin_valuation_daily produced no usable valuation matrices")
+        manifest = DataManifest(
+            services=["valuation"],
+            fields=sorted(extras),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=int(len(frame)),
+            data_hash=_frame_hash(extras),
+        )
+        return DataBundle(kind="valuation", frames=extras, fields=sorted(extras), manifest=manifest)
+
+    def financial_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
+        """PIT date x symbol matrices from financial statements.
+
+        The statement service exposes ``publish_date`` (the date the market could
+        know the report); we index by that date and forward-fill across the
+        panel in the compiler.  Auto-sync is disabled here: research must not
+        silently mutate the financial database during a factor run.
+        """
+        service = self._get("financial")
+        getter = getattr(service, "get_statements", None)
+        if getter is None:
+            raise DataGap("financial service does not expose get_statements")
+        numeric_fields = {
+            "revenue", "net_income", "net_income_attributable_to_parent",
+            "gross_profit", "operating_profit", "ebit", "ebitda",
+            "total_assets", "current_assets", "total_liabilities",
+            "current_liabilities", "total_equity", "total_equity_attributable_to_parent",
+            "operating_cash_flow", "free_cash_flow", "basic_eps", "diluted_eps",
+            "research_and_development_expense", "selling_expense",
+            "general_and_admin_expense", "finance_expense",
+        }
+        by_field: dict[str, dict[str, pd.Series]] = {}
+        rows = 0
+        for code in codes:
+            for statement_type in ("IS", "BS", "CF"):
+                try:
+                    data = getter(
+                        str(code),
+                        statement_type,
+                        start_date=start,
+                        end_date=end,
+                        auto_sync=False,
+                    )
+                except Exception:
+                    continue
+                if not isinstance(data, list):
+                    continue
+                for row in data:
+                    if not isinstance(row, dict):
+                        continue
+                    ts = row.get("publish_date")
+                    if not ts:
+                        # A missing publication date is not PIT-safe; do not
+                        # silently fall back to period_end.
+                        continue
+                    timestamp = pd.to_datetime(ts, errors="coerce")
+                    if pd.isna(timestamp):
+                        continue
+                    for field in numeric_fields:
+                        value = row.get(field)
+                        try:
+                            number = float(value)
+                        except (TypeError, ValueError):
+                            continue
+                        if not np.isfinite(number):
+                            continue
+                        by_field.setdefault(field, {}).setdefault(str(code), {})[timestamp] = number
+                        rows += 1
+        if not by_field:
+            raise DataGap(f"financial statements returned no usable fields for {len(codes)} codes")
+        frames: dict[str, pd.DataFrame] = {}
+        for field, by_code in by_field.items():
+            frame = pd.DataFrame(by_code).sort_index()
+            frame = frame[~frame.index.duplicated(keep="last")]
+            if frame.notna().any().any():
+                frames[f"fin_{field}"] = frame
+        if not frames:
+            raise DataGap("financial statements produced no numeric matrices")
+        manifest = DataManifest(
+            services=["financial"],
+            fields=sorted(frames),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=rows,
+            data_hash=_frame_hash(frames),
+        )
+        return DataBundle(kind="financial", frames=frames, fields=sorted(frames), manifest=manifest)
 
     def industry_map(self) -> pd.Series:
+        # Prefer the full security-master industry; fall back to board mapping
+        # only when the profile has no industry for a code.
         frame = self.query_frame(
-            "select code, last(board_name) as name from map_stock_board "
-            "where is_primary = true group by code"
+            "select code, last(industry) as name from stock_basic_info group by code"
         )
-        if frame.empty:
+        if frame is None or frame.empty:
+            frame = self.query_frame(
+                "select code, last(board_name) as name from map_stock_board "
+                "where is_primary = true group by code"
+            )
+        if frame is None or frame.empty:
             return pd.Series(dtype=object)
         return pd.Series(frame["name"].to_numpy(), index=frame["code"].astype(str)).dropna()
 
@@ -490,14 +780,14 @@ class DataInterfaceGateway:
         end: str,
     ) -> DataBundle:
         sql = (
-            "select ts, code, value from factor_value_daily "
+            "select ts, code, value from custom_factor_value_daily "
             f"where factor_id='{factor_id.replace(chr(39), chr(39) * 2)}' "
             f"and ts between '{start}' and '{end}' "
             f"and code in ({self._code_literals(codes)})"
         )
         frame = self.query_frame(sql)
         if frame.empty:
-            raise DataGap(f"factor_value_daily has no values for {factor_id}")
+            raise DataGap(f"custom_factor_value_daily has no values for {factor_id}")
         if frame.index.name == "ts":
             frame = frame.reset_index()
         if "ts" in frame.columns:
@@ -505,7 +795,7 @@ class DataInterfaceGateway:
         frame["value"] = pd.to_numeric(frame["value"], errors="coerce")
         wide = frame.pivot_table(index="ts", columns="code", values="value", aggfunc="last")
         manifest = DataManifest(
-            services=["factor_value_daily"],
+            services=["custom_factor_value_daily"],
             fields=[factor_id],
             codes=list(codes),
             start=str(start),

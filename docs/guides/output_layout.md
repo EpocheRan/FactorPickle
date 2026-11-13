@@ -56,3 +56,19 @@ python -m research.report \
     --profile quick \
     --no-robustness
 ```
+
+## Factor Lab research memory
+
+```text
+output/factor_lab/alpha/memory/
+  validation_results.jsonl     append-only validation ledger
+  contexts/                    C1_C10_context.json and compressed variants
+  attempts.jsonl
+  edge_cards.jsonl
+  failures.jsonl
+  summary.json
+```
+
+`team/research_context.json` lives under each campaign's team directory and is
+the context read by PathFinder; campaign audit checks its source hashes, hard
+negatives and data provenance.

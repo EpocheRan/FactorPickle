@@ -7,7 +7,7 @@ from factors.stored import SCREENER_DAILY_COLUMNS
 from factors.taxonomy import Category
 
 LEGACY_VERSION = "daily-v1"
-LEGACY_SOURCE = "factor_daily_wide"
+LEGACY_SOURCE = "screener_daily_wide_view"
 
 
 def legacy_specs() -> list[FactorSpec]:

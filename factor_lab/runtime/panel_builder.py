@@ -19,9 +19,10 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
-from research.report.panel import Panel
+from data_interface.panel import Panel
 
 from factor_lab.runtime.data_interface_adapter import DataBundle, DataGap, DataInterfaceGateway, DataManifest
 
@@ -100,6 +101,7 @@ def _pivot_extras(frames: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
             normalized = frame.copy()
             if not isinstance(normalized.index, pd.DatetimeIndex):
                 normalized = _plain_index(normalized)
+            normalized = normalized[~normalized.index.duplicated(keep="last")].sort_index()
             result[name] = normalized
     return result
 
@@ -120,7 +122,7 @@ def build_factor_panel(
     end: str,
     *,
     warmup_days: int = 800,
-    adjust: str = "qfq",
+    adjust: str = "hfq",
 ) -> BuiltPanel:
     if not codes:
         raise PanelBuildError("codes must not be empty")
@@ -137,6 +139,26 @@ def build_factor_panel(
     volume = _wide(market, "volume")
     amount = _wide(market, "amount")
     turnover = _wide(market, "turnover")
+    # Raw (unadjusted) prices are needed for execution/limits; the research
+    # close/open/high/low use PIT cumulative adjustment (hfq), never forward qfq.
+    raw_close = None
+    raw_open = None
+    raw_high = None
+    raw_low = None
+    manifests = [market.manifest]
+    try:
+        raw_frames, raw_manifest = gateway.ohlc(codes, fetch_start, end, adjust="none")
+        raw_bundle = DataBundle(kind="market_raw", frames=raw_frames, fields=list(raw_manifest.fields), manifest=raw_manifest)
+        raw_close = _wide(raw_bundle, "close")
+        raw_open = _wide(raw_bundle, "open")
+        raw_high = _wide(raw_bundle, "high")
+        raw_low = _wide(raw_bundle, "low")
+        manifests.append(raw_manifest)
+    except Exception:  # noqa: BLE001
+        raw_close = None
+        raw_open = None
+        raw_high = None
+        raw_low = None
     columns = list(close.columns)
 
     def align(frame: pd.DataFrame | None) -> pd.DataFrame | None:
@@ -145,16 +167,56 @@ def build_factor_panel(
         return frame.reindex(index=close.index, columns=columns)
 
     extras: dict[str, pd.DataFrame] = {}
-    manifests = [market.manifest]
     reference = bool(contract.get("reference", True))
     # Data availability is not a factor-category decision.  Fetch every
     # optional matrix the gateway exposes; a missing service only removes its
     # columns and is recorded in the manifest, never blocks an unrelated factor.
-    for method in ("flow_bundle", "margin_bundle", "valuation_bundle"):
+    for method in ("flow_bundle", "margin_bundle", "valuation_bundle", "financial_bundle", "event_bundle", "index_weight_bundle"):
         bundle = _safe_bundle(gateway, method, codes, fetch_start, end)
         if bundle is not None:
             extras.update(_pivot_extras(bundle.frames))
             manifests.append(bundle.manifest)
+
+    # Optional matrices are aligned to the market panel.  Financial statement
+    # fields are reported on sparse announcement dates; carry the latest
+    # published value forward so they are usable as daily factor fields (the
+    # announcement date itself is already PIT-aligned by data_interface).
+    aligned_extras: dict[str, pd.DataFrame] = {}
+    for name, frame in extras.items():
+        if str(name).startswith("index_weight_"):
+            aligned = frame.reindex(index=close.index, columns=columns, method="ffill")
+        else:
+            aligned = align(frame)
+        if aligned is None:
+            continue
+        if str(name).lower().startswith("fin_"):
+            # Keep weekend/holiday announcements: carry them forward on the
+            # union calendar, then align to the trading calendar.
+            try:
+                union = frame.index.union(close.index).sort_values()
+                widened = frame.reindex(union).ffill()
+                aligned = (widened.reindex(index=close.index, columns=close.columns)).ffill()
+            except Exception:  # noqa: BLE001
+                aligned = aligned.ffill()
+        aligned_extras[name] = aligned
+    # Static listing date -> as-of listing age.  PIT-safe: the date is static.
+    try:
+        profile = gateway.security_master(columns)
+        if profile is not None and not profile.empty and "list_date" in profile.columns:
+            listing = pd.to_datetime(profile["list_date"], errors="coerce").reindex(columns)
+            raw_days = (close.index.to_numpy()[:, None] - listing.to_numpy()[None, :]) / np.timedelta64(1, "D")
+            list_days = pd.DataFrame(raw_days, index=close.index, columns=columns)
+            aligned_extras["list_days"] = list_days.where(list_days >= 0)
+    except Exception:  # noqa: BLE001 - optional reference data
+        pass
+    # float_mv / raw close gives daily float shares when the vendor does not
+    # publish float_share directly.
+    if "float_share" not in aligned_extras and "float_mv" in aligned_extras and raw_close is not None:
+        raw = align(raw_close)
+        mv = aligned_extras.get("float_mv")
+        if raw is not None and mv is not None:
+            aligned_extras["float_share"] = mv / raw.replace(0.0, np.nan)
+    extras = aligned_extras
 
     benchmark = None
     returns = close.pct_change(fill_method=None).mean(axis=1)
@@ -183,17 +245,37 @@ def build_factor_panel(
 
     manifest = DataManifest(
         services=sorted({service for item in manifests for service in item.services}),
-        fields=sorted({field for item in manifests for field in item.fields}),
+        fields=sorted(
+            {field for item in manifests for field in item.fields}
+            | ({"close_raw"} if raw_close is not None else set())
+            # Derived extras (list_days, float_share) are added after the bundles
+            # were collected; without this they are missing from the manifest.
+            | set(extras)
+        ),
         codes=columns,
         start=str(start),
         end=str(end),
         rows=int(len(close)),
         data_hash="-".join(item.data_hash for item in manifests),
+        fetch_start=fetch_start,
+        warmup_days=int(warmup_days),
+        n_eval_dates=int(len(close.loc[(close.index >= pd.Timestamp(start)) & (close.index <= pd.Timestamp(end))])),
+        n_cells=int(close.loc[(close.index >= pd.Timestamp(start)) & (close.index <= pd.Timestamp(end))].shape[0] * close.shape[1]),
+        adjust=str(adjust),
     )
     manifest.source = "DataInterfaceGateway"
+    manifest.per_field_coverage = {
+        name: round(float(frame.loc[(frame.index >= pd.Timestamp(start)) & (frame.index <= pd.Timestamp(end))].notna().to_numpy().mean()), 6)
+        for name, frame in (extras or {}).items()
+        if isinstance(frame, pd.DataFrame) and not frame.empty
+    }
     panel = Panel(
         close=close,
         open=align(open_),
+        close_raw=align(raw_close) if raw_close is not None else None,
+        open_raw=align(raw_open) if raw_open is not None else None,
+        raw_high=align(raw_high) if raw_high is not None else None,
+        raw_low=align(raw_low) if raw_low is not None else None,
         market_cap=market_cap.reindex(index=close.index, columns=columns) if market_cap is not None else None,
         industry=industry,
         regime=regime,

@@ -11,7 +11,7 @@
 主脚本会：
 1. 读取 config.json；
 2. 判断当前是 Docker 还是宿主机（Windows/Linux/macOS）；
-3. 自动把 ``questdb`` 主机名在宿主机上解析为 ``localhost``；
+3. 自动把 ``questdb`` 主机名在宿主机上解析为 ``127.0.0.1``；
 4. 连接 QuestDB 并按顺序调用子脚本；
 5. 任何子脚本失败立即退出，返回非 0 退出码。
 
@@ -44,6 +44,7 @@ except Exception:
 from data_interface.common.config import load_config, resolve_questdb_host  # noqa: E402
 from data_interface.common.questdb_client import QuestDBClient  # noqa: E402
 from scripts.schemas import (  # noqa: E402
+    create_basic_tables,
     create_concept_tables,
     create_disclosure_tables,
     create_factor_tables,
@@ -64,6 +65,7 @@ SUB_SCRIPTS = {
     "moneyflow": create_moneyflow_tables,
     "concept": create_concept_tables,
     "disclosure": create_disclosure_tables,
+    "basic": create_basic_tables,
     "factor": create_factor_tables,
     "position": create_position_tables,
     "screener": create_screener_tables,
@@ -99,7 +101,7 @@ def detect_runtime(config: dict) -> RuntimePlan:
     elif configured_host == "questdb":
         run_mode = "local-fallback"
         notes.append(
-            "当前不在 Docker 内，questdb.host=questdb 无法解析，已自动回退到 localhost。"
+            "当前不在 Docker 内，questdb.host=questdb 无法解析，已自动回退到 127.0.0.1。"
         )
     else:
         run_mode = "local"
@@ -153,10 +155,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="FactorPickle QuestDB 初始化主脚本")
     parser.add_argument(
         "--only",
-        default="market,financial,moneyflow,sentiment,concept,disclosure,factor,position,screener,task",
+        default="market,financial,moneyflow,sentiment,concept,disclosure,basic,factor,position,screener,task",
         help=(
             "只运行指定子脚本，逗号分隔："
-            "market,financial,moneyflow,sentiment,concept,disclosure,factor,position,screener,task"
+            "market,financial,moneyflow,sentiment,concept,disclosure,basic,factor,position,screener,task"
         ),
     )
     parser.add_argument("--host", default=None, help="覆盖 QuestDB host")

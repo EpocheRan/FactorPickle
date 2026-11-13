@@ -42,7 +42,7 @@ class QuestDBScreenerQuery:
             f"{expression} AS {name}"
             for name, expression in DERIVED_SQL.items()
         ]
-        select = "SELECT *, " + ", ".join(derived) + ' FROM "factor_daily_wide"'
+        select = "SELECT *, " + ", ".join(derived) + ' FROM "screener_daily_wide_view"'
 
         clauses = ["ts = %s"]
         params: list = [datetime.combine(spec.as_of, time.min)]

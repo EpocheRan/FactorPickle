@@ -1,0 +1,36 @@
+{
+  "schema": "factor_lab.alpha.ten_year_protocol.v1",
+  "dataset_start": "2016-01-04",
+  "dataset_end": "2025-10-31",
+  "warmup_days": 300,
+  "expanded_axes_effective_start": "2017-01-03",
+  "candidate_pool": {
+    "top_n": 1000,
+    "selection_period_start": "2015-01-01",
+    "selection_period_end": "2016-12-31",
+    "metric": "average daily amount",
+    "source_table": "ohlcv_1d",
+    "rule_file": "factor_lab/alpha/policy/pool_10y.json"
+  },
+  "universe": {
+    "policy_file": "factor_lab/alpha/policy/universe.json",
+    "top_n": 1000,
+    "lookback_days": 60,
+    "min_history_days": 120
+  },
+  "holdout": {
+    "start": "2025-11-01",
+    "end": "2026-11-01",
+    "used": 4,
+    "confirmation_allowed": false
+  },
+  "costs": {
+    "buy_fee_bps": 2.44,
+    "sell_fee_bps": 7.44,
+    "borrow_bps_per_year": 800.0,
+    "fee_source": "actual A-share fee schedule: commission 1.8, handling 0.34, regulatory 0.20, transfer 0.10, sell stamp 5.0"
+  },
+  "entry_rule": "next_open",
+  "horizon": 20,
+  "execution": "factor_lab.alpha.ten_year.audit / run_expression"
+}

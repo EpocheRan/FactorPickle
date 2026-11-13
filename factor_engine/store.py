@@ -13,39 +13,27 @@ from data_interface.common.questdb_client import QuestDBClient
 
 logger = logging.getLogger("FactorEngine.Store")
 
-REGISTRY_TABLE = '"factor_registry"'
-ALIAS_TABLE = '"factor_alias"'
-DAILY_TABLE = '"factor_value_daily"'
-ANNOUNCE_TABLE = '"factor_value_announce"'
-LATEST_TABLE = '"factor_value_latest"'
-BUILD_TABLE = '"factor_build_state"'
-AUDIT_TABLE = '"factor_audit_state"'
+from .asset_schema import (
+    CUSTOM_ALIAS_COLUMNS,
+    CUSTOM_ANNOUNCE_COLUMNS,
+    CUSTOM_AUDIT_STATE_COLUMNS,
+    CUSTOM_BUILD_STATE_COLUMNS,
+    CUSTOM_LATEST_COLUMNS,
+    CUSTOM_CUTOVER_AT,
+    CUSTOM_REGISTRY_COLUMNS,
+    CUSTOM_VALUE_COLUMNS,
+)
 
-VALUE_COLUMNS = [
-    "ts",
-    "code",
-    "factor_id",
-    "value",
-    "quality",
-    "source",
-    "source_version",
-    "version",
-    "computed_at",
-]
-ANNOUNCE_COLUMNS = [
-    "ts",
-    "code",
-    "factor_id",
-    "report_period",
-    "announce_date",
-    "lag_days",
-    "value",
-    "quality",
-    "source",
-    "source_version",
-    "version",
-    "computed_at",
-]
+REGISTRY_TABLE = '"custom_factor_registry"'
+ALIAS_TABLE = '"custom_factor_alias"'
+DAILY_TABLE = '"custom_factor_value_daily"'
+ANNOUNCE_TABLE = '"custom_factor_value_announce"'
+LATEST_TABLE = '"custom_factor_value_latest"'
+BUILD_TABLE = '"custom_factor_build_state"'
+AUDIT_TABLE = '"custom_factor_audit_state"'
+
+VALUE_COLUMNS = CUSTOM_VALUE_COLUMNS
+ANNOUNCE_COLUMNS = CUSTOM_ANNOUNCE_COLUMNS
 
 
 def _clean(value: Any) -> Any:
@@ -79,6 +67,15 @@ def _day(value: str | date | datetime) -> datetime:
     return datetime.combine(pd.Timestamp(value).date(), time.min)
 
 
+def _check_cutover(frame: pd.DataFrame) -> None:
+    if frame is None or frame.empty or "computed_at" not in frame.columns:
+        return
+    cutoff = pd.Timestamp(CUSTOM_CUTOVER_AT).tz_localize(None)
+    stamps = pd.to_datetime(frame["computed_at"], errors="coerce")
+    if stamps.notna().any() and stamps.min() < cutoff:
+        raise ValueError(f"custom factor values before cutover: {stamps.min()} < {cutoff}")
+
+
 class FactorStore:
     def __init__(self, db: QuestDBClient | None = None, config: dict | None = None):
         self.config = config or get_config()
@@ -88,7 +85,14 @@ class FactorStore:
     def upsert_registry(self, specs: Iterable[Any]) -> int:
         rows: list[tuple] = []
         now = pd.Timestamp.now().to_pydatetime()
+        try:
+            frame = self.db.query_dataframe(f"SELECT factor_id FROM {REGISTRY_TABLE}")
+            existing = set(frame["factor_id"].astype(str)) if frame is not None and not frame.empty else set()
+        except Exception:
+            existing = set()
         for spec in specs:
+            if spec.factor_id in existing:
+                continue
             rows.append(
                 (
                     now,
@@ -107,8 +111,6 @@ class FactorStore:
                     str(spec.unit),
                     spec.direction,
                     spec.price_basis,
-                    spec.version,
-                    spec.source_version_policy,
                     ";".join(dep.token for dep in spec.dependencies),
                     int(spec.warmup),
                     spec.formula,
@@ -116,13 +118,11 @@ class FactorStore:
                     str(spec.materialization.value),
                 )
             )
+        if not rows:
+            return 0
         sql = (
             f"INSERT INTO {REGISTRY_TABLE} "
-            "(updated_at, factor_id, name, category, subcategory, source_dataset, source_vendor, "
-            "source_fields, freq, window, lag, value_kind, update_mode, unit, direction, "
-            "price_basis, version, source_version_policy, dependencies, warmup, formula, enabled, "
-            "materialization) "
-            "VALUES %s"
+            "(" + ", ".join(CUSTOM_REGISTRY_COLUMNS) + ") VALUES %s"
         )
         return self.db.execute_values(sql, rows)
 
@@ -138,8 +138,18 @@ class FactorStore:
             )
             for alias, factor_id, window in aliases
         ]
+        if not rows:
+            return 0
+        # Current alias mapping only; no historical snapshots.
+        try:
+            existing = set(self.db.query_dataframe(f"SELECT alias FROM {ALIAS_TABLE}")["alias"].astype(str))
+        except Exception:
+            existing = set()
+        rows = [row for row in rows if row[1] not in existing]
+        if not rows:
+            return 0
         sql = (
-            f"INSERT INTO {ALIAS_TABLE} (updated_at, alias, factor_id, window, params, notes) "
+            f"INSERT INTO {ALIAS_TABLE} (" + ", ".join(CUSTOM_ALIAS_COLUMNS) + ") "
             "VALUES %s"
         )
         return self.db.execute_values(sql, rows)
@@ -148,12 +158,14 @@ class FactorStore:
     def upsert_values(self, frame: pd.DataFrame) -> int:
         if frame is None or frame.empty:
             return 0
+        _check_cutover(frame)
         sql = f"INSERT INTO {DAILY_TABLE} ({', '.join(VALUE_COLUMNS)}) VALUES %s"
         return self.db.execute_values(sql, _rows(frame, VALUE_COLUMNS), page_size=1000)
 
     def upsert_latest(self, frame: pd.DataFrame) -> int:
         if frame is None or frame.empty:
             return 0
+        _check_cutover(frame)
         sql = f"INSERT INTO {LATEST_TABLE} ({', '.join(VALUE_COLUMNS)}) VALUES %s"
         return self.db.execute_values(sql, _rows(frame, VALUE_COLUMNS), page_size=1000)
 
@@ -165,21 +177,7 @@ class FactorStore:
 
     # ------------------------------------------------------------------ state
     def upsert_build_state(self, payload: dict[str, Any]) -> int:
-        columns = [
-            "updated_at",
-            "job_id",
-            "dataset",
-            "factor_ids",
-            "window_start",
-            "window_end",
-            "cursor",
-            "status",
-            "attempts",
-            "retry_at",
-            "rows_written",
-            "last_error",
-            "payload",
-        ]
+        columns = CUSTOM_BUILD_STATE_COLUMNS
         row = dict(payload)
         row.setdefault("updated_at", pd.Timestamp.now().to_pydatetime())
         row.setdefault("attempts", 0)
@@ -187,21 +185,7 @@ class FactorStore:
         return self.db.execute_values(sql, [tuple(_clean(row.get(c)) for c in columns)])
 
     def upsert_audit(self, payload: dict[str, Any]) -> int:
-        columns = [
-            "updated_at",
-            "audit_id",
-            "dataset",
-            "factor_ids",
-            "window_start",
-            "window_end",
-            "status",
-            "checked",
-            "failed",
-            "max_abs_diff",
-            "max_rel_diff",
-            "details",
-            "payload",
-        ]
+        columns = CUSTOM_AUDIT_STATE_COLUMNS
         row = dict(payload)
         row.setdefault("updated_at", pd.Timestamp.now().to_pydatetime())
         sql = f"INSERT INTO {AUDIT_TABLE} ({', '.join(columns)}) VALUES %s"

@@ -1,6 +1,6 @@
 """日频因子组合器（纯计算）。
 
-输入长表 OHLCV、基准收益、股本参考数据，输出与 ``factor_daily_wide``
+输入长表 OHLCV、基准收益、股本参考数据，输出与 ``screener_feature_daily``
 对齐的 DataFrame。不读数据库、不发请求、不读配置文件。
 """
 
@@ -367,7 +367,7 @@ def _compute_one(
 
 
 class FactorEngine:
-    """把纯因子函数组合成 ``factor_daily_wide`` 行。"""
+    """把纯因子函数组合成 ``screener_feature_daily`` 行。"""
 
     def __init__(self, config: DailyFactorConfig | None = None):
         self.config = config or DailyFactorConfig()

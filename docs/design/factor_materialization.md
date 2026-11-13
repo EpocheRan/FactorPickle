@@ -4,7 +4,7 @@
 
 回测时同一策略可以混用两类因子：
 
-1. **读已预计算落库的因子**（`factor_value_daily`）。
+1. **读已预计算落库的因子**（`custom_factor_value_daily`）。
 2. **对没落库的因子逐 bar 现算**。
 
 `acquisition.run --datasets factors` 只预计算**指定集合**，指定之外不落库。每个因子带 `materialization` 标记，引用方式不匹配时**启动期报错**，而不是静默 NaN。
@@ -23,7 +23,7 @@ class Materialization(str, Enum):
     AUTO   = "auto"     # stored 优先，缺失且有 compute 则回退 inline
 ```
 
-- `FactorSpec.materialization`（引擎侧目录，持久化到 `factor_registry.materialization`）
+- `FactorSpec.materialization`（引擎侧目录，持久化到 `custom_factor_registry.materialization`）
 - `FactorDef.materialization`（回测侧声明，`F.factor(id, materialization=...)`）
 
 内置因子标记：
@@ -86,4 +86,4 @@ python -m acquisition update --code 600519 --start 2026-10-01 --end 2026-10-27 -
 
 - 老策略 `F.factor(id)` 默认 `AUTO`，行为不变。
 - `F.mom/ma/atr/vol` 仍是 op 类现算。
-- `F.stored(column)` legacy 保持，映射 `factor_daily_wide`。
+- `F.stored(column)` legacy 保持，映射 `screener_daily_wide_view`。

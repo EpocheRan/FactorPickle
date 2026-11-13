@@ -1,160 +1,126 @@
-# Factor Lab
+# Alpha Research Engine
 
-Factor Lab 是 FactorPickle 上的自主因子研究运行时。目标是让研究循环由机制约束、
-可审计、可中断，同时不改变生产研究与数据模块的语义。
+`factor_lab/alpha` is the current Factor Lab engine. It is a deterministic
+research loop with five model-facing roles and a set of non-LLM services.
 
-## 1. 边界
-
-读取：
-
-- `data_interface`：行情、财务、资金流、两融、估值、行业、regime、ML frame
-- Research Module：报告、评级、敏感性
-- Lab 历史、预算、控制状态、数据覆盖
-
-写入：
-
-- `output/factor_lab/**`
-- `factor_lab/factors/generated/**`
-
-不写：
-
-- `research/`、`factors/`、`data_interface/` 的生产行为
-- 生产因子 registry
-- QuestDB 业务数据
-
-## 2. 运行时结构
+## Roles
 
 ```text
 PathFinder
-  ├─ Web Gateway
-  ├─ FactorBuilder
-  └─ ML Engine
-        │
-        ▼
-Runner
-  ├─ DataInterfaceGateway
-  ├─ build_factor_panel
-  └─ Research Adapter
-        │
-        ▼
-Evaluator
-  ├─ research.report.runner.generate
-  ├─ audit
-  └─ rating
-        │
-        ▼
-Supervisor
-  ├─ campaign rounds
-  ├─ budget
-  ├─ readiness
-  └─ agent reclamation
+Web Gateway
+ML Planner
+FactorBuilder
+Reader
 ```
 
-Runner 是 LLM 执行角色，不计算因子矩阵。FactorBuilder 的产物是代码 + spec +
-测试 + hash；Research Module 负责因子计算和 `FactorReport`。
+Runner, Research Runtime, Evaluator, Supervisor, Falsifier, Registrar,
+Allocator and ML Runtime are deterministic/tool layers. They cannot rewrite
+Gate verdicts.
 
-## 3. 数据契约
-
-`DataInterfaceGateway` 暴露 typed bundles：
-
-| Bundle | 用途 |
-|---|---|
-| `market_bundle` | OHLC、amount、turnover |
-| `flow_bundle` | 资金流，映射为 `mf_*` |
-| `margin_bundle` | 两融，映射为 `margin_*` |
-| `valuation_bundle` | `total_mv` / `float_mv` |
-| `industry_map` | 主行业映射 |
-| `regime_series` | 创业板指 200D MA regime |
-| `ml_frame` | ML Engine long-form market frame |
-
-`build_factor_panel` 按因子 category 路由：
+## Loop
 
 ```text
-price      → market + reference
-sentiment  → market + moneyflow + margin
-quality    → market + valuation/reference
-value      → market + valuation/reference
+PathFinder / Web Gateway
+  → FactorBuilder
+  → Factor Library
+  → Runner
+  → Research Runtime
+  → Falsifier
+  → Edge Card
+  → Memory
+  → Campaign
+  → long-only deployability
+  → Allocator
 ```
 
-Quality/Value 的 materialized factor values 仍由 Research Module 读取。
-
-## 4. 因子库与工件
-
-FactorBuilder 写入：
+## Memory
 
 ```text
-factor_lab/factors/generated/<family>/<factor_id>/vN/
-  factor.py
+output/factor_lab/alpha/memory/
+  attempts.jsonl
+  edge_cards.jsonl
+  failures.jsonl
+  discoveries.jsonl
+  summary.json
+```
+
+Search reads known expressions before generation, records every attempt, and
+writes top-candidate Edge Cards. Search is therefore closed-loop, not a
+one-shot report generator.
+
+## Factor Library
+
+```text
+output/factor_lab/factors/generated/<family>/<factor_id>/v1/
+  factor.dsl | factor.py
   spec.json
   test_factor.py
   manifest.json
 ```
 
-每个 artifact 必须包含：
+Old versions are immutable. Edge Cards reference `factor_id`, `version` and
+`code_hash`.
 
-- `factor_id`
-- `family`
-- `category`
-- `version`
-- `code_hash`
-- `data_contract`
+## Evaluation
 
-Runner 校验 artifact 的 `factor_id` 与 hypothesis 一致，并把 artifact 写入
-`experiments/<id>/data_manifest.json`。
+All factor-evaluation algorithms live in the IO-free ``factor_metrics`` core,
+which carries the production report's calibrated implementations.  The Alpha
+gate and the production report are thin products over that core; neither keeps
+a private formula copy.  The binding reference is
+[docs/design/factor_evaluation_contract.md](factor_evaluation_contract.md).
 
-## 5. 实验与门禁
+- Profiles: ``alpha-gate-v1`` (non-overlapping sampling, plain t, PIT universe)
+  and ``research-report-v1`` (daily IC + Newey-West); every result records its
+  ``metrics_spec`` identity.
+- Signal evidence: long-short IC / spread.
+- Deployment: long-only next-open excess after tax and cost.
+- Universe: point-in-time eligibility from trailing data only (delisted,
+  suspended and not-yet-seasoned names are excluded); policy in
+  `factor_lab/alpha/policy/universe.json`, applied by every research command
+  unless `--no-pit-universe` is passed.
+- Verdicts are tri-state (`pass` / `fail` / `insufficient_evidence`); null
+  metrics never become pass or fail.
+- Research protocol: model-facing work is delegated to the five DSH roles
+  (shared tasks + messages, outputs recorded under the campaign `team/`
+  directory); the Lead runs deterministic services only. A Lead-only campaign
+  is invalid; mechanical re-runs are labeled `protocol: deterministic-maintenance`.
+- Gates: net spread, IC, turnover, holdout. Capacity is informational only and
+  never vetoes a candidate.
+- Edge Card statuses: research, signal_validated, validated, active, parked,
+  not_deployable, retired, killed.
+- No validated edge means the allocator stays at the broad-index baseline.
 
-- Trial = hypothesis × 预注册 outcome。
-- 默认 `outcome_policy=single`。
-- N 为 family-scoped；confirmation 使用 `family=confirm`。
-- 已决策候选保留 `n_at_decision`，不回溯重判。
-- L0–L3 是同一 trial 的阶段，不重复计数。
-- 门禁：G0.5 暴露相关；G2 审计完整性；G3 交易性。
-- 预算与存储上限由 supervisor 和 R4 统一检查。
+## Campaigns
 
-## 6. 控制与恢复
+`CampaignController` writes round records, traces, stop decisions, and enforces
+max rounds, budget, duplicate stops and researcher stop/pause.
 
-```powershell
-python -m factor_lab control pause --reason "review"
-python -m factor_lab control resume
-python -m factor_lab control show
-```
+## ML
 
-- `control` 人工所有；
-- stop = drain，不杀正在收尾的 worker；
-- lease、heartbeat、HLC 保证多进程下不重复决策；
-- 崩溃后的 experiment 通过 ledger repair / quarantine 恢复；
-- 所有状态可从 workspace 恢复，不依赖聊天历史。
+The ML branch is non-deep-learning. It uses purged walk-forward splits with
+embargo at least as long as the target horizon, a model card, and an ML Monitor.
+Its daily rank-IC metric depends one-way on the shared
+`factor_metrics.rank_ic_frame`; CV, model fitting and the monitor remain
+runtime-owned. Its results carry `evaluation_spec` and are not comparable with
+cross-sectional factor metrics. Artifacts live under `output/factor_lab/alpha/ml/`.
 
-## 7. 评估后端
+## Data
 
-Research Module 的 quantile NAV 支持 pandas/Polars：
+Alpha reads panels through `DataInterfaceGateway` and `build_factor_panel`.
+Research modules never access QuestDB directly. All mutable state is under
+`output/factor_lab`.
 
-```text
-REPORT_METRICS_BACKEND=auto | pandas | polars
-```
+PathFinder defaults to a fixed 5–8 component equal-weight rank composite when single-factor evidence is saturated or components are economically complementary; single-factor questions need a concrete new-mechanism/event reason. Components are fixed before evaluation; no fitted weights, post-hoc selection or combination scans.
 
-- 默认 auto；
-- Rank IC 固定 pandas；
-- Quantile NAV 中等截面 Polars，全市场 pandas；
-- `FactorReport.metrics_engine` 记录实际后端；
-- 两条路径必须保持数值 parity；
-- Polars 是可选依赖，缺失时自动回退 pandas。
 
-## 8. 观测
+## Per-campaign full team protocol
 
-Dashboard 读取：
+Every campaign, including every adaptive iteration, must have its own completed PathFinder, FactorBuilder, Web Gateway and ML Planner tasks with campaign-scoped outputs. Task ids and outputs cannot be reused across campaigns; one PathFinder decision cannot be relabeled as several campaigns. A pre-registration may contain at most two candidates. `protocol_audit` is binding.
 
-- experiments
-- ledger
-- policy
-- campaigns
-- data coverage
-- storage / budget
+## Long-only primary evidence (current)
 
-人工入口：
+The mandate is long-only and the primary research statistic is **long-only net excess** after actual fees versus the eligible equal-weight benchmark. Coverage is enforced in the promotion Gate; the long-only Gate also checks net excess, t, IR, cost/gross and capacity. Long-short evidence is a diagnostic (style/beta/short-leg realizability), not a promotion veto. Promotion requires long-only Gate + coverage + long-only program FDR + independent validation. The FDR primary statistic is the long-only t-statistic; trials are admitted to the promotion denominator only with long-only evidence.
 
-```powershell
-python -m factor_lab dashboard
-python -m factor_lab campaign start --objective "研究因子"
-```
+## Research context
+
+Every new campaign writes `team/research_context.json` (`factor_lab.alpha.research_context.v2`). It carries parent campaign source hashes, structured prior results, validation hard negatives and data provenance. Campaign audit enforces context presence, source-hash integrity, hard-negative coverage and lineage. LLM compression is narrative only; the structured facts remain authoritative. See `research_memory.md`.
