@@ -359,6 +359,21 @@ class DataInterfaceGateway:
             "buy_elg_amount": "mf_buy_elg",
             "sell_elg_amount": "mf_sell_elg",
             "net_mf_amount": "mf_net_amount",
+            # Full size-bucket decomposition.  The amount fields are already
+            # admitted above; the volume/mid-bucket fields are complete in
+            # moneyflow_daily (100% non-null 2017-2025) and are required to
+            # distinguish price pressure from share-count flow.
+            "buy_sm_vol": "mf_buy_sm_vol",
+            "sell_sm_vol": "mf_sell_sm_vol",
+            "buy_md_amount": "mf_buy_md",
+            "buy_md_vol": "mf_buy_md_vol",
+            "sell_md_amount": "mf_sell_md",
+            "sell_md_vol": "mf_sell_md_vol",
+            "buy_lg_vol": "mf_buy_lg_vol",
+            "sell_lg_vol": "mf_sell_lg_vol",
+            "buy_elg_vol": "mf_buy_elg_vol",
+            "sell_elg_vol": "mf_sell_elg_vol",
+            "net_mf_vol": "mf_net_vol",
         }
         by_column: dict[str, dict[str, pd.Series]] = {}
         rows = 0
@@ -499,11 +514,93 @@ class DataInterfaceGateway:
         return self._extra_bundle(
             kind="margin",
             table="margin_detail",
-            mapping={"rzye": "margin_rzye", "rzmre": "margin_rzmre", "rqye": "margin_rqye", "rqyl": "margin_rqyl"},
+            mapping={
+                "rzye": "margin_rzye",
+                "rzmre": "margin_rzmre",
+                "rqye": "margin_rqye",
+                "rqyl": "margin_rqyl",
+                # Repayment/close-out flow: complete (100% non-null 2017-2025)
+                # and needed to separate new leverage from position unwinding.
+                "rzche": "margin_rzche",
+                "rqchl": "margin_rqchl",
+            },
             codes=codes,
             start=start,
             end=end,
         )
+
+    def tradability_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
+        """Exact exchange trading constraints: price limits and suspension state.
+
+        ``stk_limit`` publishes the daily up/down limit prices for every listed
+        name (9.4M rows, 100% non-null 2017-2025).  ``suspend_d`` is an event
+        table whose rows exist only for suspended (``S``) or resumed (``R``)
+        names, so a missing row means "not suspended" and the suspension matrix
+        is zero-filled.  Both are same-day execution constraints, exposed as
+        daily date x symbol matrices so the tradability mask no longer has to
+        reconstruct limits from a board-wide ratio.
+        """
+        frames: dict[str, pd.DataFrame] = {}
+        rows = 0
+        try:
+            limit = self._extra_bundle(
+                kind="stk_limit",
+                table="stk_limit",
+                mapping={"up_limit": "up_limit", "down_limit": "down_limit"},
+                codes=codes,
+                start=start,
+                end=end,
+            )
+            frames.update(limit.frames)
+            rows += int(limit.manifest.rows)
+        except DataGap:
+            pass
+        limit_base = frames.get("up_limit")
+        try:
+            frame = self.query_frame(
+                "select ts, code, suspend_type from suspend_d "
+                f"where code in ({self._code_literals(codes)}) "
+                f"and ts between '{start}' and '{end}'"
+            )
+            suspended: pd.DataFrame | None = None
+            if frame is not None and not frame.empty:
+                if frame.index.name == "ts":
+                    frame = frame.reset_index()
+                frame["ts"] = pd.to_datetime(frame["ts"], errors="coerce").dt.tz_localize(None)
+                frame["code"] = frame["code"].astype(str)
+                suspended = frame.assign(
+                    _value=(frame["suspend_type"].astype(str).str.upper() == "S").astype(float)
+                ).pivot_table(index="ts", columns="code", values="_value", aggfunc="max")
+                rows += int(len(frame))
+            if limit_base is not None:
+                # A missing suspension row means "not suspended": expose a
+                # complete zero matrix so the field is always present for a
+                # pool without suspension events.
+                if suspended is None:
+                    suspended = pd.DataFrame(
+                        0.0, index=limit_base.index, columns=limit_base.columns
+                    )
+                else:
+                    suspended = suspended.reindex(
+                        index=limit_base.index, columns=limit_base.columns
+                    ).fillna(0.0)
+                frames["is_suspended"] = suspended
+            elif suspended is not None and suspended.notna().any().any():
+                frames["is_suspended"] = suspended.fillna(0.0)
+        except Exception:  # noqa: BLE001 - suspension is optional on partial data
+            pass
+        if not frames:
+            raise DataGap(f"tradability tables returned no usable fields for {len(codes)} codes")
+        manifest = DataManifest(
+            services=["stk_limit", "suspend_d"],
+            fields=sorted(frames),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=rows,
+            data_hash=_frame_hash(frames),
+        )
+        return DataBundle(kind="tradability", frames=frames, fields=sorted(frames), manifest=manifest)
 
     def event_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
         """P1 event-axis features through data_interface.p1_events.
@@ -528,6 +625,31 @@ class DataInterfaceGateway:
             data_hash=_frame_hash(frames),
         )
         return DataBundle(kind="p1_events", frames=frames, fields=sorted(frames), manifest=manifest)
+
+    def state_event_bundle(self, codes: list[str], start: str, end: str) -> DataBundle:
+        """PIT state axes: earnings forecast/express and ST-name state.
+
+        ``forecast``/``express``/``namechange`` are complete 2017-2025 event
+        tables but carry state (latest disclosure) rather than flow.  The
+        loader forward-fills the latest disclosure and lags it one trading day,
+        so the rows behave like ordinary daily fields.
+        """
+        try:
+            from data_interface.state_events import load_state_events
+        except Exception as exc:  # noqa: BLE001
+            raise DataGap(f"data_interface.state_events unavailable: {type(exc).__name__}: {exc}") from exc
+        result = load_state_events(codes, start, end, db=self._get_client())
+        frames = result.frames
+        manifest = DataManifest(
+            services=["state_events"],
+            fields=sorted(frames),
+            codes=list(codes),
+            start=str(start),
+            end=str(end),
+            rows=int(sum(result.raw_rows.values())),
+            data_hash=_frame_hash(frames),
+        )
+        return DataBundle(kind="state_events", frames=frames, fields=sorted(frames), manifest=manifest)
 
     def security_master(self, codes: list[str] | None = None) -> pd.DataFrame:
         """Current security master row per code (static fields + list date).
@@ -680,6 +802,21 @@ class DataInterfaceGateway:
             "operating_cash_flow", "free_cash_flow", "basic_eps", "diluted_eps",
             "research_and_development_expense", "selling_expense",
             "general_and_admin_expense", "finance_expense",
+            # Income-statement detail admitted only when field coverage is
+            # verified in the database (2017-2025, publish_date PIT).
+            "total_revenue", "cost_of_revenue", "selling_general_admin_expense",
+            "pretax_profit", "income_tax",
+            # Balance-sheet detail.  Only fields with >=88% non-null coverage
+            # over 2017-2025 are admitted; the sparse debt lines are omitted
+            # because total_debt / net_debt already carry the debt state.
+            "cash_and_cash_equivalents", "cash_and_short_term_investments",
+            "accounts_receivable", "inventory", "total_current_assets",
+            "total_current_liabilities", "accounts_payable",
+            "total_debt", "net_debt", "equity_attributable_to_parent",
+            "retained_earnings", "intangible_assets", "fixed_assets",
+            # Cash-flow detail.
+            "investing_cash_flow", "financing_cash_flow", "capital_expenditure",
+            "dividends_paid", "cash_at_beginning", "cash_at_end",
         }
         by_field: dict[str, dict[str, pd.Series]] = {}
         rows = 0

@@ -41,6 +41,35 @@ LEDGER_SCHEMA = "factor_lab.alpha.family_ledger.v1"
 # --------------------------------------------------------------------------
 # policy / paths
 # --------------------------------------------------------------------------
+def _load_local_family_campaign_ids() -> dict[str, list[str]]:
+    """Load campaign-to-family ids from the gitignored runtime workspace."""
+    path = config.LAB_ROOT / "alpha" / "research_data" / "family_campaign_ids.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 - optional local data
+        return {}
+    rows = payload.get("families") if isinstance(payload, dict) else None
+    if not isinstance(rows, dict):
+        return {}
+    return {
+        str(family_id): [str(item) for item in (campaign_ids or [])]
+        for family_id, campaign_ids in rows.items()
+    }
+
+
+def _merge_local_family_campaign_ids(policy: dict[str, Any]) -> dict[str, Any]:
+    local = _load_local_family_campaign_ids()
+    if not local:
+        return policy
+    families = []
+    for family in policy.get("families") or []:
+        merged = dict(family)
+        if not merged.get("campaign_ids"):
+            merged["campaign_ids"] = local.get(str(merged.get("family_id")), [])
+        families.append(merged)
+    return {**policy, "families": families}
+
+
 def load_family_policy(path: str | Path | None = None) -> dict[str, Any]:
     target = Path(path) if path is not None else FAMILY_POLICY_PATH
     raw = read_json(target)
@@ -49,7 +78,9 @@ def load_family_policy(path: str | Path | None = None) -> dict[str, Any]:
     families = raw.get("families")
     if not isinstance(families, list) or not families:
         raise ValueError("family policy requires families")
-    return raw
+    # Campaign ids are research data and are kept local; explicit test policies
+    # are used verbatim and never merged with the developer's workspace.
+    return _merge_local_family_campaign_ids(raw) if path is None else raw
 
 
 def family_policy_by_campaign(policy: dict[str, Any]) -> dict[str, str]:

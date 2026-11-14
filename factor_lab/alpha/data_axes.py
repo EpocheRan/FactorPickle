@@ -12,12 +12,20 @@ from __future__ import annotations
 from typing import Any
 
 from data_interface.p1_events import P1_EVENT_FIELDS
+from data_interface.state_events import STATE_EVENT_FIELDS
 
 
 P0_AXES: dict[str, dict[str, Any]] = {
     "margin": {
         "label": "两融 / 杠杆",
-        "fields": ["margin_rzye", "margin_rqye", "margin_rzmre", "margin_rqyl"],
+        "fields": [
+            "margin_rzye",
+            "margin_rqye",
+            "margin_rzmre",
+            "margin_rqyl",
+            "margin_rzche",
+            "margin_rqchl",
+        ],
         "pit": "exchange disclosure after close; use T+1 in expressions",
         "source": "margin_detail via DataInterfaceGateway.margin_bundle",
     },
@@ -31,6 +39,17 @@ P0_AXES: dict[str, dict[str, Any]] = {
             "mf_sell_lg",
             "mf_sell_elg",
             "mf_net_amount",
+            "mf_buy_sm_vol",
+            "mf_sell_sm_vol",
+            "mf_buy_md",
+            "mf_buy_md_vol",
+            "mf_sell_md",
+            "mf_sell_md_vol",
+            "mf_buy_lg_vol",
+            "mf_sell_lg_vol",
+            "mf_buy_elg_vol",
+            "mf_sell_elg_vol",
+            "mf_net_vol",
         ],
         "pit": "after-close moneyflow; T+1",
         "source": "moneyflow_daily via DataInterfaceGateway.flow_bundle",
@@ -90,6 +109,43 @@ P0_AXES: dict[str, dict[str, Any]] = {
         "pit": "daily share-count field exposed by the valuation panel; PIT same-date",
         "source": "fin_valuation_daily via DataInterfaceGateway.valuation_bundle",
     },
+    "tradability": {
+        "label": "交易约束 / 停复牌",
+        "fields": ["up_limit", "down_limit", "is_suspended"],
+        "pit": "same-day exchange execution constraint; limit prices are published before the open",
+        "source": "stk_limit / suspend_d via DataInterfaceGateway.tradability_bundle",
+    },
+    "financial_statements": {
+        "label": "财务三表明细",
+        "fields": [
+            "fin_total_revenue",
+            "fin_cost_of_revenue",
+            "fin_selling_general_admin_expense",
+            "fin_pretax_profit",
+            "fin_income_tax",
+            "fin_cash_and_cash_equivalents",
+            "fin_cash_and_short_term_investments",
+            "fin_accounts_receivable",
+            "fin_inventory",
+            "fin_total_current_assets",
+            "fin_total_current_liabilities",
+            "fin_accounts_payable",
+            "fin_total_debt",
+            "fin_net_debt",
+            "fin_equity_attributable_to_parent",
+            "fin_retained_earnings",
+            "fin_intangible_assets",
+            "fin_fixed_assets",
+            "fin_investing_cash_flow",
+            "fin_financing_cash_flow",
+            "fin_capital_expenditure",
+            "fin_dividends_paid",
+            "fin_cash_at_beginning",
+            "fin_cash_at_end",
+        ],
+        "pit": "financial statements aligned to publish_date by data_interface; carried forward after announcement",
+        "source": "financial statements via DataInterfaceGateway.financial_bundle",
+    },
     "security_master": {
         "label": "证券主数据",
         "fields": ["list_days"],
@@ -135,6 +191,24 @@ P1_AXES: dict[str, dict[str, Any]] = {
         "fields": P1_EVENT_FIELDS["stk_holdernumber"],
         "pit": "announcement date is the table ts; p1_events lags one trading day",
         "source": "stk_holdernumber via DataInterfaceGateway.event_bundle",
+    },
+    "earnings_forecast": {
+        "label": "业绩预告",
+        "fields": STATE_EVENT_FIELDS["forecast"],
+        "pit": "announcement date is the table ts; state_events carries the latest forecast and lags one trading day",
+        "source": "forecast via DataInterfaceGateway.state_event_bundle",
+    },
+    "earnings_express": {
+        "label": "业绩快报",
+        "fields": STATE_EVENT_FIELDS["express"],
+        "pit": "announcement date is the table ts; state_events carries the latest express report and lags one trading day",
+        "source": "express via DataInterfaceGateway.state_event_bundle",
+    },
+    "name_change": {
+        "label": "名称 / ST 状态",
+        "fields": STATE_EVENT_FIELDS["namechange"],
+        "pit": "effective name-change date is the table ts; state_events lags one trading day",
+        "source": "namechange via DataInterfaceGateway.state_event_bundle",
     },
 }
 

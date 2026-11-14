@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import pandas as pd
@@ -192,15 +193,18 @@ class StrategyAdapter:
             for code, weight in target.items():
                 oid = to_order_book_id(code)
                 bar = _bar(bar_dict, oid)
-                if bar is None or float(bar.close) <= 0:
+                if bar is None:
+                    continue
+                close = float(bar.close)
+                if not math.isfinite(close) or close <= 0:
                     continue
                 weight = float(weight) * scale
                 position = positions.get(oid)
                 current = float(getattr(position, "quantity", 0.0) or 0.0)
                 sellable = self._sellable(position, code)
-                target_shares = int(equity * float(weight) / float(bar.close) // 100 * 100)
+                target_shares = int(equity * float(weight) / close // 100 * 100)
                 delta = target_shares - int(current)
-                if abs(delta) * float(bar.close) < max(0.002 * equity, float(bar.close) * 100):
+                if abs(delta) * close < max(0.002 * equity, close * 100):
                     continue
                 if delta > 0:
                     self._queue_buy(code, delta, "rebalance_in")
