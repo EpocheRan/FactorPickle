@@ -221,9 +221,15 @@ Alpha reads data only through `DataInterfaceGateway` and
 
 P1 event features are loaded through `DataInterfaceGateway.event_bundle`
 (`data_interface.p1_events`); they are zero-filled event flows and PIT-lagged
-one trading day. Financial statement fields are carried forward from their
-PIT announcement dates before entering the daily panel. P0/P1 field coverage is
-recorded under `output/factor_lab/alpha/data_axes/coverage.json`.
+one trading day. Earnings state fields and the PIT ST flag are loaded through
+`DataInterfaceGateway.state_event_bundle` (`data_interface.state_events`);
+they carry the latest disclosure and are PIT-lagged one trading day.
+Tradability fields come from `DataInterfaceGateway.tradability_bundle`
+(`stk_limit` / `suspend_d`): `up_limit`/`down_limit` are raw-price execution
+limits and `is_suspended` is 1 only on suspended days. Financial statement
+fields are carried forward from their PIT announcement dates before entering
+the daily panel. P0/P1 field coverage is recorded under
+`output/factor_lab/alpha/data_axes/coverage.json`.
 
 ## 7. Research invariants
 
@@ -235,7 +241,7 @@ recorded under `output/factor_lab/alpha/data_axes/coverage.json`.
 - The family ledger is frozen once into `output/factor_lab/alpha/families/ledger_snapshot.json`; evaluations use the snapshot hash. Re-freezing is an explicit `refresh=True` action and changes the denominator identity.
 - Every pre-registration declares its evaluation conditions, has at most 10 candidates, and every used family must be registered in `policy/families.json`. Freeze rejects `require_prereg=False` and Q overrides, and selects the latest recorded trial rather than the largest sample.
 - Each campaign round records `evaluation_universe` with schema `factor_lab.alpha.evaluation_universe.v1`; `kind` is `full_panel` or `custom_mask` and the nested universe summary is the auditable PIT mask. The field is first-class, not a team-manifest workaround.
-- P0 data axes are the single field registry used by PathFinder (pre-registration) and ML Planner: expanded `valuation` fields (`dividend_yield`, `earnings_yield`, `pcf_ttm`, `pfcf`, `ev_*`, `p_nwc`, ...), `share_structure` (`total_share`, `float_share`), `security_master.list_days`, and `index_membership.index_weight_*` are admitted once the panel provides them. Do not maintain a separate ML-only field list.
+- P0 data axes are the single field registry used by PathFinder (pre-registration) and ML Planner: expanded `valuation` fields (`dividend_yield`, `earnings_yield`, `pcf_ttm`, `pfcf`, `ev_*`, `p_nwc`, ...), `share_structure` (`total_share`, `float_share`), `security_master.list_days`, `index_membership.index_weight_*`, `tradability` (`up_limit`, `down_limit`, `is_suspended`), the moneyflow/margin flow decomposition, and the three-statement detail fields (`fin_total_revenue`, `fin_net_debt`, `fin_capital_expenditure`, ...) are admitted once the panel provides them. Do not maintain a separate ML-only field list.
 - ML features may be raw PIT fields or validated deterministic DSL feature expressions (for example `rank(div(fin_net_income, fin_total_assets))`, `ts_std(returns, 20)`, `div(ts_mean(abs(returns),20), ts_mean(amount,20))`). The runtime compiles expressions on the evaluation context, so long-lookback features keep their warmup; raw fields are never auto-injected.
 - The ML result includes a deterministic long-only construction block built from OOS scores: top-quintile equal weight, next-open entry, actual A-share buy/sell fees. It is deployability evidence, not a promotion gate.
 - Universe is point-in-time: eligibility uses trailing data only. Delisted,

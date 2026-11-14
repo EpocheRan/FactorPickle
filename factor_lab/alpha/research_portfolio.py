@@ -36,8 +36,33 @@ from factor_lab.core import config
 
 
 REPORT_SCHEMA = "factor_lab.alpha.research_portfolio.v1"
-RUN_START_UTC = "2026-11-12T14:56:00+00:00"
-RUN_END_UTC = "2026-11-13T00:00:00+00:00"
+
+
+def _load_local_annotations() -> dict[str, Any]:
+    """Load optional research annotations from the gitignored runtime workspace.
+
+    Campaign labels, conclusions and run windows are research data, not code.
+    They live under ``output/factor_lab/alpha/research_data`` so the report
+    logic can be committed without shipping research findings or campaign ids.
+    Missing annotations degrade to generic campaign ids/empty conclusions.
+    """
+    path = Path(config.LAB_ROOT) / "alpha" / "research_data" / "portfolio_annotations.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 - optional local data
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+_ANNOTATIONS = _load_local_annotations()
+RUN_START_UTC = str(_ANNOTATIONS.get("run_start_utc") or "")
+RUN_END_UTC = str(_ANNOTATIONS.get("run_end_utc") or "")
+CAMPAIGN_LABELS = {
+    str(key): str(value) for key, value in (_ANNOTATIONS.get("campaign_labels") or {}).items()
+}
+KNOWN_CONCLUSIONS = {
+    str(key): str(value) for key, value in (_ANNOTATIONS.get("known_conclusions") or {}).items()
+}
 ROLES = [
     ("pathfinder", "PathFinder"),
     ("web-gateway", "Web Gateway"),
@@ -59,28 +84,8 @@ ROLE_FILES = {
     "factor_builder.json": "factor-builder",
     "reader_events.json": "reader",
 }
-CAMPAIGN_LABELS = {
-    "CAMP-548013a26d": "Campaign 1 · MAX/lottery baseline",
-    "CAMP-9126b55d26": "Campaign 1b · Baby MAX/lottery",
-    "CAMP-e8d05b7311": "Campaign 2 · Post-kill search",
-    "CAMP-382cbc7893": "Campaign 3 · MAX attribution",
-    "CAMP-24d0c741d3": "Campaign 4 · Low-price/value",
-    "CAMP-4319413b27": "P3 · Web discovery",
-    "CAMP-2b995bc651": "P2 · ML execution",
-    "CAMP-b79c47ef2d": "P0/P1 · Pre-registered batch",
-    "CAMP-35db6b3056": "P1b · Holder-number robustness",
-    "CAMP-6efd50f0a4": "L0 smoke · clean cycle",
-    "CAMP-76e3088958": "L0 smoke · cycle",
-    "CAMP-a98589944b": "L0 smoke · cycle 2",
-    "CAMP-f13fb8b93a": "L0 smoke · final cycle",
-}
-KNOWN_CONCLUSIONS = {
-    "CAMP-548013a26d": "MAX/lottery baseline: search and ML rounds did not produce a freezeable candidate.",
-    "CAMP-9126b55d26": "Baby MAX/lottery cycles failed on net spread; the first holdout was consumed historically; no candidate.",
-    "CAMP-e8d05b7311": "Post-kill dev search produced no candidate that survived the freeze/FDR path.",
-    "CAMP-382cbc7893": "MAX attribution falsified: MAX increment +0.000019; the price leg is decisive; the frozen composite was later reclassified killed.",
-    "CAMP-24d0c741d3": "Low-price/value candidate was strong in dev (net +0.004199 / net_t 1.9558) but program-level FDR later rejected it; reclassified killed.",
-}
+
+
 KIND_LABELS = {
     "research": "研究 campaign",
     "discovery": "Discovery",
@@ -168,7 +173,9 @@ def _rel_link(path: Path | str | None, base_dir: Path) -> str:
 
 
 def _run_group(created_at: str | None) -> str:
-    """Group campaigns into the 9-hour run, post-run replication, or legacy."""
+    """Group campaigns into the local run window, post-run replication, or legacy."""
+    if not RUN_START_UTC or not RUN_END_UTC:
+        return "legacy"
     try:
         value = datetime.fromisoformat(str(created_at or "").replace("Z", "+00:00"))
         start = datetime.fromisoformat(RUN_START_UTC)

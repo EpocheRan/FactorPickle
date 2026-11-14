@@ -171,11 +171,24 @@ def build_factor_panel(
     # Data availability is not a factor-category decision.  Fetch every
     # optional matrix the gateway exposes; a missing service only removes its
     # columns and is recorded in the manifest, never blocks an unrelated factor.
-    for method in ("flow_bundle", "margin_bundle", "valuation_bundle", "financial_bundle", "event_bundle", "index_weight_bundle"):
+    for method in (
+        "flow_bundle",
+        "margin_bundle",
+        "valuation_bundle",
+        "financial_bundle",
+        "event_bundle",
+        "state_event_bundle",
+        "index_weight_bundle",
+        "tradability_bundle",
+    ):
         bundle = _safe_bundle(gateway, method, codes, fetch_start, end)
         if bundle is not None:
             extras.update(_pivot_extras(bundle.frames))
             manifests.append(bundle.manifest)
+    # A missing suspension row means "not suspended"; the raw event table only
+    # stores suspended/resumed names, so the daily matrix is zero-filled.
+    if "is_suspended" in extras:
+        extras["is_suspended"] = extras["is_suspended"].fillna(0.0)
 
     # Optional matrices are aligned to the market panel.  Financial statement
     # fields are reported on sparse announcement dates; carry the latest
