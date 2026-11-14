@@ -19,12 +19,6 @@
         "lottery-demand",
         "MAX-conditioned"
       ],
-      "campaign_ids": [
-        "CAMP-548013a26d",
-        "CAMP-9126b55d26",
-        "CAMP-e8d05b7311",
-        "CAMP-382cbc7893"
-      ],
       "pre_registered": true
     },
     {
@@ -34,10 +28,6 @@
         "low-nominal-price",
         "pb-value"
       ],
-      "campaign_ids": [
-        "CAMP-24d0c741d3",
-        "CAMP-4319413b27"
-      ],
       "pre_registered": true
     },
     {
@@ -45,9 +35,6 @@
       "research_question": "Does leverage crowding in margin financing predict negative 5-day long-short returns in the pool, so that a factor oriented high = low margin build / low margin balance relative to size earns a positive spread after costs?",
       "mechanism": "Margin financing is exchange-disclosed after close (T+1 in expressions). Crowded leveraged longs and forced deleveraging should predict underperformance: recent margin-balance growth and margin balance relative to market cap are the crowding proxies. Both candidates are oriented high = low crowding => expected positive 5-day long-short spread.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-b79c47ef2d"
-      ],
       "fields": [
         "margin_rzye",
         "margin_rqye",
@@ -62,9 +49,6 @@
       "research_question": "Is 5-day order-size structure in moneyflow priced — large plus extra-large net buying positive and small-order net buying negative — in the cross-section of 5-day forward returns?",
       "mechanism": "Order-size decomposition separates informed large-ticket flow from retail small-ticket flow; large-order net inflow should predict positive and retail small-order net inflow negative short-horizon returns. Flows are normalized by same-window amount to be cross-sectionally comparable; moneyflow is after-close and used with a T+1 lag.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-b79c47ef2d"
-      ],
       "fields": [
         "mf_buy_sm",
         "mf_buy_lg",
@@ -81,9 +65,6 @@
       "research_question": "Do accruals (earnings not backed by cash, negative) and gross profitability (positive) predict 5-day forward returns in the pool?",
       "mechanism": "Quality/accrual anomaly: high accruals signal low earnings quality and subsequent underperformance, while high gross profit over total assets signals quality and outperformance. Financial statements are PIT-aligned to publish_date and carried forward by the panel; no label or future-return inputs.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-b79c47ef2d"
-      ],
       "fields": [
         "fin_net_income",
         "fin_operating_cash_flow",
@@ -101,9 +82,6 @@
       "research_question": "Does a non-PB valuation multiple (low PS_TTM) add a positive 5-day value spread in the pool, distinct from the already-tested low-PB/low-price composite?",
       "mechanism": "Sales-multiple value premium: low price-to-sales predicts higher subsequent returns; PS_TTM is selected over PB to keep novelty versus the existing low-price/low-PB composite. Valuation is daily PIT with coverage above 0.90; one candidate only to hold the family-level budget.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-b79c47ef2d"
-      ],
       "fields": [
         "pb_mrq",
         "pe_ttm",
@@ -117,9 +95,6 @@
       "research_question": "Does block-trade activity (amount share over 5 days, count intensity over 20 days) predict negative 5-day returns because block trades clear at discounts and signal large-holder supply?",
       "mechanism": "Block trades are negotiated at discounts and mostly reflect large-holder distribution; the event table is announcement-dated and p1_events lags it one trading day, so the features are PIT-safe. High block-trade intensity should predict underperformance; candidates are oriented high = low block intensity. Event flow is zero-filled (true zero) upstream.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-b79c47ef2d"
-      ],
       "fields": [
         "block_amount",
         "block_vol",
@@ -135,9 +110,6 @@
       "research_question": "Does Dragon-Tiger-list buying pressure positively and raw listing intensity negatively predict 5-day returns in the pool?",
       "mechanism": "Top-list large-seat net buying relative to amount carries positive short-horizon information, while raw listing intensity reflects attention-driven crowding and predicts reversal. The event table is after-close disclosed and p1_events lags it one trading day; non-stock rows are filtered upstream and event flow is zero-filled.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-b79c47ef2d"
-      ],
       "fields": [
         "top_amount",
         "top_l_buy",
@@ -152,9 +124,6 @@
       "research_question": "Does a declining shareholder count (chip concentration) predict positive 5-day returns in the pool?",
       "mechanism": "Fewer holders per stock means concentrated chips and lower retail crowding; holder-number disclosures are announcement-dated, p1_events lags them one trading day, and the state is forward-filled. Candidates use the disclosed change (holder_chg) and its 60-day smoothed level, both oriented high = holder decline.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-b79c47ef2d"
-      ],
       "fields": [
         "holder_num",
         "holder_chg",
@@ -166,9 +135,6 @@
       "research_question": "Does actual repurchase execution (amount intensity relative to float cap over 20 days, execution-count persistence) predict positive 5-day returns as a management-confidence signal?",
       "mechanism": "Executed buybacks are a costly signal of undervaluation and reduce float; repurchase announcements are announcement-dated and p1_events lags them one trading day, with execution fields zero-filled when there is no repurchase. Amount intensity is normalized by float market cap to avoid a pure size bet; the second candidate measures execution persistence via event count.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-b79c47ef2d"
-      ],
       "fields": [
         "rep_amount",
         "rep_vol",
@@ -181,9 +147,6 @@
       "research_question": "Does holder-number robustness survive orthogonalization and concentration variants?",
       "mechanism": "Shareholder-count changes reflect ownership concentration/retail crowding; robustness vs turnover/size and level variants.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-35db6b3056"
-      ],
       "fields": [
         "holder_num",
         "holder_chg",
@@ -198,9 +161,6 @@
       "research_question": "Do P0/P1 expanded axes add incremental information in combinations?",
       "mechanism": "Incremental combinations/residuals of margin, flow, block/top events, holder/repurchase against price/value/turnover controls.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-a54ad429f3"
-      ],
       "fields": [
         "margin_rzye",
         "margin_rqye",
@@ -225,9 +185,6 @@
       "research_question": "Does a deterministic expanded-axis control provide a benchmark for the ML experiment?",
       "mechanism": "Deterministic non-ML control: top-list net buying minus margin purchase intensity.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-d07a274118"
-      ],
       "fields": [
         "top_net_amount",
         "margin_rzmre",
@@ -239,9 +196,6 @@
       "research_question": "Does a distilled ML model add falsifiable signal over deterministic controls?",
       "mechanism": "Non-deep-learning ML distilled to DSL; admission-gated, program-FDR counted.",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-d07a274118"
-      ],
       "fields": [
         "margin_rzmre",
         "mf_net_amount",
@@ -256,9 +210,6 @@
       "research_question": "Does shareholder concentration survive 10y PIT top-800?",
       "mechanism": "ownership breadth/concentration; holder_chg/holder_num",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-0f9b786f80"
-      ],
       "fields": [
         "holder_chg",
         "holder_num",
@@ -274,9 +225,6 @@
       "research_question": "Can a rank-native ridge pass admission and distill faithfully on 10y PIT top-800?",
       "mechanism": "rank-native linear composite/distillation",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-362d30cbb5"
-      ],
       "fields": [
         "returns",
         "turnover",
@@ -290,9 +238,6 @@
       "research_question": "Single-fit rank-native ML plus signed rank composite on 10y PIT top-800",
       "mechanism": "single walk-forward coefficient vector / rank composite",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-9ded21c30e"
-      ],
       "fields": [
         "returns",
         "turnover",
@@ -306,9 +251,6 @@
       "research_question": "Horizon-20 cost-aware rank-native ML/control on 10y PIT top-800",
       "mechanism": "20-day horizon / lower borrow-adjusted turnover",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-356f31ae6b"
-      ],
       "fields": [
         "returns",
         "turnover",
@@ -322,9 +264,6 @@
       "research_question": "External-evidence lottery/MAX purge of top quantile on 10y PIT top-800",
       "mechanism": "MAX/lottery contamination purge; external A-share MAX anomaly + limits-to-arbitrage",
       "pre_registered": true,
-      "campaign_ids": [
-        "CAMP-d95264e8cd"
-      ],
       "fields": [
         "returns",
         "turnover",
@@ -341,9 +280,6 @@
         "margin",
         "regime"
       ],
-      "campaign_ids": [
-        "CAMP-cf9b606323"
-      ],
       "pre_registered": true
     },
     {
@@ -353,9 +289,6 @@
         "delta_ATO",
         "DuPont",
         "efficiency"
-      ],
-      "campaign_ids": [
-        "CAMP-cf9b606323"
       ],
       "pre_registered": true
     },
@@ -367,9 +300,6 @@
         "low-price",
         "illiquidity-premium"
       ],
-      "campaign_ids": [
-        "CAMP-cf9b606323"
-      ],
       "pre_registered": true
     },
     {
@@ -380,9 +310,6 @@
         "innovation",
         "intangible"
       ],
-      "campaign_ids": [
-        "CAMP-cf9b606323"
-      ],
       "pre_registered": true
     },
     {
@@ -391,9 +318,6 @@
       "mechanism_tags": [
         "revenue-growth",
         "fundamental-momentum"
-      ],
-      "campaign_ids": [
-        "CAMP-cf9b606323"
       ],
       "pre_registered": true
     },
@@ -405,9 +329,6 @@
         "order-imbalance",
         "attention"
       ],
-      "campaign_ids": [
-        "CAMP-435e3ebaf5"
-      ],
       "pre_registered": true
     },
     {
@@ -417,9 +338,6 @@
         "institutional-flow",
         "smart-money",
         "order-imbalance"
-      ],
-      "campaign_ids": [
-        "CAMP-435e3ebaf5"
       ],
       "pre_registered": true
     },
@@ -431,9 +349,6 @@
         "informed-trading",
         "liquidity"
       ],
-      "campaign_ids": [
-        "CAMP-435e3ebaf5"
-      ],
       "pre_registered": true
     },
     {
@@ -444,9 +359,6 @@
         "signaling",
         "corporate-action"
       ],
-      "campaign_ids": [
-        "CAMP-435e3ebaf5"
-      ],
       "pre_registered": true
     },
     {
@@ -456,9 +368,6 @@
         "holder-number",
         "ownership-dispersion",
         "retail-attention"
-      ],
-      "campaign_ids": [
-        "CAMP-435e3ebaf5"
       ],
       "pre_registered": true
     },
@@ -471,9 +380,6 @@
         "MAX",
         "lottery"
       ],
-      "campaign_ids": [
-        "CAMP-9a0c068c52"
-      ],
       "pre_registered": true
     },
     {
@@ -483,9 +389,6 @@
         "accruals",
         "earnings-quality",
         "global-anomaly"
-      ],
-      "campaign_ids": [
-        "CAMP-9a0c068c52"
       ],
       "pre_registered": true
     },
@@ -497,9 +400,6 @@
         "quality",
         "global-anomaly"
       ],
-      "campaign_ids": [
-        "CAMP-9a0c068c52"
-      ],
       "pre_registered": true
     },
     {
@@ -509,9 +409,6 @@
         "low-volatility",
         "BAB",
         "global-anomaly"
-      ],
-      "campaign_ids": [
-        "CAMP-9a0c068c52"
       ],
       "pre_registered": true
     },
@@ -524,9 +421,6 @@
         "quality",
         "interaction"
       ],
-      "campaign_ids": [
-        "CAMP-9a0c068c52"
-      ],
       "pre_registered": true
     },
     {
@@ -536,9 +430,6 @@
         "factor-composite",
         "ensemble",
         "diversification"
-      ],
-      "campaign_ids": [
-        "CAMP-9091939333"
       ],
       "pre_registered": true
     },
@@ -550,9 +441,6 @@
         "fundamental",
         "quality"
       ],
-      "campaign_ids": [
-        "CAMP-9091939333"
-      ],
       "pre_registered": true
     },
     {
@@ -563,9 +451,6 @@
         "quality-value",
         "ownership"
       ],
-      "campaign_ids": [
-        "CAMP-9091939333"
-      ],
       "pre_registered": true
     },
     {
@@ -574,9 +459,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-66762b57ef"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -588,9 +470,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-37ff03fb1f"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -600,9 +479,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-7bf824ae37"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -614,9 +490,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-af8318b3b7"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -626,9 +499,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-679d673db8"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -640,9 +510,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-4c7091e8cb"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -652,9 +519,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-cab708aaeb"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -666,9 +530,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-13b4ff0748"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -678,9 +539,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-4a70668f42"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -692,9 +550,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-a38da097ec"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -704,9 +559,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-faabc13a63"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -718,9 +570,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-79688adbc4"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -730,9 +579,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-082e385ef9"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -744,9 +590,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-4d2a395ccd"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -756,9 +599,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-9de1c2ef7d"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -770,9 +610,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-1771001fa8"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -782,9 +619,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-1701c58054"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -796,9 +630,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-22c4f811d6"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -808,9 +639,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-9ae9bc2530"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -822,9 +650,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-97833d5bbb"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -834,9 +659,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-191b7b29f9"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -848,9 +670,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-113b9abaa4"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -860,9 +679,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-0ff94f9c7a"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -874,9 +690,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-68e459b7ed"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -886,9 +699,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-e7d014e1ec"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -900,9 +710,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-32b8498728"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -912,9 +719,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-170e37bfd4"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -926,9 +730,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-d5e56b4cd6"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -938,9 +739,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-c8e3460ecf"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -952,9 +750,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-a7c779d4c5"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -964,9 +759,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-6e3db13eb0"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -978,9 +770,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-e96f3b55b7"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -990,9 +779,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-b8640f9979"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -1004,9 +790,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-f2a774a2a7"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -1016,9 +799,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-5fd43ad72a"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -1030,9 +810,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-ab4ce3d16a"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -1042,9 +819,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-dc847e666e"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -1056,9 +830,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-9e8c6e06e1"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -1069,9 +840,6 @@
         "historical-backfill",
         "frozen-prereg"
       ],
-      "campaign_ids": [
-        "CAMP-fb385870ae"
-      ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
     },
@@ -1081,9 +849,6 @@
       "mechanism_tags": [
         "historical-backfill",
         "frozen-prereg"
-      ],
-      "campaign_ids": [
-        "CAMP-8149471776"
       ],
       "pre_registered": true,
       "registration_source": "frozen-prereg-backfill"
@@ -1096,9 +861,6 @@
         "power",
         "diversification"
       ],
-      "campaign_ids": [
-        "CAMP-441bc2dd8b"
-      ],
       "pre_registered": true
     },
     {
@@ -1108,9 +870,6 @@
         "weak-signal-ensemble",
         "smoothing",
         "turnover"
-      ],
-      "campaign_ids": [
-        "CAMP-b61c4d1845"
       ],
       "pre_registered": true
     },
@@ -1122,9 +881,6 @@
         "fcf-yield",
         "quality-conditioning",
         "cost-impact-gate"
-      ],
-      "campaign_ids": [
-        "CAMP-a0f95bb345"
       ],
       "pre_registered": true
     },
@@ -1138,9 +894,6 @@
         "systematic-battery",
         "cost-impact-gate"
       ],
-      "campaign_ids": [
-        "CAMP-66ffeecd96"
-      ],
       "pre_registered": true
     },
     {
@@ -1153,9 +906,6 @@
         "5-8-components",
         "systematic-battery"
       ],
-      "campaign_ids": [
-        "CAMP-6935afcb69"
-      ],
       "pre_registered": true
     },
     {
@@ -1166,18 +916,6 @@
         "iterative-campaigns",
         "fixed-composite",
         "cost-impact-gate"
-      ],
-      "campaign_ids": [
-        "CAMP-b8eca9d96e",
-        "CAMP-e29fc229c0",
-        "CAMP-4b3209fe38",
-        "CAMP-e01b43c9f4",
-        "CAMP-51cf2516ce",
-        "CAMP-c211f9e5fa",
-        "CAMP-4bf571ad75",
-        "CAMP-58daa10765",
-        "CAMP-ed977ea91d",
-        "CAMP-4d0830aebe"
       ],
       "pre_registered": true
     },
@@ -1191,9 +929,6 @@
         "earnings-improvement",
         "cost-impact-gate"
       ],
-      "campaign_ids": [
-        "CAMP-b8eca9d96e"
-      ],
       "pre_registered": true
     },
     {
@@ -1206,20 +941,93 @@
         "quality",
         "cost-impact-gate"
       ],
-      "campaign_ids": [
-        "CAMP-555b5a06fe",
-        "CAMP-57b52ee3ef",
-        "CAMP-7ff809cdfe",
-        "CAMP-a132de0581",
-        "CAMP-a132de0581",
-        "CAMP-7e22bfbd99",
-        "CAMP-8ec0a13532",
-        "CAMP-ded554316b",
-        "CAMP-25de576174",
-        "CAMP-dd96b49887",
-        "CAMP-80ef11654d"
-      ],
       "pre_registered": true
+    },
+    {
+      "family_id": "fam-capital-flow-composite-2026",
+      "research_question": "Does a capital-market-flow / corporate-action composite (repurchase support, block-trade premium, Dragon-Tiger institutional net, large-order moneyflow) conditioned on price trend and turnover predict positive 20-day long-only excess in A-shares?",
+      "mechanism_tags": [
+        "repurchase-support",
+        "block-trade-premium",
+        "dragon-tiger-net",
+        "large-order-moneyflow",
+        "flow-conditioning"
+      ],
+      "pre_registered": true,
+      "fields": [
+        "rep_amount",
+        "rep_count",
+        "rep_vol",
+        "block_amount",
+        "block_vol",
+        "block_vwap",
+        "top_net_amount",
+        "top_amount",
+        "mf_buy_lg",
+        "mf_sell_lg",
+        "amount",
+        "volume",
+        "float_mv",
+        "turnover",
+        "returns"
+      ]
+    },
+    {
+      "family_id": "fam-liquidity-attention-2026",
+      "research_question": "Do slow liquidity/attention signals — low abnormal turnover, low turnover volatility, low volume-spike crowding, Amihud illiquidity and low price risk — predict positive 20-day long-only excess in A-shares?",
+      "mechanism_tags": [
+        "abnormal-turnover",
+        "turnover-volatility",
+        "volume-spike",
+        "amihud-illiquidity",
+        "low-price-risk"
+      ],
+      "pre_registered": true,
+      "fields": [
+        "turnover",
+        "volume",
+        "amount",
+        "returns"
+      ]
+    },
+    {
+      "family_id": "fam-fundamental-growth-2026",
+      "research_question": "Do slow fundamental-growth and earnings-acceleration signals predict positive 20-day long-only excess in A-shares without a raw-glamour growth trap?",
+      "mechanism_tags": [
+        "earnings-acceleration",
+        "revenue-growth",
+        "net-income-growth",
+        "margin-expansion",
+        "operating-leverage"
+      ],
+      "pre_registered": true,
+      "fields": [
+        "fin_net_income",
+        "fin_revenue",
+        "fin_gross_profit",
+        "fin_basic_eps",
+        "fin_ebit",
+        "fin_total_assets"
+      ]
+    },
+    {
+      "family_id": "fam-issuance-shareholder-yield-2026",
+      "research_question": "Do low net share issuance, repurchase support, investment discipline and profitability conditioning predict positive 20-day long-only excess in A-shares?",
+      "mechanism_tags": [
+        "net-share-issuance",
+        "repurchase-support",
+        "asset-growth",
+        "profitability-conditioning"
+      ],
+      "pre_registered": true,
+      "fields": [
+        "total_share",
+        "float_share",
+        "rep_amount",
+        "total_mv",
+        "fin_total_assets",
+        "fin_gross_profit"
+      ]
     }
   ],
   "legacy_family_id": "legacy-unassigned",

@@ -192,14 +192,15 @@ def _run_group(created_at: str | None) -> str:
 def _kind_for(campaign_id: str, objective: str) -> str:
     import re
 
+    annotated = str(_ANNOTATIONS.get("campaign_kinds", {}).get(campaign_id) or "")
+    if annotated in {"calibration", "ml", "discovery", "research"}:
+        return annotated
     text = objective.lower()
-    if campaign_id in {"CAMP-6efd50f0a4", "CAMP-76e3088958", "CAMP-a98589944b", "CAMP-f13fb8b93a"}:
-        return "calibration"
     if "l0" in text or "smoke" in text:
         return "calibration"
-    if campaign_id == "CAMP-2b995bc651" or "p2" in text or "ml execution" in text or text.startswith("ml ") or "machine learning" in text or "ml expanded" in text or "ml branch" in text or "ml experiment" in text or re.search(r"\bml\b", text):
+    if "p2" in text or "ml execution" in text or text.startswith("ml ") or "machine learning" in text or "ml expanded" in text or "ml branch" in text or "ml experiment" in text or re.search(r"\bml\b", text):
         return "ml"
-    if campaign_id == "CAMP-4319413b27" or "p3" in text or "discovery" in text:
+    if "p3" in text or "discovery" in text:
         return "discovery"
     return "research"
 
@@ -335,11 +336,11 @@ def _agent_evidence(
         for agent, task in zip(agents, tasks):
             if agent in evidence and task:
                 evidence[agent]["tasks"].add(task)
-    # P2 reused the ML Planner plan from campaign 4; record the dependency explicitly.
-    if campaign_id == "CAMP-2b995bc651":
-        source = next((p for p, v in team_files if p.name == "p2_run.json"), None)
-        if source:
-            evidence["ml-planner"]["notes"].append("reused pre-registered plan from CAMP-24d0c741d3")
+    # A P2 run may carry the ML Planner plan from an earlier campaign; record the
+    # dependency generically when the team artifact exists.
+    source = next((p for p, v in team_files if p.name == "p2_run.json"), None)
+    if source:
+        evidence["ml-planner"]["notes"].append("reused pre-registered plan from prior campaign")
     for row in evidence.values():
         row["tasks"] = sorted(row["tasks"])
         row["files"] = sorted(set(row["files"]))
@@ -581,8 +582,9 @@ def _campaign_record(
             eval_files.append(path)
     stop_decision = _read_json(campaign_dir / "stop_decision.json", {})
     ml_summary = None
-    if campaign_id == "CAMP-2b995bc651":
-        p2_payload = _read_json(team_dir / "p2_run.json", {})
+    p2_payload_path = team_dir / "p2_run.json"
+    if p2_payload_path.exists():
+        p2_payload = _read_json(p2_payload_path, {})
         if isinstance(p2_payload, dict):
             plan = p2_payload.get("plan") or {}
             admission = p2_payload.get("admission") or {}
@@ -595,7 +597,7 @@ def _campaign_record(
             if plan.get("hypothesis"):
                 ideas.append({"agent": "ml-planner", "kind": "ML experiment plan", "title": _clean(plan.get("hypothesis"), 300), "detail": f"features={', '.join(plan.get('features') or [])} | {plan.get('model_family')} / {plan.get('cv_scheme')}", "source": team_dir / "p2_run.json"})
             evidence["ml-planner"]["used"] = True
-            evidence["ml-planner"]["notes"].append("reused pre-registered plan from CAMP-24d0c741d3")
+            evidence["ml-planner"]["notes"].append("reused pre-registered plan from prior campaign")
             evidence["ml-planner"]["files"].append(str(team_dir / "p2_run.json"))
             conclusion = str(p2_payload.get("conclusion") or conclusion)
     if ml_summary is None:
